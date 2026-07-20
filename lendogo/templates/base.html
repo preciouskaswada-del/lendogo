@@ -1,0 +1,101 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="{% static 'manifest.json' %}">
+    <meta name="theme-color" content="#16a34a">
+    
+    <!-- iOS PWA Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Lendogo">
+    <link rel="apple-touch-icon" href="{% static 'icons/apple-touch-icon.png' %}">
+    
+    <title>{% block title %}Lendogo - Buy, Sell, Rent in Malawi{% endblock %}</title>
+    
+    <!-- Global CSS -->
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Navbar removed - home.html handles it -->
+
+    <!-- Main page content goes here -->
+    <main>
+        {% block content %}
+        {% endblock %}
+    </main>
+    
+    <!-- Footer removed - home.html handles it -->
+
+    <!-- Install App Popup -->
+    <div id="installPopup" style="display:none; position:fixed; bottom:20px; left:16px; right:16px; background:#fff; border-radius:16px; box-shadow:0 4px 20px rgba(0,0,0,0.2); padding:16px; z-index:9999; font-family:sans-serif; border: 2px solid #16a34a;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <img src="{% static 'icons/icon-192.png' %}" style="width:56px; height:56px; border-radius:12px;">
+        <div style="flex:1;">
+          <h4 style="margin:0; font-size:16px; color:#16a34a;">Install LENDOGO</h4>
+          <p style="margin:4px 0 0 0; font-size:13px; color:#555;">Add to home screen. Works offline & saves data!</p>
+        </div>
+      </div>
+      <div style="display:flex; gap:10px; margin-top:12px;">
+        <button id="installBtn" style="flex:1; background:#16a34a; color:white; border:none; padding:10px; border-radius:8px; font-weight:bold;">Install</button>
+        <button id="closeBtn" style="background:#f3f4f6; color:#333; border:none; padding:10px 16px; border-radius:8px;">Later</button>
+      </div>
+    </div>
+
+    <!-- Global JS -->
+    {% block extra_js %}{% endblock %}
+
+    <!-- PWA Install Prompt Logic -->
+    <script>
+      let deferredPrompt;
+      const installPopup = document.getElementById('installPopup');
+
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault(); // stop default chrome popup
+        deferredPrompt = e;
+        
+        // Show our popup after 3 seconds, only on mobile
+        if (window.innerWidth < 768) {
+          setTimeout(() => {
+            installPopup.style.display = 'block';
+          }, 3000);
+        }
+      });
+
+      document.getElementById('installBtn').addEventListener('click', async () => {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          console.log('User choice:', outcome);
+          deferredPrompt = null;
+        }
+        installPopup.style.display = 'none';
+      });
+
+      document.getElementById('closeBtn').addEventListener('click', () => {
+        installPopup.style.display = 'none';
+      });
+
+      // Hide if already installed
+      window.addEventListener('appinstalled', () => {
+        installPopup.style.display = 'none';
+      });
+    </script>
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('{% static "sw.js" %}')
+            .then(reg => console.log('SW registered:', reg.scope))
+            .catch(err => console.log('SW registration failed:', err));
+        });
+      }
+    </script>
+</body>
+</html>

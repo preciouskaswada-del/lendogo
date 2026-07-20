@@ -1,0 +1,373 @@
+{% extends 'base.html' %}
+{% load static humanize %}
+
+{% block title %}{{ listing.product|default:"Listing" }} - Lendogo{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/photoswipe@5/dist/photoswipe.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+    --brand: #0F766E;
+    --brand-dark: #115E59;
+    --brand-light: #CCFBF1;
+    --ink: #0F172A;
+    --ink-light: #64748B;
+    --line: #E2E8F0;
+    --bg: #F8FAFC;
+    --card: #FFFFFF;
+    --success: #059669;
+    --warning: #EA580C;
+    --danger: #DC2626;
+}
+* { box-sizing: border-box; }
+body {
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+}
+.container { max-width: 1280px; margin: 0 auto; padding: 16px; }
+.back-link { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 16px; color: var(--ink-light); text-decoration: none; font-size: 14px; font-weight: 500; }
+
+.product-wrap { display: grid; grid-template-columns: 1fr; gap: 24px; }
+@media (min-width: 1024px) {.product-wrap { grid-template-columns: 60% 40%; }}
+
+.media-section {
+    background: var(--card);
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgb(0 0 0 / 0.05);
+    border: 1px solid var(--line);
+}
+
+.video-box {
+    width: 100%;
+    background: #000;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 16px;
+    position: relative;
+    aspect-ratio: 16 / 9;
+}
+.video-box video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+.video-label {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    z-index: 2;
+}
+
+.main-media {
+    position: relative;
+    width: 100%;
+    background: #000; /* Black background for letterboxing */
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 16px;
+    cursor: zoom-in;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 4 / 3; /* FIX: Keeps ratio instead of min-height */
+}
+.main-media img {
+    width: 100%;
+    height: 100%; /* FIX: Fill container */
+    object-fit: contain; /* FIX: No squish, keeps aspect ratio */
+    display: block;
+}
+.no-image { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--ink-light); text-align: center; }
+.media-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.95); border: none; width: 44px; height: 44px; border-radius: 12px; cursor: pointer; font-size: 18px; color: var(--ink); display: flex; align-items: center; justify-content: center; z-index: 5; }
+.media-nav.prev { left: 16px; }
+.media-nav.next { right: 16px; }
+.media-nav.hide { display: none; }
+.media-count { position: absolute; bottom: 16px; right: 16px; background: rgba(0,0,0,0.7); color: white; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; }
+.media-count.hide { display: none; }
+.zoom-btn { position: absolute; top: 16px; right: 16px; background: rgba(255,255,255,0.95); border: none; width: 40px; height: 40px; border-radius: 12px; cursor: pointer; font-size: 16px; color: var(--ink); z-index: 6; }
+
+.thumbs { display: flex; gap: 12px; overflow-x: auto; padding: 4px 2px; }
+.thumbs.hide { display: none; }
+.thumb { flex-shrink: 0; width: 80px; height: 80px; border-radius: 12px; overflow: hidden; border: 2px solid var(--line); cursor: pointer; background: var(--bg); }
+.thumb.active { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(15,118,110,0.1); }
+.thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+.info { background: var(--card); border-radius: 20px; padding: 24px; box-shadow: 0 4px 12px rgb(0 0 0 / 0.05); border: 1px solid var(--line); height: fit-content; position: sticky; top: 16px; }
+.info h1 { font-size: 26px; font-weight: 800; margin: 0 0 12px 0; line-height: 1.2; }
+.price { font-size: 40px; font-weight: 800; color: var(--brand); margin: 20px 0; }
+.badge { padding: 6px 16px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; display: inline-block; margin-left: 12px; }
+.badge.ok { background: #D1FAE5; color: #065F46; }
+.badge.sold { background: #FEE2E2; color: #991B1B; }
+.verified-badge { display: inline-flex; align-items: center; gap: 4px; background: #D1FAE5; color: #065F46; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; margin-left: 8px; }
+.lendogo-badge { display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, #0F766E, #115E59); color: white; padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-left: 12px; box-shadow: 0 2px 8px rgba(15,118,110,0.3); }
+.photo-badge { position: absolute; top: 16px; left: 16px; background: rgba(5,150,105,0.95); color: white; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; z-index: 6; display: flex; align-items: center; gap: 6px; }
+
+.meta { display: flex; flex-direction: column; gap: 12px; margin: 24px 0; padding: 20px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.meta-item { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--ink-light); }
+.meta-item strong { color: var(--ink); }
+.desc { color: var(--ink-light); font-size: 15px; margin: 20px 0; white-space: pre-wrap; }
+
+.actions { display: flex; flex-direction: column; gap: 12px; margin-top: 24px; }
+@media (min-width:600px) {.actions { flex-direction:row; }}
+.btn { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 18px; border: none; border-radius: 14px; font-weight: 700; font-size: 16px; cursor: pointer; text-decoration: none; width: 100%; flex: 1; }
+.btn-brand { background: var(--brand); color: white; }
+.btn-brand:hover { background: var(--brand-dark); }
+.btn-whatsapp { background: #25D366; color: white; }
+.btn-gray { background: var(--bg); color: var(--ink); border: 1px solid var(--line); }
+
+.location-box { background: var(--bg); padding: 20px; border-radius: 14px; margin-top: 20px; border: 1px solid var(--line); }
+.risk-banner { background: #FEE2E2; border: 1px solid #FECACA; border-radius: 14px; padding: 16px; margin-top: 20px; display: flex; gap: 12px; align-items: flex-start; }
+.risk-banner i { color: var(--danger); font-size: 20px; margin-top: 2px; }
+.risk-banner h4 { margin: 0 0 4px 0; color: #991B1B; font-weight: 700; }
+.risk-banner p { margin: 0; font-size: 13px; color: #7F1D1D; }
+
+.modal { display: none; position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.8); align-items: center; justify-content: center; }
+.modal.show { display: flex; }
+.modal-card { background: var(--card); padding: 32px; border-radius: 24px; max-width: 440px; width: 92%; text-align: center; }
+.modal-btns { display: flex; gap: 12px; margin-top: 24px; }
+
+@media (max-width: 768px) {.info { position: relative; top: 0; }.price { font-size: 32px; }}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <a href="{% url 'home' %}" class="back-link"><i class="fas fa-arrow-left"></i> Back to listings</a>
+
+  <div class="product-wrap">
+    <div class="media-section">
+      {% if listing.video %}
+      <div class="video-box">
+        <div class="video-label"><i class="fas fa-video"></i> Product Video</div>
+        <video controls playsinline controlsList="nodownload">
+          <source src="{{ listing.video.url|slice:':50' }}q_auto/{{ listing.video.url|slice:'50:' }}" type="video/mp4">
+        </video>
+      </div>
+      {% endif %}
+
+      <div class="main-media" id="mainMedia">
+        {% if listing.photo_verified %}
+        <div class="photo-badge"><i class="fas fa-camera"></i> Photo Verified</div>
+        {% endif %}
+        <img id="mainImage" src="" alt="{{ listing.product|default:'Product' }}" style="display:none;">
+        <button class="media-nav prev hide" id="prevBtn"><i class="fas fa-chevron-left"></i></button>
+        <button class="media-nav next hide" id="nextBtn"><i class="fas fa-chevron-right"></i></button>
+        <button class="zoom-btn hide" id="zoomBtn"><i class="fas fa-expand"></i></button>
+        <div class="media-count hide"><span id="currentIdx">0</span>/<span id="totalCount">0</span></div>
+        <div class="no-image" id="noImageMsg"><i class="fas fa-image" style="font-size:48px;margin-bottom:12px;opacity:0.3;"></i><p>No media uploaded</p></div>
+      </div>
+
+      <div class="thumbs hide" id="thumbStrip">
+        {% for img in listing.images.all %}
+          {% if img.image %}
+          <div class="thumb"
+               data-src="{{ img.image.url|slice:':50' }}w_1200,q_auto,f_auto/{{ img.image.url|slice:'50:' }}"
+               data-width="{{ img.image.width|default:1200 }}"
+               data-height="{{ img.image.height|default:900 }}">
+            <img src="{{ img.image.url|slice:':50' }}w_300,q_auto,f_auto/{{ img.image.url|slice:'50:' }}" alt="{{ listing.product|default:'Product' }}" loading="lazy">
+          </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="info">
+      <h1>{{ listing.product|default:"Untitled Listing" }}</h1>
+      <div>
+        <span class="price">MK {{ listing.price|default:0|intcomma }}</span>
+        {% if listing.status == 'ACTIVE' %}<span class="badge ok">Available</span>{% else %}<span class="badge sold">Sold</span>{% endif %}
+        {% if listing.is_lendogo_verified %}<span class="lendogo-badge"><i class="fas fa-certificate"></i> Lendogo Verified</span>{% endif %}
+      </div>
+
+      <div class="meta">
+        <div class="meta-item"><i class="fas fa-user"></i><span>Seller: <strong>{{ listing.seller.username|default:"Unknown" }}</strong></span>{% if listing.seller.userprofile.is_verified %}<span class="verified-badge"><i class="fas fa-shield-check"></i> Verified Seller</span>{% endif %}</div>
+        <div class="meta-item"><i class="fas fa-clock"></i><span>Posted <strong>{{ listing.created_at|timesince|default:"recently" }} ago</strong></span></div>
+        <div class="meta-item"><i class="fas fa-eye"></i><span><strong>{{ listing.view_count|default:0 }}</strong> views</span></div>
+      </div>
+
+      <div class="desc">{{ listing.description|default:"No description provided." }}</div>
+
+      <div class="actions">
+        {% if user.is_authenticated and user != listing.seller and listing.status == 'ACTIVE' %}
+        <form method="POST" action="{% url 'start_conversation' listing.id %}" style="margin:0; flex:1;" id="messageForm">{% csrf_token %}<input type="hidden" name="risk_accepted" value="1"><button type="submit" class="btn btn-brand" style="width:100%;"><i class="fas fa-comment-dots"></i> Message Seller</button></form>
+        {% endif %}
+        {% if listing.status == 'ACTIVE' %}<a href="{% url 'track_whatsapp_click' listing.id %}" target="_blank" class="btn btn-whatsapp" id="whatsappBtn"><i class="fab fa-whatsapp"></i> WhatsApp</a>{% endif %}
+      </div>
+
+      {% if listing.phone and listing.status == 'ACTIVE' %}<a href="tel:{{ listing.phone }}" class="btn btn-gray" style="margin-top:12px;" id="callBtn"><i class="fas fa-phone"></i> Call {{ listing.phone }}</a>{% endif %}
+
+      {% if listing.location %}
+      <div class="location-box">
+        <h4 style="margin:0 0 8px 0;font-size:15px;font-weight:700;"><i class="fas fa-location-dot"></i> Meetup Location</h4>
+        <p style="margin:0 0 16px 0;font-weight:600;">{{ listing.location }}</p>
+        <a href="https://www.google.com/maps/search/?api=1&query={{ listing.location|urlencode }}, Malawi" target="_blank" class="btn btn-gray"><i class="fas fa-diamond-turn-right"></i> Get Directions</a>
+      </div>
+      {% endif %}
+
+      {% if show_warning %}
+      <div class="risk-banner"><i class="fas fa-triangle-exclamation"></i><div><h4>High Risk Listing Detected</h4><p>{{ scam_warning }}{% if has_market_data %} Market avg: MK {{ market_avg|intcomma }}{% endif %}</p></div></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if show_warning %}
+<div id="scamModal" class="modal">
+  <div class="modal-card">
+    <i class="fas fa-triangle-exclamation" style="font-size:56px;color:#DC2626;"></i>
+    <h3>High Risk Listing Detected</h3>
+    <p id="modalWarningText" style="color:var(--ink-light);">{{ scam_warning|default:"" }}</p>
+    {% if has_market_data %}<p style="font-weight:700;margin:12px 0;">Market average: MK {{ market_avg|default:0|intcomma }}</p>{% endif %}
+    <p style="font-weight:700;margin:20px 0;">Safe buying rules:<br>1. Meet at public places<br>2. Check item works before paying<br>3. Never send money first</p>
+    <div class="modal-btns"><button class="btn btn-gray" onclick="closeScamModal()">Cancel</button><button class="btn btn-brand" id="confirmContact">I Understand, Continue</button></div>
+  </div>
+</div>
+{% endif %}
+
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+window.LENDOGO = {
+    isSuspicious: {{ show_warning|yesno:"true,false" }},
+    suspicionLevel: {{ suspicion_level|default:0 }},
+    listingId: {{ listing.id|default:0 }},
+    warningText: "{{ scam_warning|escapejs|default:'' }}",
+    csrfToken: "{{ csrf_token }}"
+};
+</script>
+
+<script type="module">
+document.addEventListener('DOMContentLoaded', async function() {
+    const { default: PhotoSwipeLightbox } = await import('https://unpkg.com/photoswipe@5/dist/photoswipe-lightbox.esm.min.js');
+    const { default: PhotoSwipe } = await import('https://unpkg.com/photoswipe@5/dist/photoswipe.esm.min.js');
+
+    const mainImage = document.getElementById('mainImage');
+    const mainMedia = document.getElementById('mainMedia');
+    const noImageMsg = document.getElementById('noImageMsg');
+    const thumbs = Array.from(document.querySelectorAll('.thumb'));
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const zoomBtn = document.getElementById('zoomBtn');
+    const currentIdxEl = document.getElementById('currentIdx');
+    const totalCountEl = document.getElementById('totalCount');
+    const mediaCount = document.querySelector('.media-count');
+    const thumbStrip = document.getElementById('thumbStrip');
+
+    const images = thumbs.map(t => ({
+        src: t.dataset.src,
+        width: parseInt(t.dataset.width) || 1200,
+        height: parseInt(t.dataset.height) || 900
+    })).filter(img => img.src);
+
+    if (totalCountEl) totalCountEl.textContent = images.length;
+
+    if (images.length > 0) {
+        if (mainImage) { mainImage.style.display = 'block'; mainImage.src = images[0].src; }
+        if (noImageMsg) noImageMsg.style.display = 'none';
+        if (zoomBtn) zoomBtn.classList.remove('hide');
+
+        const lightbox = new PhotoSwipeLightbox({
+            dataSource: images,
+            pswpModule: PhotoSwipe,
+            wheelToZoom: true,
+            padding: { top: 20, bottom: 20, left: 20, right: 20 }
+        });
+        lightbox.init();
+
+        let current = 0;
+        let autoTimer = null;
+
+        function openZoom(idx) { lightbox.loadAndOpen(idx || 0); }
+
+        function showImage(idx) {
+            if (idx < 0) idx = images.length - 1;
+            if (idx >= images.length) idx = 0;
+            current = idx;
+            thumbs.forEach(t => t.classList.remove('active'));
+            if (thumbs[idx]) thumbs[idx].classList.add('active');
+            if (currentIdxEl) currentIdxEl.textContent = idx + 1;
+            if (mainImage) mainImage.src = images[idx].src;
+        }
+
+        function startAutoplay() {
+            if (images.length <= 1) return;
+            stopAutoplay();
+            autoTimer = setInterval(() => { showImage(current + 1); }, 4000);
+        }
+        function stopAutoplay() { if (autoTimer) clearInterval(autoTimer); }
+
+        if (mainMedia) {
+            mainMedia.onclick = (e) => {
+                if (e.target.closest('.media-nav') || e.target.closest('.zoom-btn')) return;
+                openZoom(current);
+            };
+        }
+        if (zoomBtn) { zoomBtn.onclick = (e) => { e.stopPropagation(); openZoom(current); }; }
+
+        if (images.length > 1) {
+            if (prevBtn) prevBtn.classList.remove('hide');
+            if (nextBtn) nextBtn.classList.remove('hide');
+            if (mediaCount) mediaCount.classList.remove('hide');
+            if (thumbStrip) thumbStrip.classList.remove('hide');
+            if (prevBtn) prevBtn.onclick = (e) => { e.stopPropagation(); showImage(current - 1); stopAutoplay(); };
+            if (nextBtn) nextBtn.onclick = (e) => { e.stopPropagation(); showImage(current + 1); stopAutoplay(); };
+            thumbs.forEach((thumb, idx) => { thumb.onclick = () => { showImage(idx); stopAutoplay(); }; });
+            startAutoplay();
+            mainMedia.addEventListener('mouseenter', stopAutoplay);
+            mainMedia.addEventListener('mouseleave', startAutoplay);
+        }
+        showImage(0);
+    } else {
+        if (mainImage) mainImage.style.display = 'none';
+        if (noImageMsg) noImageMsg.style.display = 'block';
+    }
+
+    if (window.LENDOGO.isSuspicious) {
+        const modal = document.getElementById('scamModal');
+        const confirmBtn = document.getElementById('confirmContact');
+        const whatsappBtn = document.getElementById('whatsappBtn');
+        const callBtn = document.getElementById('callBtn');
+        const messageForm = document.getElementById('messageForm');
+        const modalWarningText = document.getElementById('modalWarningText');
+        let pendingAction = null;
+
+        function showScamModal(action, actionName) {
+            pendingAction = action;
+            if (modalWarningText) {
+                modalWarningText.innerHTML = `<strong>Action Blocked: ${actionName}</strong><br>${window.LENDOGO.warningText}<br><br>Scammers often ask you to move to WhatsApp to avoid buyer protection.`;
+            }
+            if (modal) modal.classList.add('show');
+        }
+
+        function blockIfRisky(e, actionFn, actionName) {
+            e.preventDefault();
+            e.stopPropagation();
+            showScamModal(actionFn, actionName);
+        }
+
+        if (whatsappBtn) { whatsappBtn.addEventListener('click', function(e) { blockIfRisky(e, () => window.open(this.href, '_blank'), 'WhatsApp'); }); }
+        if (callBtn) { callBtn.addEventListener('click', function(e) { blockIfRisky(e, () => window.location.href = this.href, 'Call Seller'); }); }
+        if (messageForm) { messageForm.addEventListener('submit', function(e) { e.preventDefault(); showScamModal(() => this.submit(), 'Message Seller'); }); }
+        if (confirmBtn) { confirmBtn.onclick = () => { if (modal) modal.classList.remove('show'); if (pendingAction) pendingAction(); pendingAction = null; }; }
+        window.closeScamModal = () => { if (modal) modal.classList.remove('show'); pendingAction = null; };
+    }
+});
+</script>
+{% endblock %}

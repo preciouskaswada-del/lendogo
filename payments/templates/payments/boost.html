@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Boost Listing - Lendogo{% endblock %}
+
+{% block extra_css %}
+<style>
+  .boost-wrapper {
+    min-height: 70vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 0;
+  }
+  
+  .boost-card {
+    background: white;
+    border-radius: 16px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    padding: 40px 32px;
+    text-align: center;
+    max-width: 500px;
+    width: 100%;
+  }
+  
+  .boost-icon {
+    width: 64px;
+    height: 64px;
+    background: #0F766E;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    color: white;
+    font-size: 1.75rem;
+  }
+  
+  .pay-btn {
+    background: #00a651;
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    font-size: 18px;
+    font-weight: 600;
+    border-radius: 10px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    transition: 0.2s;
+  }
+  
+  .pay-btn:hover {
+    background: #008f47;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 166, 81, 0.3);
+  }
+  
+  .price-tag {
+    background: #f0fdf4;
+    border: 2px solid #00a651;
+    border-radius: 12px;
+    padding: 16px;
+    margin: 24px 0;
+    font-size: 24px;
+    font-weight: 800;
+    color: #00a651;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="boost-wrapper">
+  <div class="boost-card">
+    <div class="boost-icon">
+      <i class="fas fa-rocket"></i>
+    </div>
+    
+    <h2 class="fw-bold mb-2">Boost Your Listing</h2>
+    <p class="text-muted mb-3">Get premium placement for 7 days</p>
+    
+    <div class="price-tag">
+      K1,000 MWK
+    </div>
+    
+    <p class="text-muted small mb-4">
+      <i class="fas fa-check-circle me-1" style="color: #00a651;"></i>
+      Appear at the top of search results
+    </p>
+    
+    <a href="/payment/initiate/" class="pay-btn">
+      <i class="fas fa-lock me-2"></i>Pay with PayChangu
+    </a>
+    
+    <p class="text-muted small mt-4 mb-0">
+      <i class="fas fa-shield-halved me-1"></i> Secure payment powered by PayChangu
+    </p>
+  </div>
+</div>
+{% endblock %}

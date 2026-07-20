@@ -1,0 +1,258 @@
+{% extends 'base.html' %}
+{% load static humanize %}
+
+{% block title %}Dashboard - Lendogo{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+ .stat-card { min-width: 0; }
+ .stat-card * { word-wrap: break-word; }
+ .truncate-safe { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+  <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
+    <div class="min-w-0 flex-1">
+      <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 truncate-safe">
+        Welcome back, {{ request.user.username }}
+        {% if stats.is_verified %}
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800 ml-2">
+          <i class="fas fa-check-circle mr-1"></i> Verified Seller
+        </span>
+        {% endif %}
+      </h1>
+    </div>
+    <a href="{% url 'home' %}" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-medium whitespace-nowrap">
+      Back to Marketplace
+    </a>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
+    <div class="bg-white p-5 sm:p-6 rounded-xl shadow-sm stat-card">
+      <div class="text-sm text-gray-500 flex items-center gap-1.5">
+        <i class="fas fa-eye text-gray-400"></i>
+        Total Views
+      </div>
+      <div class="text-xl sm:text-2xl font-bold text-gray-900 mt-1 truncate-safe">{{ stats.total_views|intcomma }}</div>
+      <div class="text-xs text-gray-400 mt-2 space-y-1 sm:space-y-0 sm:flex sm:flex-wrap sm:gap-x-2">
+        {% if stats.views_today > 0 %}
+        <span class="text-green-600 font-medium block sm:inline">+{{ stats.views_today }} today</span>
+        {% else %}
+        <span class="block sm:inline">+{{ stats.views_today }} today</span>
+        {% endif %}
+        <span class="hidden sm:inline">•</span>
+        <span class="block sm:inline">Yesterday {{ stats.views_yesterday }}</span>
+        <span class="hidden sm:inline">•</span>
+        <span class="block sm:inline">Week {{ stats.views_this_week }}</span>
+      </div>
+    </div>
+
+    <div class="bg-white p-5 sm:p-6 rounded-xl shadow-sm stat-card">
+      <div class="text-sm text-gray-500 flex items-center gap-1.5">
+        <i class="fab fa-whatsapp text-green-500"></i>
+        WhatsApp Clicks
+      </div>
+      <div class="text-xl sm:text-2xl font-bold text-green-600 mt-1 truncate-safe">{{ stats.whatsapp_clicks|intcomma }}</div>
+      <div class="text-xs text-gray-400 mt-2 space-y-1 sm:space-y-0 sm:flex sm:flex-wrap sm:gap-x-2">
+        {% if stats.whatsapp_clicks_today > 0 %}
+        <span class="text-green-600 font-medium block sm:inline">+{{ stats.whatsapp_clicks_today }} today</span>
+        {% else %}
+        <span class="block sm:inline">+{{ stats.whatsapp_clicks_today }} today</span>
+        {% endif %}
+        <span class="hidden sm:inline">•</span>
+        <span class="block sm:inline">Yesterday {{ stats.whatsapp_clicks_yesterday }}</span>
+        <span class="hidden sm:inline">•</span>
+        <span class="block sm:inline">Week {{ stats.whatsapp_clicks_week }}</span>
+      </div>
+    </div>
+
+    <div class="bg-white p-5 sm:p-6 rounded-xl shadow-sm stat-card">
+      <div class="text-sm text-gray-500 flex items-center gap-1.5">
+        <i class="fas fa-box text-gray-400"></i>
+        Active Listings
+      </div>
+      <div class="text-xl sm:text-2xl font-bold text-gray-900 mt-1 truncate-safe">{{ stats.active_listings }}</div>
+      <div class="text-xs text-gray-400 mt-2 space-y-1 sm:space-y-0 sm:flex sm:flex-wrap sm:gap-x-2">
+        {% if stats.posted_today > 0 %}
+        <span class="text-teal-600 font-medium block sm:inline">+{{ stats.posted_today }} today</span>
+        {% else %}
+        <span class="block sm:inline">+{{ stats.posted_today }} today</span>
+        {% endif %}
+        <span class="hidden sm:inline">•</span>
+        <span class="block sm:inline">Yesterday {{ stats.posted_yesterday }}</span>
+        <span class="hidden sm:inline">•</span>
+        <span class="block sm:inline">Total {{ stats.total_listings }}</span>
+      </div>
+    </div>
+
+    <div class="bg-white p-5 sm:p-6 rounded-xl shadow-sm stat-card">
+      <div class="text-sm text-gray-500 flex items-center gap-1.5">
+        <i class="fas fa-check-circle text-gray-400"></i>
+        Items Sold
+      </div>
+      <div class="text-xl sm:text-2xl font-bold text-gray-900 mt-1 truncate-safe">{{ stats.sold_listings }}</div>
+      <div class="text-xs text-gray-400 mt-2 space-y-1 sm:space-y-0 sm:flex sm:flex-wrap sm:gap-x-2">
+        {% if stats.sold_today > 0 %}
+        <span class="text-green-600 font-medium block sm:inline">+{{ stats.sold_today }} today</span>
+        {% else %}
+        <span class="block sm:inline">+{{ stats.sold_today }} today</span>
+        {% endif %}
+        <span class="hidden sm:inline">•</span>
+        <span class="block sm:inline">Yesterday {{ stats.sold_yesterday }}</span>
+        <span class="hidden sm:inline">•</span>
+        <span class="block sm:inline">Week {{ stats.sold_this_week }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+    <h2 class="text-xl font-bold text-gray-900">Your Products</h2>
+    <a href="{% url 'create_listing' %}" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-medium text-sm">
+      <i class="fas fa-plus mr-1"></i> Post Item
+    </a>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for listing in listings %}
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden {% if listing.status == 'SOLD' %}opacity-60{% endif %}">
+
+      <div class="relative">
+        {% if listing.display_image %}
+        <img src="{{ listing.display_image.image.url }}" alt="{{ listing.product }}" class="w-full h-48 object-cover" onerror="this.parentElement.innerHTML='<div class=\'w-full h-48 bg-gray-200 flex items-center justify-center\'><i class=\'fas fa-image text-gray-400 text-4xl\'></i></div>'">
+        {% elif listing.video %}
+        <video src="{{ listing.video.url }}" class="w-full h-48 object-cover" muted></video>
+        <div class="absolute inset-0 flex items-center justify-center">
+          <div class="bg-black bg-opacity-60 rounded-full w-14 h-14 flex items-center justify-center">
+            <i class="fas fa-play text-white text-xl"></i>
+          </div>
+        </div>
+        {% else %}
+        <div class="w-full h-48 bg-gray-200 flex items-center justify-center">
+          <i class="fas fa-image text-gray-400 text-4xl"></i>
+        </div>
+        {% endif %}
+
+        <div class="absolute top-2 left-2 flex flex-col gap-1">
+          {% if listing.photo_verified %}
+          <span class="bg-emerald-600 text-white text-xs font-bold px-2 py-1 rounded">
+            📷 Verified
+          </span>
+          {% endif %}
+          {% if listing.is_lendogo_verified %}
+          <span class="bg-gradient-to-r from-teal-700 to-teal-800 text-white text-xs font-bold px-2 py-1 rounded">
+            ✓ Lendogo
+          </span>
+          {% endif %}
+        </div>
+
+        {% if listing.is_boosted and listing.boost_expiry > now %}
+        <span class="absolute top-2 right-2 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded">
+          ⚡ BOOSTED
+        </span>
+        {% endif %}
+
+        {% if listing.status == 'SOLD' %}
+        <div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+          <span class="text-white font-bold text-xl">SOLD</span>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="p-4">
+        <h3 class="font-bold text-gray-900 truncate">{{ listing.product }}</h3>
+        <p class="text-teal-600 font-bold text-lg mt-1">MK {{ listing.price|intcomma }}</p>
+
+        <div class="flex items-center gap-4 mt-3 text-sm text-gray-500">
+          <span><i class="fas fa-eye mr-1"></i> {{ listing.view_count|intcomma }}</span>
+          <span><i class="fab fa-whatsapp mr-1 text-green-500"></i> {{ listing.whatsapp_clicks|intcomma }}</span>
+          {% if listing.status == 'ACTIVE' %}
+          <span class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded font-medium">Active</span>
+          {% elif listing.status == 'SOLD' %}
+          <span class="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded font-medium">Sold</span>
+          {% else %}
+          <span class="text-xs bg-gray-100 text-gray-800 px-2 py-0.5 rounded font-medium">{{ listing.get_status_display }}</span>
+          {% endif %}
+        </div>
+
+        <div class="space-y-2 mt-4">
+          {% if listing.status != 'SOLD' %}
+            {% if listing.is_boosted and listing.boost_expiry > now %}
+              <div class="block w-full bg-green-600 text-white text-sm font-medium py-2 rounded-lg text-center cursor-not-allowed">
+                <i class="fas fa-check mr-1"></i> Boosted
+              </div>
+            {% else %}
+              <form method="post" action="{% url 'boost_listing' listing.id %}">
+                {% csrf_token %}
+                <button type="submit" class="block w-full bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium py-2 rounded-lg text-center">
+                  <i class="fas fa-bolt mr-1"></i> Boost for MK 500
+                </button>
+              </form>
+            {% endif %}
+          {% endif %}
+
+          <div class="flex gap-2">
+            <a href="{% url 'edit_listing' listing.id %}" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-2 rounded-lg text-center">
+              Edit
+            </a>
+
+            {% if listing.status != 'SOLD' %}
+            <form method="post" action="{% url 'mark_as_sold' listing.id %}" class="flex-1">
+              {% csrf_token %}
+              <button type="submit" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-2 rounded-lg">
+                Mark Sold
+              </button>
+            </form>
+            {% endif %}
+
+            <button onclick="confirmDelete({{ listing.id }}, '{{ listing.product|escapejs }}')" class="flex-1 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium py-2 rounded-lg text-center">
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="col-span-full text-center py-12">
+      <i class="fas fa-box-open text-gray-300 text-5xl mb-4"></i>
+      <p class="text-gray-500">No listings yet. Post your first item!</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div id="deleteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+  <div class="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
+    <h3 class="text-lg font-bold text-gray-900 mb-2">Delete Listing?</h3>
+    <p class="text-gray-600 mb-4">Are you sure you want to delete "<span id="deleteItemName"></span>"? This cannot be undone.</p>
+    <div class="flex gap-3">
+      <button onclick="closeDeleteModal()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-lg font-medium">
+        Cancel
+      </button>
+      <form id="deleteForm" method="post" class="flex-1">
+        {% csrf_token %}
+        <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-medium">
+          Delete
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function confirmDelete(id, name) {
+    document.getElementById('deleteItemName').textContent = name;
+    document.getElementById('deleteForm').action = `/listing/${id}/delete/`;
+    document.getElementById('deleteModal').classList.remove('hidden');
+  }
+  function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.add('hidden');
+  }
+</script>
+{% endblock %}

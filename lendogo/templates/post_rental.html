@@ -1,0 +1,283 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Post Rental Product - Lendogo{% endblock %}
+
+{% block extra_css %}
+<style>
+.post-nav { background: white; padding: 16px 24px; box-shadow: 0 2px 4px rgba(0,0,0,0.06); margin: -16px -16px 30px -16px; }
+.post-nav a { text-decoration: none; color: #2563eb; font-weight: 600; font-size: 18px; margin-right: 15px; }
+
+.post-container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+
+h1 { font-size: 28px; color: #1e293b; margin-bottom: 8px; }
+.subtitle { color: #64748b; margin-bottom: 25px; }
+
+.form-group { margin-bottom: 20px; }
+label { display: block; font-weight: 600; color: #334155; margin-bottom: 6px; font-size: 14px; }
+input, textarea, select {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 15px;
+  font-family: inherit;
+}
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+textarea { min-height: 100px; resize: vertical; }
+small { color: #64748b; font-size: 12px; display: block; margin-top: 4px; }
+
+.btn {
+  width: 100%;
+  padding: 14px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 10px;
+}
+.btn:hover { background: #1d4ed8; }
+.btn:disabled { background: #94a3b8; cursor: not-allowed; }
+
+.preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin-top: 12px; }
+.preview-item { position: relative; aspect-ratio: 1/1; border-radius: 8px; overflow: hidden; border: 2px solid #e2e8f0; }
+.preview-item img,.preview-item video { width: 100%; height: 100%; object-fit: cover; }
+.remove-btn { position: absolute; top: 4px; right: 4px; background: #ef4444; color: white; border: none; border-radius: 50%; width: 26px; height: 26px; cursor: pointer; font-size: 16px; font-weight: 700; z-index: 2; }
+
+.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 999; align-items: center; justify-content: center; }
+.modal.active { display: flex; }
+.modal-box { background: white; padding: 24px; border-radius: 12px; max-width: 350px; text-align: center; }
+.modal-box h3 { margin-bottom: 12px; color: #1e293b; }
+.modal-box p { color: #64748b; margin-bottom: 16px; font-size: 14px; }
+.modal-box button { margin: 6px; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+.btn-danger { background: #ef4444; color: white; }
+.btn-cancel { background: #e2e8f0; color: #334155; }
+
+#uploadStatus { text-align: center; color: #2563eb; font-weight: 600; margin-top: 10px; display: none; font-size: 14px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="post-nav">
+  <a href="/">Lendogo</a>
+  <a href="/hire/">← Back to For Hire</a>
+</div>
+
+<div class="post-container">
+  <h1>🔧 Post Rental Product</h1>
+  <p class="subtitle">List your item so people can rent it from you</p>
+
+  <form method="post" enctype="multipart/form-data" id="rentalForm">
+    {% csrf_token %}
+
+    <div class="form-group">
+      <label>Title / Product Name</label>
+      <input type="text" name="product" placeholder="e.g. Ps system" required>
+    </div>
+
+    <div class="form-group">
+      <label>Description</label>
+      <textarea name="description" placeholder="ndiya new one ndima bass bin folo" required></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Price (MK)</label>
+      <input type="text" id="price_display" placeholder="5,000" required>
+      <input type="hidden" name="price" id="price_raw">
+      <small>Commas auto-added.</small>
+    </div>
+
+    <div class="form-group">
+      <label>Rental Type</label>
+      <select name="rental_type" required>
+        <option value="hour">Per Hour</option>
+        <option value="day" selected>Per Day</option>
+        <option value="week">Per Week</option>
+        <option value="month">Per Month</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Location</label>
+      <input type="text" name="location" placeholder="e.g. Area 49, Lilongwe" required>
+    </div>
+
+    <div class="form-group">
+      <label>Contact Phone - Optional</label>
+      <input type="text" name="contact" placeholder="088xxxxx or 099xxxx">
+    </div>
+
+    <div class="form-group">
+      <label>Deposit Required - MK</label>
+      <input type="text" id="deposit_display" value="0">
+      <input type="hidden" name="deposit_required" id="deposit_raw" value="0">
+    </div>
+
+    <div class="form-group">
+      <label>Available From</label>
+      <input type="date" name="available_from">
+    </div>
+
+    <div class="form-group">
+      <label>Upload Photos</label>
+      <input type="file" name="images" id="image_input" accept="image/*" multiple>
+      <small>JPG, PNG. Auto compressed to 1200px. Click X to remove</small>
+      <div id="uploadStatus">Compressing images... Please wait</div>
+      <div class="preview-grid" id="image_preview"></div>
+    </div>
+
+    <div class="form-group">
+      <label>Upload Video - Optional</label>
+      <input type="file" name="video" id="video_input" accept="video/*">
+      <small>MP4, MOV. Max 50MB. Show the item working</small>
+      <div id="video_preview" style="margin-top:12px"></div>
+    </div>
+
+    <button type="submit" class="btn" id="submitBtn">Post Rental Product</button>
+  </form>
+</div>
+
+<div class="modal" id="removeModal">
+  <div class="modal-box">
+    <h3>Remove this file?</h3>
+    <p>This only removes it from the form. Won't delete from server yet</p>
+    <button class="btn-danger" id="confirmRemove">Yes, Remove</button>
+    <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function formatNumberInput(displayInput, hiddenInput) {
+  displayInput.addEventListener('input', (e) => {
+    let num = e.target.value.replace(/[^0-9.]/g, '');
+
+    if(num!== '') {
+      hiddenInput.value = num;
+      e.target.value = Number(num).toLocaleString();
+    } else {
+      hiddenInput.value = '0';
+      e.target.value = '';
+    }
+  });
+}
+formatNumberInput(document.getElementById('price_display'), document.getElementById('price_raw'));
+formatNumberInput(document.getElementById('deposit_display'), document.getElementById('deposit_raw'));
+
+const imageInput = document.getElementById('image_input');
+const imagePreview = document.getElementById('image_preview');
+const dt = new DataTransfer();
+let removeIndex = null;
+
+// COMPRESSION FUNCTION
+async function compressImage(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let width = img.width;
+        let height = img.height;
+        const maxWidth = 1200;
+
+        if (width > maxWidth) {
+          height *= maxWidth / width;
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob((blob) => {
+          const compressedFile = new File(, file.name, {
+            type: 'image/jpeg',
+            lastModified: Date.now()
+          });
+          resolve(compressedFile);
+        }, 'image/jpeg', 0.7);
+      };
+    };
+  });
+}
+
+imageInput.addEventListener('change', async (e) => {
+  document.getElementById('uploadStatus').style.display = 'block';
+  document.getElementById('submitBtn').disabled = true;
+
+  dt.items.clear();
+  for(let file of Array.from(e.target.files)) {
+    const compressed = await compressImage(file);
+    dt.items.add(compressed);
+  }
+
+  imageInput.files = dt.files;
+  updateImagePreview();
+  document.getElementById('uploadStatus').style.display = 'none';
+  document.getElementById('submitBtn').disabled = false;
+});
+
+function updateImagePreview() {
+  imagePreview.innerHTML = '';
+  Array.from(dt.files).forEach((file, index) => {
+    const div = document.createElement('div');
+    div.className = 'preview-item';
+    div.innerHTML = `
+      <img src="${URL.createObjectURL(file)}">
+      <button type="button" class="remove-btn" data-index="${index}">×</button>
+    `;
+    imagePreview.appendChild(div);
+  });
+}
+
+imagePreview.addEventListener('click', (e) => {
+  if(e.target.classList.contains('remove-btn')) {
+    removeIndex = parseInt(e.target.dataset.index);
+    document.getElementById('removeModal').classList.add('active');
+  }
+});
+
+const videoInput = document.getElementById('video_input');
+const videoPreview = document.getElementById('video_preview');
+videoInput.addEventListener('change', () => {
+  const file = videoInput.files[0];
+  if(file) {
+    videoPreview.innerHTML = `
+      <div class="preview-item" style="max-width:250px">
+        <video src="${URL.createObjectURL(file)}" controls muted></video>
+        <button type="button" class="remove-btn" onclick="removeVideo()">×</button>
+      </div>
+    `;
+  }
+});
+
+function removeVideo() {
+  videoInput.value = '';
+  videoPreview.innerHTML = '';
+}
+
+document.getElementById('confirmRemove').onclick = () => {
+  dt.items.remove(removeIndex);
+  imageInput.files = dt.files;
+  updateImagePreview();
+  closeModal();
+};
+
+function closeModal() {
+  document.getElementById('removeModal').classList.remove('active');
+  removeIndex = null;
+}
+</script>
+{% endblock %}

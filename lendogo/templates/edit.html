@@ -1,0 +1,277 @@
+{% extends 'base.html' %}
+{% load static humanize %}
+
+{% block title %}Edit Listing - Lendogo{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<style>
+.form-wrapper { max-width: 800px; margin: 0 auto; }
+.form-card { background: white; border-radius: 16px; border: 1px solid #e5e7eb; }
+.form-section { border-bottom: 1px solid #f3f4f6; padding: 24px; }
+.form-section:last-child { border-bottom: none; }
+.section-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
+
+.photo-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+.photo-slot {
+    aspect-ratio: 1;
+    border-radius: 12px;
+    border: 2px dashed #d1d5db;
+    background: #f9fafb;
+    position: relative;
+    overflow: hidden;
+  }
+.photo-slot.filled { border: 2px solid #e5e7eb; }
+.photo-preview {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+.photo-actions {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    display: flex;
+    gap: 6px;
+  }
+.photo-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #9ca3af;
+  }
+
+.sticky-footer {
+    position: sticky;
+    bottom: 0;
+    background: white;
+    border-top: 1px solid #e5e7eb;
+    padding: 16px 24px;
+    margin: 0 -24px -24px;
+    border-radius: 0 0 16px 16px;
+  }
+
+.btn-primary { background: #2563eb; border: none; }
+.btn-primary:hover { background: #1d4ed8; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4 form-wrapper">
+  <a href="javascript:history.back()" class="btn btn-light mb-3">
+    <i class="bi bi-arrow-left"></i> Back
+  </a>
+
+  <form method="POST" enctype="multipart/form-data" id="editForm">
+    {% csrf_token %}
+    <div class="form-card">
+
+      <div class="form-section">
+        <h3 class="section-title">Listing Details</h3>
+
+        <div class="mb-3">
+          <label class="form-label fw-medium">Item Name</label>
+          {{ form.product }}
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-medium">Price (MWK)</label>
+            {{ form.price }}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-medium">Phone/WhatsApp</label>
+            {{ form.phone }}
+          </div>
+        </div>
+
+        <div class="mt-3">
+          <label class="form-label fw-medium">Description</label>
+          {{ form.description }}
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3 class="section-title">Location</h3>
+        <div class="mb-3">
+          <label class="form-label fw-medium">Area / City</label>
+          {{ form.location }}
+        </div>
+        <div class="row g-3 d-none">
+          <div class="col-6">{{ form.latitude }}</div>
+          <div class="col-6">{{ form.longitude }}</div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3 class="section-title">Photos <span class="text-muted fw-normal fs-6">Up to 4</span></h3>
+        {{ formset.management_form }}
+
+        <div class="photo-grid">
+          {% for img_form in formset %}
+          <div class="photo-slot {% if img_form.instance.pk %}filled{% endif %}" data-index="{{ forloop.counter0 }}">
+            {{ img_form.id }}
+            <div class="d-none">{{ img_form.image }}</div>
+            <div class="d-none">{{ img_form.DELETE }}</div>
+
+            {% if img_form.instance.pk %}
+              <img src="{{ img_form.instance.image.url }}" class="photo-preview" id="preview-{{ forloop.counter0 }}">
+              <div class="photo-actions">
+                <button type="button" class="btn btn-sm btn-light change-btn">
+                  <i class="bi bi-arrow-repeat"></i> Change
+                </button>
+                <button type="button" class="btn btn-sm btn-danger delete-btn">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            {% else %}
+              <div class="photo-placeholder" id="placeholder-{{ forloop.counter0 }}">
+                <i class="bi bi-camera fs-2 mb-2"></i>
+                <button type="button" class="btn btn-sm btn-outline-primary change-btn">
+                  Add Photo
+                </button>
+              </div>
+              <img src="" class="photo-preview d-none" id="preview-{{ forloop.counter0 }}">
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3 class="section-title">Video <span class="text-muted fw-normal fs-6">Optional</span></h3>
+        <div class="border rounded-3 p-4 text-center bg-light">
+          <i class="bi bi-camera-video fs-1 text-muted d-block mb-2"></i>
+          <p class="text-muted mb-3">Add a short video to show your item in action</p>
+          <input type="file" name="video" id="videoInput" accept="video/*" class="d-none">
+          <button type="button" class="btn btn-outline-primary" id="videoUploadBtn">
+            <i class="bi bi-upload"></i> Upload Video
+          </button>
+          <div id="videoPreview" class="mt-3 d-none">
+            <video controls class="w-100 rounded" style="max-height:250px;"></video>
+            <button type="button" class="btn btn-sm btn-outline-danger mt-2" id="removeVideoBtn">Remove</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sticky-footer">
+        <div class="d-flex gap-2 justify-content-end">
+          <a href="javascript:history.back()" class="btn btn-outline-secondary">Cancel</a>
+          <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-check-lg"></i> Save Changes
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </form>
+</div>
+
+<div class="modal fade" id="confirmModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <div class="modal-body text-center p-4">
+        <i class="bi bi-exclamation-circle text-warning fs-1"></i>
+        <h5 class="mt-3 mb-2">Replace Photo?</h5>
+        <p class="text-muted mb-0">This will delete the current photo.</p>
+      </div>
+      <div class="modal-footer border-0 justify-content-center">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmChangeBtn">Replace</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  document.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(el => {
+    el.classList.add('form-control');
+  });
+
+  let currentInput = null;
+  const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+
+  document.addEventListener('click', function(e){
+    const btn = e.target.closest('.change-btn');
+    if (btn){
+      e.preventDefault();
+      const slot = btn.closest('.photo-slot');
+      currentInput = slot.querySelector('input[type="file"]');
+
+      if (slot.classList.contains('filled')) {
+        confirmModal.show();
+      } else {
+        currentInput.click();
+      }
+    }
+
+    const delBtn = e.target.closest('.delete-btn');
+    if (delBtn){
+      e.preventDefault();
+      const slot = delBtn.closest('.photo-slot');
+      slot.querySelector('input[name$="-DELETE"]').checked = true;
+      slot.style.opacity = '0.4';
+      slot.querySelector('.photo-actions').innerHTML = '<span class="badge bg-secondary">Deleted on save</span>';
+    }
+  });
+
+  document.getElementById('confirmChangeBtn').addEventListener('click', function(){
+    confirmModal.hide();
+    if (currentInput) currentInput.click();
+  });
+
+  document.addEventListener('change', function(e) {
+    if (e.target.type === 'file' && e.target.closest('.photo-slot') && e.target.files[0]) {
+      const slot = e.target.closest('.photo-slot');
+      const img = slot.querySelector('.photo-preview');
+      const placeholder = slot.querySelector('.photo-placeholder');
+
+      img.src = URL.createObjectURL(e.target.files[0]);
+      img.classList.remove('d-none');
+      if (placeholder) placeholder.remove();
+      slot.classList.add('filled');
+
+      if (!slot.querySelector('.photo-actions')) {
+        slot.insertAdjacentHTML('beforeend', `
+          <div class="photo-actions">
+            <button type="button" class="btn btn-sm btn-light change-btn">
+              <i class="bi bi-arrow-repeat"></i> Change
+            </button>
+            <button type="button" class="btn btn-sm btn-danger delete-btn">
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>
+        `);
+      }
+    }
+  });
+
+  document.getElementById('videoUploadBtn').addEventListener('click', () => {
+    document.getElementById('videoInput').click();
+  });
+
+  document.getElementById('videoInput').addEventListener('change', function(e){
+    if (e.target.files[0]) {
+      const video = document.querySelector('#videoPreview video');
+      video.src = URL.createObjectURL(e.target.files[0]);
+      document.getElementById('videoPreview').classList.remove('d-none');
+      e.target.closest('.border').classList.add('border-primary');
+    }
+  });
+
+  document.getElementById('removeVideoBtn').addEventListener('click', function(){
+    document.getElementById('videoInput').value = '';
+    document.getElementById('videoPreview').classList.add('d-none');
+  });
+</script>
+{% endblock %}

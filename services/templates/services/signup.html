@@ -1,0 +1,294 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Join Lendogo Services - Earn More in Lilongwe{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  body { background: #f9fafb; }
+
+.form-input,.form-select,.form-textarea {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.75rem;
+    background-color: #f9fafb;
+    transition: all 0.2s;
+  }
+.form-input:focus,.form-select:focus,.form-textarea:focus {
+    outline: none;
+    border-color: #0d9488;
+    background-color: #fff;
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+  }
+  input[type="file"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+  }
+  input[type="checkbox"] {
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 0.375rem;
+    border-color: #d1d5db;
+  }
+  input[type="checkbox"]:checked {
+    background-color: #0d9488;
+    border-color: #0d9488;
+  }
+  #compressStatus { font-size: 12px; color: #0d9488; font-weight: 600; margin-top: 6px; display: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<nav class="bg-white border-b sticky top-0 z-10">
+    <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+        <a href="/" class="text-2xl font-bold text-teal-600">Lendogo</a>
+        <a href="/services/" class="text-sm text-gray-600 hover:text-teal-600">View Workers</a>
+    </div>
+</nav>
+
+<div class="max-w-2xl mx-auto px-4 py-8 md:py-12">
+
+    <div class="text-center mb-8">
+        <div class="inline-flex items-center gap-2 bg-teal-100 text-teal-800 px-3 py-1 rounded-full text-sm font-medium mb-3">
+            <i class="fa-solid fa-shield-halved"></i>
+            ID-Verified Workers Only
+        </div>
+        <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-3">Get More Customers in Lilongwe</h1>
+        <p class="text-lg text-gray-600">Customers find YOU and contact you on WhatsApp.</p>
+    </div>
+
+    <div class="grid grid-cols-3 gap-4 mb-8 text-center">
+        <div class="bg-white p-3 rounded-lg border">
+            <i class="fa-brands fa-whatsapp text-2xl text-green-500 mb-1"></i>
+            <p class="text-xs font-medium">Direct WhatsApp</p>
+        </div>
+        <div class="bg-white p-3 rounded-lg border">
+            <i class="fa-solid fa-user-check text-2xl text-teal-500 mb-1"></i>
+            <p class="text-xs font-medium">Manual Verification</p>
+        </div>
+        <div class="bg-white p-3 rounded-lg border">
+            <i class="fa-solid fa-badge-check text-2xl text-yellow-500 mb-1"></i>
+            <p class="text-xs font-medium">Verified Badge</p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-lg border-gray-100 p-6 md:p-8">
+
+        {% if messages %}
+            {% for message in messages %}
+            <div class="bg-teal-50 border-l-4 border-teal-500 text-teal-700 p-4 rounded mb-6">
+                <p class="font-medium">{{ message }}</p>
+            </div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="post" enctype="multipart/form-data" class="space-y-5" novalidate id="joinForm">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+                <div class="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded">
+                    {{ form.non_field_errors }}
+                </div>
+            {% endif %}
+
+            <div>
+                <label class="block text-sm font-semibold text-gray-800 mb-2">
+                    {{ form.name.label }} <span class="text-red-500">*</span>
+                </label>
+                {{ form.name }}
+                {% for error in form.name.errors %}
+                    <p class="text-xs text-red-600 mt-1.5 font-medium">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-gray-800 mb-2">
+                    {{ form.phone.label }} <span class="text-red-500">*</span>
+                </label>
+                {{ form.phone }}
+                {% for error in form.phone.errors %}
+                    <p class="text-xs text-red-600 mt-1.5 font-medium">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-gray-800 mb-2">
+                    {{ form.skill_name.label }} <span class="text-red-500">*</span>
+                </label>
+                {{ form.skill_name }}
+                <datalist id="skill-options">
+                    <option value="Electrician">
+                    <option value="Drone Repair">
+                    <option value="TV and Radio Repair">
+                    <option value="Tailor">
+                    <option value="Carpenter">
+                    {% for skill in form.existing_skills %}
+                        <option value="{{ skill }}">
+                    {% endfor %}
+                </datalist>
+                <p class="text-xs text-gray-500 mt-1.5">Select from list or type a new skill</p>
+                {% for error in form.skill_name.errors %}
+                    <p class="text-xs text-red-600 mt-1.5 font-medium">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-gray-800 mb-2">
+                    {{ form.location.label }} <span class="text-red-500">*</span>
+                </label>
+                {{ form.location }}
+                {% for error in form.location.errors %}
+                    <p class="text-xs text-red-600 mt-1.5 font-medium">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-gray-800 mb-2">
+                    {{ form.years_experience.label }}
+                </label>
+                {{ form.years_experience }}
+                <p class="text-xs text-gray-500 mt-1.5">
+                    <i class="fa-solid fa-handshake text-teal-600"></i>
+                    In Malawi, quotes are free. You get paid after work is done.
+                </p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-gray-800 mb-2">
+                    {{ form.bio.label }}
+                </label>
+                {{ form.bio }}
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-gray-800 mb-2">
+                    {{ form.photo.label }}
+                </label>
+                <div id="photo-container">
+                    <label for="{{ form.photo.id_for_label }}" class="flex items-center justify-center w-full px-4 py-4 bg-teal-50 border-2 border-dashed border-teal-300 rounded-xl cursor-pointer hover:bg-teal-100 hover:border-teal-400 transition group">
+                        <div class="text-center">
+                            <i class="fa-solid fa-camera text-2xl text-teal-600 mb-2 group-hover:scale-110 transition"></i>
+                            <span class="block text-sm font-medium text-teal-700">Take Selfie or Upload Photo</span>
+                            <span class="text-xs text-teal-600">Auto compressed to 800px</span>
+                        </div>
+                        {{ form.photo }}
+                    </label>
+                </div>
+                <div id="compressStatus">Compressing image... please wait</div>
+                <div id="photo-preview" class="hidden mt-3 relative inline-block">
+                    <img class="w-24 h-24 rounded-lg object-cover border" alt="Preview">
+                    <button type="button" onclick="removeFile('photo')" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs hover:bg-red-600">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                {% for error in form.photo.errors %}
+                    <p class="text-xs text-red-600 mt-1.5 font-medium">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-gray-800 mb-2">
+                    {{ form.id_photo.label }} <span class="text-red-500">*</span>
+                </label>
+                <div id="id-container">
+                    <label for="{{ form.id_photo.id_for_label }}" class="flex items-center justify-center w-full px-4 py-4 bg-blue-50 border-2 border-dashed border-blue-300 rounded-xl cursor-pointer hover:bg-blue-100 hover:border-blue-400 transition group">
+                        <div class="text-center">
+                            <i class="fa-solid fa-id-card text-2xl text-blue-600 mb-2 group-hover:scale-110 transition"></i>
+                            <span class="block text-sm font-medium text-blue-700">Upload National ID</span>
+                            <span class="text-xs text-blue-600">Auto compressed. We verify manually</span>
+                        </div>
+                        {{ form.id_photo }}
+                    </label>
+                </div>
+                <div id="id-preview" class="hidden mt-3 relative inline-block">
+                    <img class="w-24 h-24 rounded-lg object-cover border" alt="Preview">
+                    <button type="button" onclick="removeFile('id_photo')" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs hover:bg-red-600">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                {% for error in form.id_photo.errors %}
+                    <p class="text-xs text-red-600 mt-1.5 font-medium">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-gray-800 mb-2">
+                    {{ form.work_photos.label }}
+                </label>
+                <label for="{{ form.work_photos.id_for_label }}" class="flex items-center justify-center w-full px-4 py-4 bg-purple-50 border-2 border-dashed border-purple-300 rounded-xl cursor-pointer hover:bg-purple-100 hover:border-purple-400 transition group">
+                    <div class="text-center">
+                        <i class="fa-solid fa-images text-2xl text-purple-600 mb-2 group-hover:scale-110 transition"></i>
+                        <span class="block text-sm font-medium text-purple-700">Upload Work Photos</span>
+                        <span class="text-xs text-purple-600">Auto compressed. Select multiple</span>
+                    </div>
+                    {{ form.work_photos }}
+                </label>
+                <div id="work-preview" class="hidden mt-3 grid-cols-4 gap-2"></div>
+            </div>
+
+            <div class="flex items-start p-3 bg-gray-50 rounded-lg">
+                {{ form.has_airtel_money }}
+                <label for="{{ form.has_airtel_money.id_for_label }}" class="ml-3 text-sm text-gray-700 font-medium">
+                    {{ form.has_airtel_money.label }}
+                    <span class="block text-xs text-gray-500 font-normal">Let customers know how you accept payment</span>
+                </label>
+            </div>
+
+            <button type="submit" id="submitBtn" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-4 px-4 rounded-xl text-lg transition duration-200 shadow-md hover:shadow-lg">
+                Submit for Verification <i class="fa-solid fa-arrow-right ml-2"></i>
+            </button>
+
+            <p class="text-xs text-center text-gray-500 pt-2">
+                <i class="fa-solid fa-lock"></i> Your ID is reviewed manually by our team. We delete it after verification.
+            </p>
+        </form>
+    </div>
+
+    <div class="mt-8 text-center">
+        <p class="text-sm text-gray-500">Be one of the first verified workers on Lendogo</p>
+    </div>
+
+</div>
+
+<div id="imageModal" class="hidden fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4" onclick="closeModal()">
+    <div class="relative max-w-3xl">
+        <img id="modalImage" class="rounded-lg max-h-[80vh]" alt="Preview">
+        <button onclick="closeModal()" class="absolute top-4 right-4 bg-white text-black rounded-full w-10 h-10">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// COMPRESSION FUNCTION - SAME AS YOURS
+async function compressImage(file, maxWidth = 800) {... }
+async function previewImage(input, previewId, containerId) {... }
+function removeFile(fieldName) {... }
+async function previewMultiple(input) {... }
+function openModal(src) {... }
+function closeModal() {... }
+
+// REMOVED: pending modal JS
+
+document.getElementById('{{ form.photo.id_for_label }}').addEventListener('change', function(e) {
+    previewImage(this, 'photo-preview', 'photo-container');
+});
+document.getElementById('{{ form.id_photo.id_for_label }}').addEventListener('change', function(e) {
+    previewImage(this, 'id-preview', 'id-container');
+});
+document.getElementById('{{ form.work_photos.id_for_label }}').addEventListener('change', function(e) {
+    previewMultiple(this);
+});
+</script>
+{% endblock %}

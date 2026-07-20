@@ -1,0 +1,233 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Find Workers - Lendogo{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  body { background: #f9fafb; }
+</style>
+{% endblock %}
+
+{% block content %}
+<nav class="bg-white border-b sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
+        <a href="/" class="text-xl font-bold text-green-600">Lendogo</a>
+        
+        <div class="relative" id="menuDropdown">
+            <button id="menuBtn" class="text-gray-700 hover:text-green-600 p-2 relative">
+                <i class="fa-solid fa-ellipsis-vertical text-xl"></i>
+                {% if unread_messages_count > 0 %}
+                <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {{ unread_messages_count }}
+                </span>
+                {% endif %}
+            </button>
+            
+            <div id="dropdownCard" class="hidden absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border z-50">
+                <a href="/" class="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-b">
+                    <i class="fa-solid fa-house mr-3 text-green-600"></i>
+                    Lendogo Home
+                </a>
+                
+                <button id="nearMeBtn" class="w-full flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-b text-left">
+                    <i class="fa-solid fa-location-dot mr-3 text-green-600"></i>
+                    Workers Near Me
+                </button>
+
+                <div class="border-b px-4 py-2">
+                    <p class="text-xs font-semibold text-gray-500 uppercase mb-1">Sort Workers</p>
+                    <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.lat %}lat={{ request.GET.lat }}&lng={{ request.GET.lng }}&{% endif %}sort=recommended" 
+                       class="flex items-center py-2 text-sm hover:text-green-600 {% if request.GET.sort == 'recommended' or not request.GET.sort %}text-green-600 font-semibold{% else %}text-gray-700{% endif %}">
+                        <i class="fa-solid fa-wand-magic-sparkles mr-3 w-4"></i> Recommended
+                    </a>
+                    <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.lat %}lat={{ request.GET.lat }}&lng={{ request.GET.lng }}&{% endif %}sort=rating" 
+                       class="flex items-center py-2 text-sm hover:text-green-600 {% if request.GET.sort == 'rating' %}text-green-600 font-semibold{% else %}text-gray-700{% endif %}">
+                        <i class="fa-solid fa-star mr-3 w-4"></i> Highest Rated
+                    </a>
+                    <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.lat %}lat={{ request.GET.lat }}&lng={{ request.GET.lng }}&{% endif %}sort=distance" 
+                       class="flex items-center py-2 text-sm hover:text-green-600 {% if request.GET.sort == 'distance' %}text-green-600 font-semibold{% else %}text-gray-700{% endif %}">
+                        <i class="fa-solid fa-route mr-3 w-4"></i> Nearest First
+                    </a>
+                    <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.lat %}lat={{ request.GET.lat }}&lng={{ request.GET.lng }}&{% endif %}sort=newest" 
+                       class="flex items-center py-2 text-sm hover:text-green-600 {% if request.GET.sort == 'newest' %}text-green-600 font-semibold{% else %}text-gray-700{% endif %}">
+                        <i class="fa-solid fa-clock mr-3 w-4"></i> Newest Workers
+                    </a>
+                </div>
+                
+                <a href="/services/join/" class="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-b">
+                    <i class="fa-solid fa-user-plus mr-3 text-green-600"></i>
+                    Join as Worker
+                </a>
+                
+                <a href="/services/messages/" class="flex items-center justify-between px-4 py-3 text-sm text-gray-700 hover:bg-gray-50">
+                    <div class="flex items-center">
+                        <i class="fa-solid fa-inbox mr-3 text-green-600"></i>
+                        <span>Messages</span>
+                    </div>
+                    {% if unread_messages_count > 0 %}
+                    <span class="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                        {{ unread_messages_count }}
+                    </span>
+                    {% endif %}
+                </a>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<div class="max-w-6xl mx-auto px-4 py-6">
+    <h1 class="text-2xl font-bold text-gray-900">Find Verified Workers</h1>
+    <p class="text-gray-600 mt-1">{{ total_workers }} trusted workers across Malawi</p>
+    
+    <form method="GET" class="mt-4 mb-6">
+        <div class="relative">
+            <input 
+                type="text" 
+                name="q" 
+                value="{{ request.GET.q }}" 
+                placeholder="Search plumber, electrician, Area 25..." 
+                class="w-full pl-4 pr-12 py-3 border rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            >
+            <button type="submit" class="absolute right-2 top-1/2 -translate-y-1/2 text-2xl hover:scale-110 transition-transform">
+                🔍
+            </button>
+            {% if request.GET.lat %}<input type="hidden" name="lat" value="{{ request.GET.lat }}">{% endif %}
+            {% if request.GET.lng %}<input type="hidden" name="lng" value="{{ request.GET.lng }}">{% endif %}
+            {% if request.GET.sort %}<input type="hidden" name="sort" value="{{ request.GET.sort }}">{% endif %}
+        </div>
+        {% if request.GET.q %}
+        <div class="mt-2 flex items-center gap-2">
+            <span class="text-xs text-gray-600">Results for "{{ request.GET.q }}"</span>
+            <a href="{% url 'services:services_list' %}{% if request.GET.sort %}?sort={{ request.GET.sort }}{% endif %}{% if request.GET.lat %}&lat={{ request.GET.lat }}&lng={{ request.GET.lng }}{% endif %}" 
+               class="text-xs text-green-600 hover:underline">
+                Clear search
+            </a>
+        </div>
+        {% endif %}
+    </form>
+    
+    <div class="mt-6">
+        <div class="mb-4 flex items-center justify-between">
+            <p class="text-sm text-gray-700">{{ total_workers }} workers found</p>
+            <p class="text-xs text-gray-500">
+                <i class="fa-solid fa-ellipsis-vertical mr-1"></i> Tap menu to sort
+            </p>
+        </div>
+        
+        {% if workers %}
+            {% for worker in workers %}
+            <a href="{% url 'services:worker_detail_slug' worker.pk worker.name|slugify %}" class="block">
+                <div class="bg-white p-4 rounded-lg border mb-3 flex items-start gap-4 hover:border-green-500 active:bg-gray-50">
+                    <div class="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                        {% if worker.photo %}
+                            <!-- COMPRESSED THUMB w_120,q_auto,f_auto -->
+                            <img src="{{ worker.photo.url|slice:':50' }}w_120,q_auto,f_auto/{{ worker.photo.url|slice:'50:' }}" 
+                                 class="w-full h-full object-cover rounded-lg" 
+                                 alt="{{ worker.name }}"
+                                 loading="lazy">
+                        {% else %}
+                            <i class="fa-solid fa-user text-2xl text-gray-400"></i>
+                        {% endif %}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h3 class="font-semibold text-gray-900 truncate">{{ worker.name }}</h3>
+                            {% if worker.is_verified %}
+                                <i class="fa-solid fa-circle-check text-blue-500 text-sm"></i>
+                            {% endif %}
+                        </div>
+                        <p class="text-green-600 text-sm font-medium">{{ worker.skill.name }}</p>
+                        <p class="text-gray-500 text-sm">
+                            <i class="fa-solid fa-location-dot mr-1"></i>{{ worker.location }}
+                        </p>
+                        <div class="flex items-center gap-4 mt-2 flex-wrap">
+                            <span class="text-sm">
+                                <i class="fa-solid fa-star text-yellow-400"></i> {{ worker.rating|default:"New" }}
+                            </span>
+                            {% if worker.distance %}
+                            <span class="text-xs text-gray-500">
+                                {{ worker.distance|floatformat:1 }} km away
+                            </span>
+                            {% endif %}
+                            <span class="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded">
+                                Free quotes - Pay after work
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+
+            {% if workers.has_other_pages %}
+            <div class="mt-6 flex justify-center gap-2">
+                {% if workers.has_previous %}
+                    <a href="?page={{ workers.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}{% if request.GET.lat %}&lat={{ request.GET.lat }}&lng={{ request.GET.lng }}{% endif %}" 
+                       class="px-4 py-2 bg-white border rounded-lg text-sm hover:bg-gray-50">Previous</a>
+                {% endif %}
+                <span class="px-4 py-2 text-sm text-gray-600">
+                    Page {{ workers.number }} of {{ workers.paginator.num_pages }}
+                </span>
+                {% if workers.has_next %}
+                    <a href="?page={{ workers.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}{% if request.GET.lat %}&lat={{ request.GET.lat }}&lng={{ request.GET.lng }}{% endif %}" 
+                       class="px-4 py-2 bg-white border rounded-lg text-sm hover:bg-gray-50">Next</a>
+                {% endif %}
+            </div>
+            {% endif %}
+
+        {% else %}
+            <div class="bg-white p-8 rounded-lg border text-center">
+                <i class="fa-solid fa-users-slash text-4xl text-gray-300 mb-3"></i>
+                <p class="text-gray-600 font-medium">No workers found</p>
+                <p class="text-gray-500 text-sm mt-1">
+                    {% if request.GET.q %}Try different keywords{% else %}Check back later{% endif %}
+                </p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const menuBtn = document.getElementById('menuBtn');
+    const dropdownCard = document.getElementById('dropdownCard');
+    const menuDropdown = document.getElementById('menuDropdown');
+    
+    menuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdownCard.classList.toggle('hidden');
+    });
+    
+    document.addEventListener('click', (e) => {
+        if (!menuDropdown.contains(e.target)) {
+            dropdownCard.classList.add('hidden');
+        }
+    });
+
+    document.getElementById('nearMeBtn').addEventListener('click', () => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition((pos) => {
+                const params = new URLSearchParams(window.location.search);
+                params.set('lat', pos.coords.latitude);
+                params.set('lng', pos.coords.longitude);
+                if (!params.get('sort')) params.set('sort', 'distance');
+                window.location.href = `?${params.toString()}`;
+            }, () => {
+                alert('Could not get location. Please enable GPS.');
+            });
+        } else {
+            alert('Geolocation not supported on this device');
+        }
+        dropdownCard.classList.add('hidden');
+    });
+
+    dropdownCard.querySelectorAll('a[href*="sort="]').forEach(link => {
+        link.addEventListener('click', () => {
+            dropdownCard.classList.add('hidden');
+        });
+    });
+</script>
+{% endblock %}

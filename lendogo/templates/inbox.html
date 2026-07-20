@@ -1,0 +1,486 @@
+{% extends 'base.html' %}
+{% load static humanize %}
+
+{% block title %}Messages - Lendogo{% endblock %}
+
+{% block extra_css %}
+<style>
+:root {
+  --bg-main: #0f172a;
+  --bg-card: #1e293b;
+  --bg-input: #0f172a;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --accent: #3b82f6;
+  --accent2: #8b5cf6;
+  --success: #22c55e;
+  --border: #334155;
+}
+
+.chat-container {
+  max-width: 700px;
+  margin: 0 auto;
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  position: sticky;
+  top: 0;
+  background: var(--bg-main);
+  padding: 16px 0;
+  z-index: 10;
+  border-bottom: 1px solid var(--border);
+}
+
+.back-btn {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 20px;
+  padding: 8px;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.back-btn:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+h1 {
+  font-size: 24px;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.convo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.convo-wrapper {
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+  overflow: hidden;
+}
+
+.convo-wrapper:hover {
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.convo-wrapper.unread {
+  border-left: 3px solid var(--accent);
+}
+
+.convo {
+  padding: 14px;
+  display: flex;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.2s;
+}
+
+.convo:hover {
+  background: #334155;
+}
+
+.convo img {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid var(--border);
+}
+
+.convo-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.convo-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  margin-bottom: 4px;
+}
+
+.product-name {
+  font-weight: 600;
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.price {
+  color: var(--success);
+  font-weight: 700;
+  font-size: 14px;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+.last-msg {
+  font-size: 13px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.read-eye {
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.typing-dots {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 4px;
+}
+
+.typing-dots span {
+  width: 4px;
+  height: 4px;
+  background: var(--text-secondary);
+  border-radius: 50%;
+  animation: bounce 1.4s infinite;
+}
+
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes bounce {
+ 0%, 60%, 100% { transform: translateY(0); }
+ 30% { transform: translateY(-3px); }
+}
+
+.unread-badge {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white;
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  margin-left: 8px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+}
+
+.timestamp {
+  font-size: 11px;
+  color: #64748b;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+.quick-reply {
+  padding: 0 14px 12px 14px;
+  display: none;
+  isolation: isolate;
+}
+
+.quick-reply.show {
+  display: block;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.quick-reply input {
+  width: 100%;
+  background: var(--bg-input)!important;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 12px 16px;
+  color: #ffffff!important;
+  font-size: 16px!important;
+  font-family: inherit;
+  outline: none;
+  caret-color: var(--accent2);
+  transition: border 0.2s, box-shadow 0.2s;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.quick-reply input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.quick-reply input::placeholder {
+  color: var(--text-secondary)!important;
+  opacity: 0.8;
+}
+
+.quick-reply input:-webkit-autofill,
+.quick-reply input:-webkit-autofill:hover,
+.quick-reply input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #ffffff;
+  -webkit-box-shadow: 0 0 0px 1000px var(--bg-input) inset;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+.empty {
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--text-secondary);
+}
+
+.empty-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty h3 {
+  font-size: 18px;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+ .chat-container { padding: 12px; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+  <div class="header">
+    <a href="/" class="back-btn">←</a>
+    <h1>Messages</h1>
+  </div>
+
+  <div class="convo-list" id="convoList">
+  {% for item in conversations %}
+  <div class="convo-wrapper {% if item.unread_count > 0 %}unread{% endif %}" data-convo="{{ item.convo.id }}">
+    <a href="{% url 'chat:chat_room' item.convo.id %}" class="convo">
+      {% if item.convo.listing.photo %}
+      <img src="{{ item.convo.listing.photo.url }}" alt="{{ item.convo.listing.name }}" loading="lazy">
+      {% elif item.convo.listing.images.first %}
+      <img src="{{ item.convo.listing.images.first.image.url }}" alt="{{ item.convo.listing.product }}" loading="lazy">
+      {% else %}
+      <div style="width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,#334155,#475569);display:flex;align-items:center;justify-content:center;font-size:24px">
+        {% if item.convo.listing.skill %}👷{% else %}📦{% endif %}
+      </div>
+      {% endif %}
+
+      <div class="convo-info">
+        <div class="convo-top">
+          <div class="product-name">
+            {% if item.convo.listing.name %}
+              {{ item.convo.listing.name }} - {{ item.convo.listing.skill.name }}
+            {% else %}
+              {{ item.convo.listing.product }}
+            {% endif %}
+          </div>
+          <div style="display:flex;align-items:center">
+            {% if item.last_msg_time %}
+            <div class="timestamp">{{ item.last_msg_time|timesince }} ago</div>
+            {% endif %}
+            {% if item.convo.listing.price %}
+            <div class="price">MK{{ item.convo.listing.price|intcomma }}</div>
+            {% endif %}
+          </div>
+        </div>
+        <div class="last-msg" data-msg-id="{{ item.last_msg.id|default:0 }}">
+          {% if item.last_msg %}
+            {% if item.last_msg.sender_id == request.user.id %}
+              You:
+              {% if item.last_msg.is_read %}
+              <span class="read-eye" title="Seen {{ item.last_msg.read_at|date:'M j, H:i' }}">👁️</span>
+              {% endif %}
+            {% endif %}
+
+            {% if item.is_typing %}
+              <span style="color:var(--accent);font-style:italic">typing</span>
+              <div class="typing-dots"><span></span><span></span></div>
+            {% elif item.last_msg.is_image %}
+              📷 Photo
+            {% else %}
+              {{ item.last_msg.content|truncatechars:50 }}
+            {% endif %}
+          {% else %}
+            No messages yet
+          {% endif %}
+        </div>
+      </div>
+
+      {% if item.unread_count > 0 %}
+      <div class="unread-badge">{{ item.unread_count }}</div>
+      {% endif %}
+    </a>
+
+    <div class="quick-reply" id="reply-{{ item.convo.id }}">
+      <input type="text"
+             inputmode="text"
+             enterkeyhint="send"
+             placeholder="Reply to {% if item.convo.listing.name %}{{ item.convo.listing.name }}{% else %}{{ item.convo.listing.product }}{% endif %}..."
+             data-convo="{{ item.convo.id }}"
+             onkeydown="quickSend(event, {{ item.convo.id }})"
+             onclick="event.stopPropagation()">
+    </div>
+  </div>
+  {% empty %}
+  <div class="empty">
+    <div class="empty-icon">💬</div>
+    <h3>No messages yet</h3>
+    <p>Start chatting by contacting a worker or seller</p>
+  </div>
+  {% endfor %}
+  </div>
+</div>
+
+{% csrf_token %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    'use strict';
+
+    function getCookie(name) {
+        try {
+            let cookieValue = null;
+            if (document.cookie && document.cookie!== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        } catch(e) {
+            console.error('Cookie error:', e);
+            return null;
+        }
+    }
+
+    document.querySelectorAll('.convo').forEach(convo => {
+        let pressTimer;
+        const wrapper = convo.closest('.convo-wrapper');
+        if(!wrapper) return;
+
+        const convoId = wrapper.dataset.convo;
+        const replyBox = document.getElementById(`reply-${convoId}`);
+        if(!replyBox) return;
+        const input = replyBox.querySelector('input');
+
+        convo.addEventListener('touchstart', (e) => {
+            pressTimer = setTimeout(() => {
+                e.preventDefault();
+                replyBox.classList.toggle('show');
+                if(replyBox.classList.contains('show')) {
+                    input.focus();
+                    setTimeout(() => {
+                        input.scrollIntoView({behavior: 'smooth', block: 'center'});
+                    }, 100);
+                }
+            }, 500);
+        });
+        convo.addEventListener('touchend', () => clearTimeout(pressTimer));
+        convo.addEventListener('touchmove', () => clearTimeout(pressTimer));
+
+        convo.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+            replyBox.classList.toggle('show');
+            if(replyBox.classList.contains('show')) {
+                input.focus();
+            }
+        });
+    });
+
+    window.quickSend = function(e, convoId) {
+        if(e.key === 'Enter' &&!e.shiftKey) {
+            e.preventDefault();
+            const input = e.target;
+            const text = input.value.trim();
+            if(!text) return;
+
+            input.disabled = true;
+
+            try {
+                const fd = new FormData();
+                fd.append('convo_id', String(convoId));
+                fd.append('content', text);
+
+                fetch('/chat/send_message/', {
+                    method: 'POST',
+                    body: fd,
+                    headers: {'X-CSRFToken': getCookie('csrftoken') || ''}
+                })
+           .then(r => {
+                   if(!r.ok) throw new Error('Network error ' + r.status);
+                   return r.json();
+               })
+           .then(data => {
+                    if(data && (data.success || data.id)) {
+                        input.value = '';
+                        const replyBox = document.getElementById(`reply-${convoId}`);
+                        if(replyBox) replyBox.classList.remove('show');
+
+                        const wrapper = input.closest('.convo-wrapper');
+                        const lastMsgDiv = wrapper? wrapper.querySelector('.last-msg') : null;
+                        if(lastMsgDiv) {
+                            const preview = text.length > 50? text.substring(0, 50) + '...' : text;
+                            lastMsgDiv.innerHTML = `You: ${preview}`;
+                        }
+                    } else {
+                        alert('Failed to send message');
+                    }
+                })
+           .catch(err => {
+                   console.error('Send error:', err);
+                   alert('Network error. Check connection.');
+               })
+           .finally(() => {
+                   input.disabled = false;
+               });
+            } catch(err) {
+                console.error('QuickSend error:', err);
+                input.disabled = false;
+            }
+        }
+    };
+
+    document.addEventListener('click', (e) => {
+        if(!e.target.closest('.quick-reply') &&!e.target.closest('.convo')) {
+            document.querySelectorAll('.quick-reply.show').forEach(box => box.classList.remove('show'));
+        }
+    });
+
+    if(window.visualViewport) {
+        window.visualViewport.addEventListener('resize', () => {
+            const activeInput = document.activeElement;
+            if(activeInput && activeInput.tagName === 'INPUT') {
+                setTimeout(() => {
+                    activeInput.scrollIntoView({behavior: 'smooth', block: 'center'});
+                }, 300);
+            }
+        });
+    }
+})();
+</script>
+{% endblock %}

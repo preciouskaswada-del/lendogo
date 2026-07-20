@@ -1,0 +1,179 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Reset Password - Lendogo{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+.auth-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 80vh;
+    padding: 20px;
+}
+
+.login-wrapper {
+    width: 100%;
+    max-width: 380px;
+}
+
+.login-card {
+    background: white;
+    padding: 32px;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    border: 1px solid #e5e7eb;
+}
+
+h1 {
+    font-size: 24px;
+    margin: 0 0 8px 0;
+    font-weight: 700;
+}
+
+.subtitle {
+    color: #666;
+    font-size: 14px;
+    margin-bottom: 24px;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+label {
+    display: block;
+    font-size: 14px;
+    margin-bottom: 6px;
+    color: #333;
+    font-weight: 500;
+}
+
+input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 15px;
+    box-sizing: border-box;
+}
+
+input:focus {
+    outline: none;
+    border-color: #0F766E;
+    box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.1);
+}
+
+.btn-primary {
+    width: 100%;
+    padding: 12px;
+    background: #0F766E;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-primary:hover {
+    background: #115E59;
+}
+
+.btn-primary:disabled {
+    background: #9CA3AF;
+    cursor: not-allowed;
+}
+
+.alert {
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    margin-bottom: 16px;
+    text-align: center;
+    display: none;
+}
+
+.alert.error {
+    background: #fee;
+    color: #c33;
+    border: 1px solid #fcc;
+}
+
+.alert.success {
+    background: #efe;
+    color: #3c3;
+    border: 1px solid #cfc;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+  <div class="login-wrapper">
+    <div class="login-card">
+      <h1>Reset password</h1>
+      <p class="subtitle">Put email which you used then we'll send a code to your Gmail account.</p>
+
+      <div id="alert" class="alert"></div>
+
+      <form id="forgotForm" method="post">
+        {% csrf_token %}
+        <div class="form-group">
+          <label for="identifier">Email Address</label>
+          <input type="email" name="identifier" id="identifier" placeholder="your@email.com" required>
+        </div>
+
+        <button type="submit" class="btn-primary" id="submitBtn">Send code</button>
+      </form>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const form = document.getElementById('forgotForm');
+const alertBox = document.getElementById('alert');
+const submitBtn = document.getElementById('submitBtn');
+
+form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending...';
+    alertBox.style.display = 'none';
+    
+    const formData = new FormData(form);
+    
+    try {
+        const res = await fetch("{% url 'forgot_password' %}", {
+            method: 'POST',
+            body: formData,
+            headers: {'X-CSRFToken': formData.get('csrfmiddlewaretoken')}
+        });
+        const data = await res.json();
+        
+        alertBox.textContent = data.message;
+        alertBox.className = 'alert ' + (data.status === 'success' ? 'success' : 'error');
+        alertBox.style.display = 'block';
+        
+        if(data.status === 'success') {
+            setTimeout(() => window.location = data.redirect, 1500);
+        } else {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Send code';
+        }
+    } catch(err) {
+        alertBox.textContent = 'Network error. Try again.';
+        alertBox.className = 'alert error';
+        alertBox.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send code';
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,437 @@
+{% extends 'base.html' %}
+{% load static humanize %}
+
+{% block title %}Lendogo - Malawi's Marketplace{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  
+  :root { --teal: #0F766E; --teal-dark: #115E59; }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', Arial, sans-serif; background: #000; color: #fff; padding-bottom: 120px; }
+  
+  /* TOP HEADER */
+  .top-header {
+    background: #111;
+    padding: 12px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    border-bottom: 1px solid #222;
+  }
+  .search-wrapper { display: flex; gap: 8px; align-items: center; }
+  .search-bar {
+    background: #1a1a1a;
+    border-radius: 25px;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+  }
+  .search-bar input {
+    background: transparent;
+    border: none;
+    color: #fff;
+    width: 100%;
+    outline: none;
+    font-size: 15px;
+  }
+  .search-bar button {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 18px;
+    cursor: pointer;
+  }
+  .near-btn {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: #fff;
+    padding: 10px 12px;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  /* FILTERS */
+  .filters {
+    display: flex;
+    gap: 10px;
+    padding: 12px 16px;
+    overflow-x: auto;
+    background: #111;
+    border-bottom: 1px solid #222;
+  }
+  .filter-btn {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 20px;
+    white-space: nowrap;
+    font-size: 14px;
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .filter-btn.active { background: var(--teal); border-color: var(--teal); }
+  .filter-dropdown {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 14px;
+  }
+
+  /* LISTING CARD */
+  .listings-container { padding: 16px; }
+  .listing-card {
+    background: #111;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    overflow: hidden;
+    border: 1px solid #222;
+  }
+  
+  /* AUTO SWIPE SLIDER */
+  .listing-img { width: 100%; height: 240px; background: #222; position: relative; overflow: hidden; }
+  .slider { display: flex; transition: transform 0.5s ease; height: 100%; }
+  .slide { min-width: 100%; height: 100%; }
+  .slide img { width: 100%; height: 100%; object-fit: cover; }
+  .no-image { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #555; }
+  .no-image i { font-size: 50px; margin-bottom: 8px; }
+  .dots { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.4); }
+  .dot.active { background: white; }
+
+  .badge { position: absolute; top: 10px; padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; color: white; z-index: 2; }
+  .badge-photo { left: 10px; background: rgba(5,150,105,0.95); }
+  .badge-lendogo { right: 10px; background: linear-gradient(135deg,var(--teal),var(--teal-dark)); }
+  
+  .listing-info { padding: 12px; }
+  .listing-price { color: var(--teal); font-size: 22px; font-weight: 800; }
+  .listing-title { font-size: 16px; margin: 6px 0; font-weight: 600; }
+  .listing-desc { color: #aaa; font-size: 14px; margin-bottom: 10px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .listing-meta { color: #888; font-size: 13px; display: flex; gap: 12px; margin-bottom: 12px; }
+  .view-btn {
+    display: block;
+    text-align: center;
+    background: var(--teal);
+    color: white;
+    padding: 10px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  /* EMPTY STATES */
+  .empty-state { text-align: center; padding: 80px 20px; color: #666; }
+  .empty-state h3 { color: #fff; margin-bottom: 8px; font-size: 20px; }
+  .empty-state a { color: var(--teal); text-decoration: none; font-weight: 600; }
+
+  /* BOTTOM NAVBAR */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background: #111;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 8px 0 12px;
+    border-top: 1px solid #222;
+    z-index: 1000;
+  }
+  .nav-item {
+    text-align: center;
+    color: #888;
+    font-size: 11px;
+    text-decoration: none;
+    flex: 1;
+  }
+  .nav-item.active { color: var(--teal); }
+  .nav-item .icon { font-size: 24px; margin-bottom: 4px; }
+  .nav-item.sell-wrapper { flex: 1.2; }
+  .nav-item.sell {
+    background: var(--teal);
+    color: #000;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: -20px auto 4px;
+    font-size: 30px;
+    font-weight: bold;
+    box-shadow: 0 4px 12px rgba(15,118,110,0.4);
+  }
+  .nav-item.sell-text { color: var(--teal); font-weight: 600; font-size: 11px; }
+
+  /* FOOTER */
+  .footer {
+    background: #0f172a;
+    color: #94a3b8;
+    padding: 40px 0 20px;
+    margin-top: 40px;
+  }
+  .footer-content {
+    max-width: 1200px;
+    padding: 0 16px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 32px;
+    margin-bottom: 32px;
+  }
+  .footer h4 { color: white; margin-bottom: 12px; font-size: 15px; font-weight: 700; }
+  .footer a { color: #94a3b8; text-decoration: none; display: block; margin-bottom: 8px; font-size: 14px; }
+  .footer a:hover { color: var(--teal); }
+  .footer-about { font-size: 14px; line-height: 1.7; color: #64748b; }
+  .footer-bottom {
+    border-top: 1px solid #1e293b;
+    padding-top: 20px;
+    text-align: center;
+    font-size: 13px;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- TOP HEADER -->
+<div class="top-header">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+    <a href="/" style="font-size: 26px; font-weight: 800; color: var(--teal); text-decoration: none;">Lendogo</a>
+    
+    {% if user.is_authenticated %}
+    <div style="position: relative;">
+      <button class="menu-btn" onclick="toggleMenu()" style="background: none; border: none; font-size: 28px; cursor: pointer; color: white;">⋯</button>
+      <div id="userMenu" style="display: none; position: absolute; right: 0; top: 45px; background: #1a1a1a; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); min-width: 240px; z-index: 1001; padding: 8px 0; border: 1px solid #333;">
+        <div style="padding: 12px 16px; border-bottom: 1px solid #333; font-weight: 600; color: #fff;">Hey 👋 {{ user.username }}</div>
+        <a href="/hire/post/" style="display: block; padding: 12px 16px; text-decoration: none; color: #ccc; font-weight: 500;">🏠 Post Rental Products</a>    
+        <a href="{% url 'dashboard' %}" style="display: block; padding: 12px 16px; text-decoration: none; color: #ccc; font-weight: 500;">📊 Dashboard</a>
+        <div style="border-top: 1px solid #333; margin: 8px 0;"></div>
+        <a href="/about/" style="display: block; padding: 12px 16px; text-decoration: none; color: #ccc; font-weight: 500;">ℹ️ About Lendogo</a>
+        <a href="/safety/" style="display: block; padding: 12px 16px; text-decoration: none; color: #ccc; font-weight: 500;">🛡️ Safety Tips</a>
+        <form method="post" action="{% url 'logout' %}" style="display: block; padding: 8px 16px; margin:0; border-top: 1px solid #333">
+          {% csrf_token %}
+          <button type="submit" style="border: none; background: none; padding: 0; color: #ef4444; cursor: pointer; font-weight: 600; font-size: 15px;">🚪 Logout</button>
+        </form> 
+      </div>
+    </div>
+    {% else %}
+    <a href="{% url 'login' %}" style="padding: 8px 16px; background: var(--teal); color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px;">Login</a>
+    {% endif %}
+  </div>
+
+  <!-- SEARCH + NEAR ME -->
+  <form method="GET" action="{% url 'home' %}" id="searchForm">
+    <div class="search-wrapper">
+      <div class="search-bar">
+        <button type="submit"><i class="bi bi-search"></i></button>
+        <input type="text" name="q" id="searchInput" placeholder="Search item or location..." value="{{ request.GET.q }}">
+        <button type="button" id="clearBtn" style="display:none;">×</button>
+      </div>
+      <button type="button" class="near-btn" onclick="getLocation()"><i class="bi bi-geo-alt"></i></button>
+    </div>
+  </form>
+</div>
+
+<!-- FILTERS -->
+<div class="filters">
+  <a href="?sort=latest{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" class="filter-btn {% if request.GET.sort == 'latest' or not request.GET.sort %}active{% endif %}">Latest</a>
+  <a href="?sort=price_low{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" class="filter-btn {% if request.GET.sort == 'price_low' %}active{% endif %}">Price Low</a>
+  <a href="?sort=price_high{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" class="filter-btn {% if request.GET.sort == 'price_high' %}active{% endif %}">Price High</a>
+  
+  <select class="filter-dropdown" onchange="window.location.href='?category='+this.value">
+    <option value="">All Categories</option>
+    <option value="cars" {% if request.GET.category == 'cars' %}selected{% endif %}>Cars</option>
+    <option value="phones" {% if request.GET.category == 'phones' %}selected{% endif %}>Phones</option>
+    <option value="laptops" {% if request.GET.category == 'laptops' %}selected{% endif %}>Laptops & PCs</option>
+    <option value="bicycles" {% if request.GET.category == 'bicycles' %}selected{% endif %}>Bicycles</option>
+    <option value="furniture" {% if request.GET.category == 'furniture' %}selected{% endif %}>Furniture</option>
+    <option value="business" {% if request.GET.category == 'business' %}selected{% endif %}>Businesses</option>
+  </select>
+</div>
+
+<!-- LISTINGS -->
+<div class="listings-container">
+  {% if all_listings %}
+    {% for listing in all_listings %}
+    <div class="listing-card">
+      <div class="listing-img" id="slider-{{ listing.id }}">
+        <div class="slider">
+          {% if listing.images.all %}
+            {% for img in listing.images.all %}
+            <div class="slide">
+              <img src="{{ img.image.url }}" alt="{{ listing.product }}">
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="slide no-image">
+              <i class="bi bi-image"></i>
+              <span>No Photo</span>
+            </div>
+          {% endif %}
+        </div>
+        {% if listing.images.all|length > 1 %}
+        <div class="dots" id="dots-{{ listing.id }}"></div>
+        {% endif %}
+        
+        {% if listing.photo_verified %}<div class="badge badge-photo">📷 Verified</div>{% endif %}
+        {% if listing.is_lendogo_verified %}<div class="badge badge-lendogo">✓ Lendogo</div>{% endif %}
+      </div>
+      
+      <div class="listing-info">
+        <div class="listing-price">MK{{ listing.price|intcomma }}</div>
+        <div class="listing-title">{{ listing.product }}</div>
+        <div class="listing-desc">{{ listing.description|truncatewords:20 }}</div>
+        <div class="listing-meta">
+          <span><i class="bi bi-geo-alt"></i> {{ listing.location }}</span>
+          <span><i class="bi bi-eye"></i> {{ listing.view_count }} Views</span>
+        </div>
+        <a href="{% url 'listing_detail' listing.id %}" class="view-btn">View Details</a>
+      </div>
+    </div>
+    {% endfor %}
+  {% elif request.GET.q or request.GET.location %}
+    <div class="empty-state">
+      <h3>No items found</h3>
+      <p>Try a different search or location</p>
+      <a href="{% url 'home' %}">Clear Filters</a>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <h3>Be the first to post</h3>
+      <p>No items listed yet. Start selling now!</p>
+      <a href="{% url 'create_listing' %}">Post Your First Item →</a>
+    </div>
+  {% endif %}
+</div>
+
+<!-- BOTTOM NAVBAR -->
+<div class="bottom-nav">
+  <a href="{% url 'home' %}" class="nav-item active">
+    <div class="icon"><i class="bi bi-house-fill"></i></div>
+    Home
+  </a>
+  <a href="/services/" class="nav-item">
+    <div class="icon"><i class="bi bi-people-fill"></i></div>
+    Workers
+  </a>
+  <div class="nav-item sell-wrapper">
+    <a href="{% url 'create_listing' %}" class="nav-item sell">+</a>
+    <div class="sell-text">Sell</div>
+  </div>
+  <a href="{% url 'chat:chat_inbox' %}" class="nav-item">
+    <div class="icon"><i class="bi bi-chat-dots-fill"></i></div>
+    Chat
+  </a>
+  <a href="/hire/" class="nav-item">
+    <div class="icon"><i class="bi bi-bag-fill"></i></div>
+    Hire
+  </a>
+</div>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-content">
+    <div>
+      <h4>Quick Links</h4>
+      <a href="/">Home</a>
+      <a href="/hire/">For Hire</a>  
+      <a href="{% url 'create_listing' %}">Sell Item</a>
+      <a href="/services/">Find a Skilled Worker</a>
+      <a href="/safety/">🛡️ Safety Tips</a>
+    </div>
+    <div>
+      <h4>Categories</h4>
+      <a href="?category=bicycles">Bicycles</a>
+      <a href="?category=cars">Cars</a>
+      <a href="?category=laptops">PCs & Laptops</a>
+      <a href="?category=business">Businesses</a>
+    </div>
+    <div>
+      <h4>About Lendogo</h4>
+      <p class="footer-about">Malawi's trusted marketplace for buying and selling safely. Connect with verified buyers and sellers across Malawi.</p>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    © 2026 Lendogo. Made in Malawi
+  </div>
+</footer>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleMenu() {
+  const menu = document.getElementById('userMenu');
+  menu.style.display = menu.style.display === "block" ? "none" : "block";
+}
+window.onclick = function(event) {
+  if (!event.target.matches('.menu-btn')) {
+    const menu = document.getElementById('userMenu');
+    if (menu) menu.style.display = "none";
+  }
+}
+
+// NEAR ME - PERMANENT FIX
+function getLocation() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(showPosition, showError);
+  } else {
+    window.location.href = "?location=Lilongwe";
+  }
+}
+function showPosition(position) {
+  window.location.href = "?location=Lilongwe"; 
+}
+function showError(error) {
+  window.location.href = "?location=Lilongwe";
+}
+
+// AUTO SWIPE SLIDER
+document.querySelectorAll('.listing-img').forEach(sliderContainer => {
+  const slider = sliderContainer.querySelector('.slider');
+  const slides = slider.querySelectorAll('.slide');
+  const dotsContainer = sliderContainer.querySelector('.dots');
+  if (slides.length <= 1) return;
+  
+  // Create dots
+  slides.forEach((_, i) => {
+    const dot = document.createElement('div');
+    dot.classList.add('dot');
+    if (i === 0) dot.classList.add('active');
+    dotsContainer.appendChild(dot);
+  });
+  const dots = dotsContainer.querySelectorAll('.dot');
+  
+  let current = 0;
+  setInterval(() => {
+    current = (current + 1) % slides.length;
+    slider.style.transform = `translateX(-${current * 100}%)`;
+    dots.forEach((d, i) => d.classList.toggle('active', i === current));
+  }, 3000);
+});
+
+// Clear search
+const searchInput = document.getElementById('searchInput');
+const clearBtn = document.getElementById('clearBtn');
+function toggleClear() { clearBtn.style.display = searchInput.value ? 'block' : 'none'; }
+searchInput.addEventListener('input', toggleClear);
+toggleClear();
+clearBtn.addEventListener('click', () => {
+  searchInput.value = '';
+  window.location.href = "{% url 'home' %}";
+});
+</script>
+{% endblock %}
