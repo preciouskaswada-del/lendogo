@@ -1,1 +1,1 @@
-web: gunicorn core.wsgi --log-file-
+   web: gunicorn lendogo.wsgi:application --bind 0.0.0.0:$PORT
