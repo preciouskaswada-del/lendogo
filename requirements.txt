@@ -6,3 +6,4 @@ cloudinary
 django-cloudinary-storage
 Pillow
 pg8000
+dj-database-url
