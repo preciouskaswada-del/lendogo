@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import dj_database_url
 from dotenv import load_dotenv
 import cloudinary
 import cloudinary.uploader
@@ -10,11 +11,11 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY
-SECRET_KEY = 'h4q6%5=)m!n(hk6@g$ye4g9hd7htdwx@j13x)nwi+^25phj@x4'
-DEBUG = True
+SECRET_KEY = os.getenv('SECRET_KEY', 'h4q6%5=)m!n(hk6@g$ye4g9hd7htdwx@j13x)nwi+^25phj@x4')
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '*']  
-CSRF_TRUSTED_ORIGINS = ['http://127.0.0.1:8000', 'http://localhost:8000']
+ALLOWED_HOSTS = ['.railway.app', '127.0.0.1', 'localhost']  
+CSRF_TRUSTED_ORIGINS = ['https://*.railway.app', 'http://127.0.0.1:8000', 'http://localhost:8000']
 
 AUTH_USER_MODEL = 'lendogo.User'
 
@@ -68,11 +69,13 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
+# DATABASE - WORKS ON RAILWAY + LOCAL
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=os.getenv('DATABASE_URL', f"sqlite:///{BASE_DIR / 'db.sqlite3'}"),
+        conn_max_age=600,
+        ssl_require=False
+    )
 }
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -101,14 +104,14 @@ DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 MEDIA_URL = '/media/'
 
 cloudinary.config( 
-  cloud_name = 'sbsdxiie',  
-  api_key = '619153399851344',        
-  api_secret = 'RczBGOUCUFx6z_P8W3Oyi9qCIL8'   
+  cloud_name = os.getenv('CLOUDINARY_CLOUD_NAME', 'sbsdxiie'),  
+  api_key = os.getenv('CLOUDINARY_API_KEY', '619153399851344'),        
+  api_secret = os.getenv('CLOUDINARY_API_SECRET', 'RczBGOUCUFx6z_P8W3Oyi9qCIL8')   
 )
 
 # PAYCHANGU - LIVE KEYS
-PAYCHANGU_PUBLIC_KEY = 'pub-live-eDaKRML8UthiKOQsfJfBsidl.s1itBbT6'
-PAYCHANGU_SECRET_KEY = 'sec-live-M4zsMpzeqkGUyHlwXhKoxJlQ5tz2c6iB'
+PAYCHANGU_PUBLIC_KEY = os.getenv('PAYCHANGU_PUBLIC_KEY', 'pub-live-eDaKRML8UthiKOQsfJfBsidl.s1itBbT6')
+PAYCHANGU_SECRET_KEY = os.getenv('PAYCHANGU_SECRET_KEY', 'sec-live-M4zsMpzeqkGUyHlwXhKoxJlQ5tz2c6iB')
 PAYCHANGU_MODE = 'live'
 PAYCHANGU_VERIFY_SSL = True
 VERIFICATION_FEE = 2000
@@ -127,7 +130,7 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 31457280  # 30MB
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = 'DENY'
-CSRF_COOKIE_SECURE = True
-SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SECURE = not DEBUG
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
