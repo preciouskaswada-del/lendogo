@@ -1,2 +1,11 @@
-[phases] 
-installCmds = ["apt-get update && apt-get install -y libmagic1"] 
+[phases.setup]
+nixPkgs = ["libmagic"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]
+
+[phases.build]
+cmds = ["python manage.py collectstatic --noinput"]
+
+[start]
+cmd = "gunicorn lendogo.wsgi:application"
