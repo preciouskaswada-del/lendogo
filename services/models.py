@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q  # <-- ADDED THIS
 from django.core.validators import RegexValidator, MinValueValidator, MaxValueValidator
 from django.urls import reverse
 from django.utils.text import slugify
@@ -119,7 +120,7 @@ class Worker(models.Model):
         ]
         constraints = [
             models.CheckConstraint(
-                condition=models.Q(rating__gte=1.0) & models.Q(rating__lte=5.0),
+                condition=Q(rating__gte=1.0) & Q(rating__lte=5.0),  # <-- CHANGED: removed models.
                 name='rating_range_check'
             ),
         ]
