@@ -10,3 +10,4 @@ dj-database-url
 python-dotenv
 django-phonenumber-field
 phonenumbers
+python-magic
