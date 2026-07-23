@@ -1,6 +1,11 @@
-Django
+Django>=4.2,<5.0
 gunicorn
-python-magic
 psycopg2-binary
-python-dotenv
 whitenoise
+cloudinary
+django-cloudinary-storage
+Pillow
+pg8000
+dj-database-url
+python-dotenv
+python-magic
