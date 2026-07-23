@@ -3,4 +3,4 @@ builder = "nixpacks"
 
 [build.nixpacks]
 pythonVersion = "3.11"
-aptPackages = ["libmagic1"]
+aptPkgs = ["libmagic1"]
