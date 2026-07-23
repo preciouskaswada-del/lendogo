@@ -8,3 +8,5 @@ Pillow
 pg8000
 dj-database-url
 python-dotenv
+django-phonenumber-field
+phonenumbers
