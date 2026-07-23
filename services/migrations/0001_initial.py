@@ -90,11 +90,11 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='worker',
-            constraint=models.CheckConstraint(condition=models.Q(('rating__gte', 1.0), ('rating__lte', 5.0)), name='rating_range_check'),
+            constraint=models.CheckConstraint(check=models.Q(('rating__gte', 1.0), ('rating__lte', 5.0)), name='rating_range_check'),
         ),
         migrations.AddConstraint(
             model_name='worker',
-            constraint=models.CheckConstraint(condition=models.Q(('rate__gte', 1000)), name='min_rate_check'),
+            constraint=models.CheckConstraint(check=models.Q(('rate__gte', 1000)), name='min_rate_check'),
         ),
         migrations.AddIndex(
             model_name='workerreview',
@@ -102,6 +102,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='workerreview',
-            constraint=models.CheckConstraint(condition=models.Q(('rating__gte', 1), ('rating__lte', 5)), name='review_rating_range'),
+            constraint=models.CheckConstraint(check=models.Q(('rating__gte', 1), ('rating__lte', 5)), name='review_rating_range'),
         ),
     ]
