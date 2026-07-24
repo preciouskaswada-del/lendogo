@@ -87,7 +87,6 @@ TIME_ZONE = 'Africa/Blantyre'
 USE_I18N = True
 USE_TZ = True
 
-
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [
     BASE_DIR / "static",           
@@ -131,3 +130,18 @@ CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# === Railway Production Settings - ADDED ===
+# This overrides ALLOWED_HOSTS and CSRF for Railway without deleting your dev ones above
+ALLOWED_HOSTS = ['lendogo-production.up.railway.app', '.up.railway.app', 'localhost', '127.0.0.1']
+
+CSRF_TRUSTED_ORIGINS = [
+    'http://127.0.0.1:8000', 
+    'http://localhost:8000',
+    'https://lendogo-production.up.railway.app'  # <-- this fixes the 403
+]
+
+# Tells Django Railway proxy is HTTPS
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+CSRF_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SAMESITE = 'Lax'
