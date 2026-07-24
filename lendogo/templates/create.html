@@ -279,8 +279,8 @@
 // CONFIG
 const CLOUD_NAME = "sbsdxiie";
 const UPLOAD_PRESET = "lendogo_unsigned";
-const { FFmpeg } = FFmpeg;
-const ffmpeg = new FFmpeg();
+const { createFFmpeg, fetchFile } = FFmpeg; // FIX 1: Destructure correctly
+const ffmpeg = createFFmpeg({ log: true }); // FIX 1
 
 // Setup form controls
   document.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(el => {
@@ -294,6 +294,7 @@ const ffmpeg = new FFmpeg();
   const addPhotoBtn = document.getElementById('addPhotoBtn');
   const photoCount = document.getElementById('photoCount');
   let selectedFiles = [];
+  let selectedVideoFile = null; // FIX 2: Track video separately
   let photoToDelete = null;
   const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
 
@@ -387,6 +388,9 @@ const ffmpeg = new FFmpeg();
     selectedFiles.forEach(item => dt.items.add(item.file));
     imageInput.files = dt.files;
     document.getElementById('imageUrls').value = JSON.stringify(selectedFiles.map(i => i.url));
+    if(selectedVideoFile) { // FIX 2
+        document.getElementById('videoUrl').value = selectedVideoFile.url;
+    }
   }
 
   function renderPhotos() {
@@ -474,6 +478,7 @@ const ffmpeg = new FFmpeg();
       const url = await uploadToCloudinary(compressedFile);
 
       if (url) {
+        selectedVideoFile = {file: compressedFile, url: url}; // FIX 2
         document.getElementById('videoUrl').value = url;
         const video = videoPreview.querySelector('video');
         video.src = url;
@@ -486,7 +491,7 @@ const ffmpeg = new FFmpeg();
 
   async function compressVideo(file) {
     try {
-      await ffmpeg.load();
+      if(!ffmpeg.isLoaded()) await ffmpeg.load(); // FIX 1
       const inputName = 'input.mp4';
       const outputName = 'output.mp4';
 
@@ -514,17 +519,10 @@ const ffmpeg = new FFmpeg();
     }
   }
 
-  async function fetchFile(file) {
-    const reader = new FileReader();
-    return new Promise((resolve) => {
-      reader.onload = () => resolve(new Uint8Array(reader.result));
-      reader.readAsArrayBuffer(file);
-    });
-  }
-
   document.getElementById('removeVideoBtn').addEventListener('click', (e) => {
     e.stopPropagation();
     videoInput.value = '';
+    selectedVideoFile = null; // FIX 2
     document.getElementById('videoUrl').value = '';
     videoPreview.classList.add('d-none');
     videoEmpty.classList.remove('d-none');
@@ -532,7 +530,7 @@ const ffmpeg = new FFmpeg();
     videoStats.innerText = '';
   });
 
-  document.getElementById('gpsBtn').addEventListener('click', function() {
+  document.getElementById('gpsBtn').addEventListener('click', function() { // FIX 3
     const btn = this;
     const latInput = document.getElementById('id_latitude');
     const lngInput = document.getElementById('id_longitude');
@@ -550,12 +548,14 @@ const ffmpeg = new FFmpeg();
           document.getElementById('locationCaptured').classList.remove('d-none');
           btn.disabled = false;
         },
-        () => {
-          alert('GPS blocked. Please allow location or type your area manually.');
+        (err) => { // FIX 3: Show actual error
+          alert('GPS Error: ' + err.message + '. Please allow location or type your area manually.');
           btn.innerHTML = '<i class="bi bi-geo-alt-fill"></i> Use My Current Location';
           btn.disabled = false;
         }
       );
+    } else {
+        alert("Geolocation is not supported by this browser.");
     }
   });
 
@@ -563,6 +563,7 @@ const ffmpeg = new FFmpeg();
     if (priceField) {
       priceField.value = priceField.value.replace(/,/g, '');
     }
+    // FIX 4: Don't block submit if no photos/videos
   });
 </script>
 {% endblock %}
