@@ -266,13 +266,12 @@
   </div>
 </div>
 {% endblock %}
-
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
 <script>
-// CONFIG - NO FFMPEG TO PREVENT CRASH
-const CLOUD_NAME = "sbsdxiie";
+// CONFIG - FIXED CLOUD NAME
+const CLOUD_NAME = "sbsdxile"; // <-- FIXED: was sbsdxiie
 const UPLOAD_PRESET = "lendogo_unsigned";
 
 // Setup form controls
@@ -336,11 +335,9 @@ imageInput.addEventListener('change', async (e) => {
       tempSlot.innerHTML = `<img src="${tempUrl}" class="photo-preview">`;
       photoGrid.insertBefore(tempSlot, addPhotoBtn);
 
-      // 1. COMPRESS - FAST
       const options = { maxSizeMB: 0.2, maxWidthOrHeight: 1200, useWebWorker: true };
       const compressedFile = await imageCompression(file, options);
 
-      // 2. UPLOAD
       const url = await uploadToCloudinary(compressedFile);
       tempSlot.remove();
 
@@ -363,11 +360,12 @@ async function uploadToCloudinary(file) {
   formData.append('folder', 'lendogo/listings');
 
   try {
-    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`, {
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
       method: 'POST',
       body: formData
     });
     const data = await res.json();
+    console.log("Cloudinary:", data); // for debugging
     return data.secure_url;
   } catch (err) {
     console.error("Upload failed", err);
@@ -421,7 +419,7 @@ document.getElementById('confirmDeleteBtn').addEventListener('click', () => {
   }
 });
 
-// VIDEO - NO COMPRESSION, JUST SIZE CHECK + DIRECT UPLOAD
+// VIDEO
 const videoInput = document.getElementById('videoInput');
 const videoUpload = document.getElementById('videoUpload');
 const videoEmpty = document.getElementById('videoEmpty');
@@ -438,12 +436,11 @@ videoInput.addEventListener('change', async (e) => {
 
   if (file) {
     if (file.size > maxVideoSize) {
-      videoError.textContent = `Video too large. Max 30MB. Yours is ${(file.size / 1024 / 1024).toFixed(1)}MB. Please record a shorter 10-15s video.`;
+      videoError.textContent = `Video too large. Max 30MB. Yours is ${(file.size / 1024 / 1024).toFixed(1)}MB.`;
       videoError.classList.remove('d-none');
       return;
     }
     
-    // Upload directly - FAST
     const url = await uploadToCloudinary(file);
     if (url) {
       selectedVideoFile = {file: file, url: url};
@@ -486,13 +483,11 @@ document.getElementById('gpsBtn').addEventListener('click', function() {
         btn.disabled = false;
       },
       (err) => {
-        alert('GPS Error: ' + err.message + '. Please allow location or type your area manually.');
+        alert('GPS Error: ' + err.message);
         btn.innerHTML = '<i class="bi bi-geo-alt-fill"></i> Use My Current Location';
         btn.disabled = false;
       }
     );
-  } else {
-    alert("Geolocation is not supported by this browser.");
   }
 });
 
@@ -503,3 +498,4 @@ document.getElementById('listingForm').addEventListener('submit', (e) => {
 });
 </script>
 {% endblock %}
+ 
