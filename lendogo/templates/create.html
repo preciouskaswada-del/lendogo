@@ -190,7 +190,7 @@
 
       <div class="form-section">
         <h3 class="section-title">Video <span class="badge bg-light text-dark fw-normal">Optional</span></h3>
-        <p class="section-subtitle">Show your item in action. Videos get 3x more views. Max 30MB after compression</p>
+        <p class="section-subtitle">Show your item in action. Videos get 3x more views. Max 30MB</p>
 
         <input type="file" id="videoInput" accept="video/*" class="d-none">
 
@@ -198,7 +198,7 @@
           <div id="videoEmpty">
             <i class="bi bi-camera-video fs-1 text-muted d-block mb-2"></i>
             <p class="mb-2 fw-medium">Upload a short video</p>
-            <p class="text-muted mb-0" style="font-size: 13px;">MP4, MOV • Will be compressed automatically</p>
+            <p class="text-muted mb-0" style="font-size: 13px;">MP4, MOV • Max 30MB</p>
           </div>
           <div id="videoPreview" class="d-none">
             <video controls class="w-100 rounded" style="max-height:300px;"></video>
@@ -207,11 +207,7 @@
             </button>
           </div>
         </div>
-        <div id="videoLoader" class="compression-loader d-none">
-          <span class="spinner-border spinner-border-sm"></span> Compressing Video... This may take 1-2 mins
-        </div>
         <div id="videoError" class="text-danger small mt-2 d-none"></div>
-        <div id="videoStats" class="text-success small mt-2"></div>
       </div>
 
       <div class="form-section">
@@ -274,296 +270,236 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
-<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
 <script>
-// CONFIG
+// CONFIG - NO FFMPEG TO PREVENT CRASH
 const CLOUD_NAME = "sbsdxiie";
 const UPLOAD_PRESET = "lendogo_unsigned";
-const { createFFmpeg, fetchFile } = FFmpeg; // FIX 1: Destructure correctly
-const ffmpeg = createFFmpeg({ log: true }); // FIX 1
 
 // Setup form controls
-  document.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(el => {
-    el.classList.add('form-control');
-  });
+document.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(el => {
+  el.classList.add('form-control');
+});
 
-  const maxPhotos = 10;
-  const maxVideoSize = 30 * 1024 * 1024; // CHANGED TO 30MB
-  const imageInput = document.getElementById('imageInput');
-  const photoGrid = document.getElementById('photoGrid');
-  const addPhotoBtn = document.getElementById('addPhotoBtn');
-  const photoCount = document.getElementById('photoCount');
-  let selectedFiles = [];
-  let selectedVideoFile = null; // FIX 2: Track video separately
-  let photoToDelete = null;
-  const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+const maxPhotos = 10;
+const maxVideoSize = 30 * 1024 * 1024;
+const imageInput = document.getElementById('imageInput');
+const photoGrid = document.getElementById('photoGrid');
+const addPhotoBtn = document.getElementById('addPhotoBtn');
+const photoCount = document.getElementById('photoCount');
+let selectedFiles = [];
+let selectedVideoFile = null;
+let photoToDelete = null;
+const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
 
-  const descField = document.getElementById('id_description');
-  const descCount = document.getElementById('descCount');
-  if (descField) {
-    descField.setAttribute('maxlength', '500');
+const descField = document.getElementById('id_description');
+const descCount = document.getElementById('descCount');
+if (descField) {
+  descField.setAttribute('maxlength', '500');
+  descCount.textContent = descField.value.length;
+  descField.addEventListener('input', () => {
     descCount.textContent = descField.value.length;
-    descField.addEventListener('input', () => {
-      descCount.textContent = descField.value.length;
-    });
-  }
+  });
+}
 
-  const priceField = document.getElementById('id_price');
-  if (priceField) {
-    priceField.setAttribute('type', 'text');
-    priceField.setAttribute('inputmode', 'numeric');
-    priceField.addEventListener('input', (e) => {
-      let val = e.target.value.replace(/[^0-9]/g, '');
-      e.target.value = val;
-    });
-  }
+const priceField = document.getElementById('id_price');
+if (priceField) {
+  priceField.setAttribute('type', 'text');
+  priceField.setAttribute('inputmode', 'numeric');
+  priceField.addEventListener('input', (e) => {
+    let val = e.target.value.replace(/[^0-9]/g, '');
+    e.target.value = val;
+  });
+}
 
-  addPhotoBtn.addEventListener('click', () => imageInput.click());
+addPhotoBtn.addEventListener('click', () => imageInput.click());
 
-  imageInput.addEventListener('change', async (e) => {
-    const files = Array.from(e.target.files);
-    const photoError = document.getElementById('photoError');
-    const loader = document.getElementById('imageLoader');
-    photoError.classList.add('d-none');
-    loader.classList.remove('d-none');
+imageInput.addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files);
+  const photoError = document.getElementById('photoError');
+  const loader = document.getElementById('imageLoader');
+  photoError.classList.add('d-none');
+  loader.classList.remove('d-none');
 
-    if (selectedFiles.length + files.length > maxPhotos) {
-      photoError.textContent = `Max ${maxPhotos} photos allowed`;
-      photoError.classList.remove('d-none');
-      loader.classList.add('d-none');
-      imageInput.value = '';
-      return;
-    }
-
-    for (const file of files) {
-      if (file.type.startsWith('image/')) {
-        const tempUrl = URL.createObjectURL(file);
-        const tempSlot = document.createElement('div');
-        tempSlot.className = 'photo-slot filled uploading';
-        tempSlot.innerHTML = `<img src="${tempUrl}" class="photo-preview">`;
-        photoGrid.insertBefore(tempSlot, addPhotoBtn);
-
-        // 1. COMPRESS
-        const options = { maxSizeMB: 0.2, maxWidthOrHeight: 1200, useWebWorker: true };
-        const compressedFile = await imageCompression(file, options);
-
-        // 2. UPLOAD
-        const url = await uploadToCloudinary(compressedFile);
-        tempSlot.remove();
-
-        if (url) {
-          selectedFiles.push({file: compressedFile, url: url});
-          console.log(`Image: ${(file.size/1024/1024).toFixed(2)}MB → ${(compressedFile.size/1024/1024).toFixed(2)}MB`);
-        }
-      }
-    }
-
+  if (selectedFiles.length + files.length > maxPhotos) {
+    photoError.textContent = `Max ${maxPhotos} photos allowed`;
+    photoError.classList.remove('d-none');
     loader.classList.add('d-none');
-    updateFileInput();
-    renderPhotos();
     imageInput.value = '';
-  });
-
-  async function uploadToCloudinary(file) {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', UPLOAD_PRESET);
-    formData.append('folder', 'lendogo/listings');
-
-    try {
-      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`, {
-        method: 'POST',
-        body: formData
-      });
-      const data = await res.json();
-      return data.secure_url;
-    } catch (err) {
-      console.error("Upload failed", err);
-      return null;
-    }
+    return;
   }
 
-  function updateFileInput() {
-    const dt = new DataTransfer();
-    selectedFiles.forEach(item => dt.items.add(item.file));
-    imageInput.files = dt.files;
-    document.getElementById('imageUrls').value = JSON.stringify(selectedFiles.map(i => i.url));
-    if(selectedVideoFile) { // FIX 2
-        document.getElementById('videoUrl').value = selectedVideoFile.url;
-    }
-  }
+  for (const file of files) {
+    if (file.type.startsWith('image/')) {
+      const tempUrl = URL.createObjectURL(file);
+      const tempSlot = document.createElement('div');
+      tempSlot.className = 'photo-slot filled uploading';
+      tempSlot.innerHTML = `<img src="${tempUrl}" class="photo-preview">`;
+      photoGrid.insertBefore(tempSlot, addPhotoBtn);
 
-  function renderPhotos() {
-    photoGrid.querySelectorAll('.photo-slot.filled').forEach(el => el.remove());
+      // 1. COMPRESS - FAST
+      const options = { maxSizeMB: 0.2, maxWidthOrHeight: 1200, useWebWorker: true };
+      const compressedFile = await imageCompression(file, options);
 
-    selectedFiles.forEach((item, index) => {
-      const slot = document.createElement('div');
-      slot.className = 'photo-slot filled';
-      slot.innerHTML = `
-        <img src="${item.url}" class="photo-preview">
-        <button type="button" class="remove-photo" data-index="${index}">×</button>
-      `;
-      photoGrid.insertBefore(slot, addPhotoBtn);
-    });
-
-    photoCount.textContent = selectedFiles.length;
-    addPhotoBtn.style.display = selectedFiles.length >= maxPhotos? 'none' : 'flex';
-  }
-
-  photoGrid.addEventListener('click', (e) => {
-    if (e.target.classList.contains('remove-photo')) {
-      e.preventDefault();
-      photoToDelete = parseInt(e.target.dataset.index);
-      confirmModal.show();
-    }
-  });
-
-  document.getElementById('confirmDeleteBtn').addEventListener('click', () => {
-    if (photoToDelete!== null) {
-      selectedFiles.splice(photoToDelete, 1);
-      updateFileInput();
-      renderPhotos();
-      confirmModal.hide();
-      photoToDelete = null;
-    }
-  });
-
-  // VIDEO COMPRESSION WITH FFMPEG
-  const videoInput = document.getElementById('videoInput');
-  const videoUpload = document.getElementById('videoUpload');
-  const videoEmpty = document.getElementById('videoEmpty');
-  const videoPreview = document.getElementById('videoPreview');
-  const videoError = document.getElementById('videoError');
-  const videoLoader = document.getElementById('videoLoader');
-  const videoStats = document.getElementById('videoStats');
-
-  videoUpload.addEventListener('click', () => {
-    if (videoPreview.classList.contains('d-none')) videoInput.click();
-  });
-
-  videoInput.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    videoError.classList.add('d-none');
-    videoStats.innerText = '';
-
-    if (file) {
-      if (file.size > 200 * 1024 * 1024) { // 200MB input limit
-        videoError.textContent = `Video too large. Max 200MB input. Your file is ${(file.size / 1024 / 1024).toFixed(1)}MB`;
-        videoError.classList.remove('d-none');
-        videoInput.value = '';
-        return;
-      }
-
-      videoLoader.classList.remove('d-none');
-
-      // 1. COMPRESS VIDEO WITH FFMPEG
-      const compressedFile = await compressVideo(file);
-      videoLoader.classList.add('d-none');
-
-      if (!compressedFile) {
-        videoError.textContent = "Compression failed. Try a smaller video.";
-        videoError.classList.remove('d-none');
-        return;
-      }
-
-      if (compressedFile.size > maxVideoSize) {
-        videoError.textContent = `Video still too large after compression: ${(compressedFile.size / 1024 / 1024).toFixed(1)}MB. Max 30MB. Try shorter video.`;
-        videoError.classList.remove('d-none');
-        return;
-      }
-
-      videoStats.innerText = `Original: ${(file.size/1024/1024).toFixed(2)}MB → Compressed: ${(compressedFile.size/1024/1024).toFixed(2)}MB ✅`;
-
-      // 2. UPLOAD COMPRESSED VIDEO
+      // 2. UPLOAD
       const url = await uploadToCloudinary(compressedFile);
+      tempSlot.remove();
 
       if (url) {
-        selectedVideoFile = {file: compressedFile, url: url}; // FIX 2
-        document.getElementById('videoUrl').value = url;
-        const video = videoPreview.querySelector('video');
-        video.src = url;
-        videoEmpty.classList.add('d-none');
-        videoPreview.classList.remove('d-none');
-        videoUpload.classList.add('has-video');
+        selectedFiles.push({file: compressedFile, url: url});
       }
-    }
-  });
-
-  async function compressVideo(file) {
-    try {
-      if(!ffmpeg.isLoaded()) await ffmpeg.load(); // FIX 1
-      const inputName = 'input.mp4';
-      const outputName = 'output.mp4';
-
-      await ffmpeg.writeFile(inputName, await fetchFile(file));
-
-      // Compress to 720p, 1000k bitrate. Good balance for Lendogo
-      await ffmpeg.exec([
-        '-i', inputName,
-        '-vcodec', 'libx264',
-        '-crf', '28',
-        '-preset', 'fast',
-        '-s', '1280x720',
-        '-b:v', '1000k',
-        '-acodec', 'aac',
-        '-b:a', '128k',
-        outputName
-      ]);
-
-      const data = await ffmpeg.readFile(outputName);
-      const compressedBlob = new Blob([data.buffer], { type: 'video/mp4' });
-      return new File([compressedBlob], file.name, { type: 'video/mp4' });
-    } catch (err) {
-      console.error("FFmpeg error", err);
-      return null;
     }
   }
 
-  document.getElementById('removeVideoBtn').addEventListener('click', (e) => {
-    e.stopPropagation();
-    videoInput.value = '';
-    selectedVideoFile = null; // FIX 2
-    document.getElementById('videoUrl').value = '';
-    videoPreview.classList.add('d-none');
-    videoEmpty.classList.remove('d-none');
-    videoUpload.classList.remove('has-video');
-    videoStats.innerText = '';
+  loader.classList.add('d-none');
+  updateFileInput();
+  renderPhotos();
+  imageInput.value = '';
+});
+
+async function uploadToCloudinary(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', UPLOAD_PRESET);
+  formData.append('folder', 'lendogo/listings');
+
+  try {
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`, {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    return data.secure_url;
+  } catch (err) {
+    console.error("Upload failed", err);
+    alert("Upload failed. Check internet connection.");
+    return null;
+  }
+}
+
+function updateFileInput() {
+  const dt = new DataTransfer();
+  selectedFiles.forEach(item => dt.items.add(item.file));
+  imageInput.files = dt.files;
+  document.getElementById('imageUrls').value = JSON.stringify(selectedFiles.map(i => i.url));
+  if(selectedVideoFile) {
+      document.getElementById('videoUrl').value = selectedVideoFile.url;
+  }
+}
+
+function renderPhotos() {
+  photoGrid.querySelectorAll('.photo-slot.filled').forEach(el => el.remove());
+
+  selectedFiles.forEach((item, index) => {
+    const slot = document.createElement('div');
+    slot.className = 'photo-slot filled';
+    slot.innerHTML = `
+      <img src="${item.url}" class="photo-preview">
+      <button type="button" class="remove-photo" data-index="${index}">×</button>
+    `;
+    photoGrid.insertBefore(slot, addPhotoBtn);
   });
 
-  document.getElementById('gpsBtn').addEventListener('click', function() { // FIX 3
-    const btn = this;
-    const latInput = document.getElementById('id_latitude');
-    const lngInput = document.getElementById('id_longitude');
+  photoCount.textContent = selectedFiles.length;
+  addPhotoBtn.style.display = selectedFiles.length >= maxPhotos? 'none' : 'flex';
+}
 
-    if (navigator.geolocation) {
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Getting location...';
-      btn.disabled = true;
+photoGrid.addEventListener('click', (e) => {
+  if (e.target.classList.contains('remove-photo')) {
+    e.preventDefault();
+    photoToDelete = parseInt(e.target.dataset.index);
+    confirmModal.show();
+  }
+});
 
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          latInput.value = pos.coords.latitude.toFixed(6);
-          lngInput.value = pos.coords.longitude.toFixed(6);
-          btn.innerHTML = '<i class="bi bi-check-lg"></i> Location Captured';
-          btn.classList.replace('btn-outline-primary', 'btn-success');
-          document.getElementById('locationCaptured').classList.remove('d-none');
-          btn.disabled = false;
-        },
-        (err) => { // FIX 3: Show actual error
-          alert('GPS Error: ' + err.message + '. Please allow location or type your area manually.');
-          btn.innerHTML = '<i class="bi bi-geo-alt-fill"></i> Use My Current Location';
-          btn.disabled = false;
-        }
-      );
-    } else {
-        alert("Geolocation is not supported by this browser.");
+document.getElementById('confirmDeleteBtn').addEventListener('click', () => {
+  if (photoToDelete!== null) {
+    selectedFiles.splice(photoToDelete, 1);
+    updateFileInput();
+    renderPhotos();
+    confirmModal.hide();
+    photoToDelete = null;
+  }
+});
+
+// VIDEO - NO COMPRESSION, JUST SIZE CHECK + DIRECT UPLOAD
+const videoInput = document.getElementById('videoInput');
+const videoUpload = document.getElementById('videoUpload');
+const videoEmpty = document.getElementById('videoEmpty');
+const videoPreview = document.getElementById('videoPreview');
+const videoError = document.getElementById('videoError');
+
+videoUpload.addEventListener('click', () => {
+  if (videoPreview.classList.contains('d-none')) videoInput.click();
+});
+
+videoInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  videoError.classList.add('d-none');
+
+  if (file) {
+    if (file.size > maxVideoSize) {
+      videoError.textContent = `Video too large. Max 30MB. Yours is ${(file.size / 1024 / 1024).toFixed(1)}MB. Please record a shorter 10-15s video.`;
+      videoError.classList.remove('d-none');
+      return;
     }
-  });
-
-  document.getElementById('listingForm').addEventListener('submit', (e) => {
-    if (priceField) {
-      priceField.value = priceField.value.replace(/,/g, '');
+    
+    // Upload directly - FAST
+    const url = await uploadToCloudinary(file);
+    if (url) {
+      selectedVideoFile = {file: file, url: url};
+      document.getElementById('videoUrl').value = url;
+      const video = videoPreview.querySelector('video');
+      video.src = url;
+      videoEmpty.classList.add('d-none');
+      videoPreview.classList.remove('d-none');
+      videoUpload.classList.add('has-video');
     }
-    // FIX 4: Don't block submit if no photos/videos
-  });
+  }
+});
+
+document.getElementById('removeVideoBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  videoInput.value = '';
+  selectedVideoFile = null;
+  document.getElementById('videoUrl').value = '';
+  videoPreview.classList.add('d-none');
+  videoEmpty.classList.remove('d-none');
+  videoUpload.classList.remove('has-video');
+});
+
+document.getElementById('gpsBtn').addEventListener('click', function() {
+  const btn = this;
+  const latInput = document.getElementById('id_latitude');
+  const lngInput = document.getElementById('id_longitude');
+
+  if (navigator.geolocation) {
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Getting location...';
+    btn.disabled = true;
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        latInput.value = pos.coords.latitude.toFixed(6);
+        lngInput.value = pos.coords.longitude.toFixed(6);
+        btn.innerHTML = '<i class="bi bi-check-lg"></i> Location Captured';
+        btn.classList.replace('btn-outline-primary', 'btn-success');
+        document.getElementById('locationCaptured').classList.remove('d-none');
+        btn.disabled = false;
+      },
+      (err) => {
+        alert('GPS Error: ' + err.message + '. Please allow location or type your area manually.');
+        btn.innerHTML = '<i class="bi bi-geo-alt-fill"></i> Use My Current Location';
+        btn.disabled = false;
+      }
+    );
+  } else {
+    alert("Geolocation is not supported by this browser.");
+  }
+});
+
+document.getElementById('listingForm').addEventListener('submit', (e) => {
+  if (priceField) {
+    priceField.value = priceField.value.replace(/,/g, '');
+  }
+});
 </script>
 {% endblock %}
