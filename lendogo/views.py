@@ -157,9 +157,9 @@ def listing_detail(request, pk):
 def create_listing(request):
     if request.method == 'POST':
         form = ListingForm(request.POST, request.FILES)
-        formset = ImageFormSet(request.POST, request.FILES)
+        formset = ImageFormSet(request.POST, request.FILES) # Keep for edit
 
-        if form.is_valid() and formset.is_valid():
+        if form.is_valid(): # FIX: Don't require formset to be valid
             with transaction.atomic():
                 listing = form.save(commit=False)
                 listing.seller = request.user
@@ -167,13 +167,35 @@ def create_listing(request):
                 listing.save()
                 form.save_m2m()
 
-                formset.instance = listing
-                formset.save()
+                # NEW: Handle Cloudinary URLs from JS
+                image_urls_json = request.POST.get('image_urls', '[]')
+                video_url = request.POST.get('video_url', '')
+
+                try:
+                    image_urls = json.loads(image_urls_json)
+                except:
+                    image_urls = []
+
+                # Save each uploaded image URL to ListingImage
+                for url in image_urls:
+                    if url: # make sure it's not empty
+                        ListingImage.objects.create(listing=listing, image=url)
+
+                # NEW: Save video if you have a video field on Listing model
+                if video_url and hasattr(listing, 'video'):
+                    listing.video = video_url
+                    listing.save(update_fields=['video'])
+
+                # Still save formset files in case someone bypasses JS
+                if formset.is_valid():
+                    formset.instance = listing
+                    formset.save()
 
             messages.success(request, 'Listing created successfully!')
             return redirect('listing_detail', pk=listing.pk)
         else:
             messages.error(request, 'Please fix the errors below')
+            print("FORM ERRORS:", form.errors) # For debugging
     else:
         form = ListingForm()
         formset = ImageFormSet()
@@ -196,7 +218,7 @@ def mark_as_sold(request, pk):
         listing.is_sold = True
         listing.save(update_fields=['status', 'is_sold'])
 
-        profile = request.user.userprofile
+        profile = request.userprofile
         profile.total_sales = F('total_sales') + 1
         profile.save(update_fields=['total_sales'])
 
@@ -428,7 +450,7 @@ def dashboard(request):
         'sold_today': sold_today,
         'sold_yesterday': sold_yesterday,
         'sold_this_week': sold_this_week,
-        'is_verified': request.user.userprofile.is_verified,
+        'is_verified': request.userprofile.is_verified,
     }
 
     return render(request, 'dashboard.html', {
@@ -674,7 +696,7 @@ def post_rental(request):
             if price < 0:
                 price = Decimal('0')
             elif price > Decimal('9999999.99'):
-                price = Decimal('9999999999.99')
+                price = Decimal('9999.99')
         except (InvalidOperation, ValueError, TypeError):
             price = Decimal('0')
 
@@ -693,7 +715,7 @@ def post_rental(request):
             if deposit < 0:
                 deposit = Decimal('0')
             elif deposit > Decimal('9999999.99'):
-                deposit = Decimal('9999999999.99')
+                deposit = Decimal('9999.99')
         except (InvalidOperation, ValueError, TypeError):
             deposit = Decimal('0')
 
@@ -746,6 +768,7 @@ def post_rental(request):
         return redirect('rental_page')
 
     return render(request, 'post_rental.html')
+
 from django.conf import settings
 
 def rental_detail(request, pk):
