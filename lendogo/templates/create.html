@@ -363,7 +363,7 @@ imageInput.addEventListener('change', async (e) => {
 
 async function uploadToCloudinary(file) {
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append('file', file, file.name || 'upload.jpg');
   formData.append('upload_preset', UPLOAD_PRESET);
   
 
