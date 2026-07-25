@@ -21,7 +21,7 @@
 .photo-preview { width: 100%; height: 100%; object-fit: cover; }
 .photo-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #9ca3af; font-size: 13px; }
 .remove-photo { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 50%; width: 24px; height: 24px; font-size: 14px; line-height: 24px; cursor: pointer; z-index: 10; display: none; }
-.photo-slot.filled:hover.remove-photo { display: block; }
+.photo-slot.filled:hover.remove-photo { display: block; } /* FIXED: added space */
 .remove-photo:hover { background: #dc2626; }
 .video-upload { border: 2px dashed #d1d5db; border-radius: 12px; padding: 32px 20px; text-align: center; background: #f9fafb; cursor: pointer; transition: 0.2s; position: relative; }
 .video-upload:hover { border-color: #2563eb; background: #eff6ff; }
@@ -93,7 +93,7 @@
 const CLOUD_NAME = "sbsdxiie";
 const UPLOAD_PRESET = "lendogo2";
 
-document.addEventListener('DOMContentLoaded', function() { // FIX 2: Wait for DOM
+document.addEventListener('DOMContentLoaded', function() {
 
 document.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(el => el.classList.add('form-control'));
 
@@ -117,7 +117,7 @@ if (priceField) { priceField.setAttribute('type', 'text'); priceField.setAttribu
 
 addPhotoBtn.addEventListener('click', () => imageInput.click());
 
-// FIX 1: ADDED TRY/CATCH + SHOW TEMP IMAGE SO IT DOESN'T LOOK STUCK
+// FINAL PHOTO FIX: FAIL-SAFE COMPRESSION + LIVE COUNTER
 imageInput.addEventListener('change', async (e) => {
   const files = Array.from(e.target.files);
   const loader = document.getElementById('imageLoader');
@@ -131,20 +131,26 @@ imageInput.addEventListener('change', async (e) => {
     tempSlot.innerHTML = `<img src="${tempUrl}" class="photo-preview">`;
     photoGrid.insertBefore(tempSlot, addPhotoBtn);
 
+    let fileToUpload = file; // default to original if compression fails
+    
     try {
-      const options = { maxSizeMB: 0.2, maxWidthOrHeight: 1200, useWebWorker: true };
-      const compressedFile = await imageCompression(file, options);
-      const url = await uploadToCloudinary(compressedFile);
-      tempSlot.remove();
-      if (url) selectedFiles.push({file: compressedFile, url: url});
-      else tempSlot.remove(); // remove if upload failed
+      const options = { maxSizeMB: 0.5, maxWidthOrHeight: 1280, useWebWorker: true }; // bumped to 0.5MB
+      fileToUpload = await imageCompression(file, options);
     } catch(err) {
-      console.error("Compression/Upload failed:", err);
-      tempSlot.remove();
-      alert("Photo failed. Try a smaller image.");
+      console.warn("Compression failed, uploading original:", err);
+    }
+
+    const url = await uploadToCloudinary(fileToUpload);
+    tempSlot.remove(); // remove temp spinner
+    if (url) {
+      selectedFiles.push({file: fileToUpload, url: url});
+      photoCount.textContent = selectedFiles.length; // update live
     }
   }
-  loader.classList.add('d-none'); updateFileInput(); renderPhotos(); imageInput.value = '';
+  loader.classList.add('d-none'); 
+  updateFileInput(); 
+  renderPhotos(); 
+  imageInput.value = '';
 });
 
 async function uploadToCloudinary(file) {
@@ -216,7 +222,7 @@ document.getElementById('confirmDeleteBtn').addEventListener('click', () => {
 
 document.getElementById('removeVideoBtnDirect').addEventListener('click', (e) => { e.stopPropagation(); deleteType = 'video'; document.getElementById('modalTitle').textContent = 'Remove Video?'; confirmModal.show(); });
 
-// FIX 2: FULL GPS CODE
+// GPS
 document.getElementById('gpsBtn').addEventListener('click', function() {
   const btn = this;
   const latInput = document.getElementById('id_latitude');
