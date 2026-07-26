@@ -54,7 +54,8 @@ def home(request):
     sort = request.GET.get('sort', '').strip()
     category_slug = request.GET.get('category', '').strip()
 
-    all_listings = Listing.objects.select_related('seller', 'seller__userprofile', 'category').filter(
+    # FIX: Removed seller__userprofile to prevent DB crash on Railway SQLite
+    all_listings = Listing.objects.select_related('seller', 'category').filter(
         status='ACTIVE'
     )
 
@@ -94,8 +95,9 @@ def home(request):
             business_q |= Q(product__icontains=keyword) | Q(location__icontains=keyword)
         all_listings = all_listings.filter(business_q)
     elif sort == 'near_me':
-        if request.user.is_authenticated and hasattr(request.user, 'userprofile') and request.userprofile.location:
-            all_listings = all_listings.filter(location=request.userprofile.location)
+        # FIX: Added.user and fixed typo
+        if request.user.is_authenticated and hasattr(request.user, 'userprofile') and request.user.userprofile.location:
+            all_listings = all_listings.filter(location=request.user.userprofile.location)
     else:
         all_listings = all_listings.order_by('-is_boosted', '-bumped_at', '-id')
 
@@ -220,7 +222,7 @@ def mark_as_sold(request, pk):
         listing.is_sold = True
         listing.save(update_fields=['status', 'is_sold'])
 
-        profile = request.userprofile
+        profile = request.user.userprofile
         profile.total_sales = F('total_sales') + 1
         profile.save(update_fields=['total_sales'])
 
@@ -419,7 +421,7 @@ def password_reset_done(request):
 
 @login_required
 def dashboard(request):
-    user_listings = Listing.objects.filter(seller=request.user).select_related('seller__userprofile')
+    user_listings = Listing.objects.filter(seller=request.user).select_related('seller')
 
     active_listings = user_listings.filter(status='ACTIVE')
     sold_listings = user_listings.filter(status='SOLD')
@@ -483,7 +485,7 @@ def dashboard(request):
         'sold_today': sold_today,
         'sold_yesterday': sold_yesterday,
         'sold_this_week': sold_this_week,
-        'is_verified': request.userprofile.is_verified,
+        'is_verified': request.user.userprofile.is_verified,
     }
 
     return render(request, 'dashboard.html', {
@@ -747,7 +749,7 @@ def post_rental(request):
             deposit = Decimal(deposit_str) if deposit_str else Decimal('0')
             if deposit < 0:
                 deposit = Decimal('0')
-            elif deposit > Decimal('9999999.99'):
+            elif deposit > Decimal('9999.99'):
                 deposit = Decimal('9999.99')
         except (InvalidOperation, ValueError, TypeError):
             deposit = Decimal('0')
