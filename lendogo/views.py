@@ -94,8 +94,8 @@ def home(request):
             business_q |= Q(product__icontains=keyword) | Q(location__icontains=keyword)
         all_listings = all_listings.filter(business_q)
     elif sort == 'near_me':
-        if request.user.is_authenticated and hasattr(request.user, 'userprofile') and request.user.userprofile.location:
-            all_listings = all_listings.filter(location=request.user.userprofile.location)
+        if request.user.is_authenticated and hasattr(request.user, 'userprofile') and request.userprofile.location:
+            all_listings = all_listings.filter(location=request.userprofile.location)
     else:
         all_listings = all_listings.order_by('-is_boosted', '-bumped_at', '-id')
 
@@ -157,9 +157,9 @@ def listing_detail(request, pk):
 def create_listing(request):
     if request.method == 'POST':
         form = ListingForm(request.POST, request.FILES)
-        formset = ImageFormSet(request.POST, request.FILES) # Keep for edit
+        formset = ImageFormSet(request.POST, request.FILES)
 
-        if form.is_valid(): # FIX: Don't require formset to be valid
+        if form.is_valid():
             with transaction.atomic():
                 listing = form.save(commit=False)
                 listing.seller = request.user
@@ -167,7 +167,7 @@ def create_listing(request):
                 listing.save()
                 form.save_m2m()
 
-                # NEW: Handle Cloudinary URLs from JS
+                # FIX 1: Handle Cloudinary URLs from JS
                 image_urls_json = request.POST.get('image_urls', '[]')
                 video_url = request.POST.get('video_url', '')
 
@@ -177,11 +177,13 @@ def create_listing(request):
                     image_urls = []
 
                 # Save each uploaded image URL to ListingImage
+                # IMPORTANT: Your ListingImage.image field must be CharField(max_length=500) not ImageField
                 for url in image_urls:
-                    if url: # make sure it's not empty
+                    if url:
                         ListingImage.objects.create(listing=listing, image=url)
 
-                # NEW: Save video if you have a video field on Listing model
+                # FIX 2: Save video URL
+                # IMPORTANT: Your Listing.video field must be CharField(max_length=500, blank=True, null=True)
                 if video_url and hasattr(listing, 'video'):
                     listing.video = video_url
                     listing.save(update_fields=['video'])
@@ -195,7 +197,7 @@ def create_listing(request):
             return redirect('listing_detail', pk=listing.pk)
         else:
             messages.error(request, 'Please fix the errors below')
-            print("FORM ERRORS:", form.errors) # For debugging
+            print("FORM ERRORS:", form.errors)
     else:
         form = ListingForm()
         formset = ImageFormSet()
@@ -238,6 +240,24 @@ def edit_listing(request, pk):
                 listing.save()
                 form.save_m2m()
 
+                # FIX 3: Also handle Cloudinary URLs on edit
+                image_urls_json = request.POST.get('image_urls', '[]')
+                video_url = request.POST.get('video_url', '')
+                try:
+                    image_urls = json.loads(image_urls_json)
+                except:
+                    image_urls = []
+
+                # Clear old and add new
+                listing.images.all().delete()
+                for url in image_urls:
+                    if url:
+                        ListingImage.objects.create(listing=listing, image=url)
+
+                if video_url and hasattr(listing, 'video'):
+                    listing.video = video_url
+                    listing.save(update_fields=['video'])
+
                 formset.save()
 
             messages.success(request, 'Listing updated')
@@ -253,6 +273,19 @@ def edit_listing(request, pk):
         'listing': listing,
         'categories': categories
     })
+
+# FIX 4: MANUAL BOOST FOR FRIENDS/ADMIN
+@login_required
+def manual_boost(request, pk):
+    if not request.user.is_staff: # only staff/admin can do this
+        return HttpResponseForbidden("Not allowed")
+
+    listing = get_object_or_404(Listing, pk=pk)
+    listing.is_boosted = True
+    listing.boost_expiry = timezone.now() + timedelta(days=7)
+    listing.save()
+    messages.success(request, f'{listing.product} manually boosted for 7 days!')
+    return redirect('listing_detail', pk=pk)
 
 def login_view(request):
     if request.method == 'POST':
@@ -695,7 +728,7 @@ def post_rental(request):
             price = Decimal(price_str) if price_str else Decimal('0')
             if price < 0:
                 price = Decimal('0')
-            elif price > Decimal('9999999.99'):
+            elif price > Decimal('9999.99'):
                 price = Decimal('9999.99')
         except (InvalidOperation, ValueError, TypeError):
             price = Decimal('0')
@@ -776,7 +809,6 @@ def rental_detail(request, pk):
     RentalListing.objects.filter(pk=pk).update(views=F('views') + 1)
     rental.refresh_from_db(fields=['views'])
 
-    # Safety: ensure images is always a list
     if not rental.images:
         rental.images = []
 
