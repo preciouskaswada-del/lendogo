@@ -12,7 +12,6 @@
 .form-section { border-bottom: 1px solid #f3f4f6; padding: 24px; }
 .form-section:last-child { border-bottom: none; }
 .section-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #111827; }
-.section-subtitle { font-size: 14px; color: #6b7280; margin-top: -8px; margin-bottom: 16px; }
 .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px; }
 .photo-slot { aspect-ratio: 1; border-radius: 12px; border: 2px dashed #d1d5db; background: #f9fafb; position: relative; overflow: hidden; cursor: pointer; transition: 0.2s; }
 .photo-slot:hover { border-color: #2563eb; background: #eff6ff; }
@@ -21,7 +20,7 @@
 .photo-preview { width: 100%; height: 100%; object-fit: cover; }
 .photo-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #9ca3af; font-size: 13px; }
 .remove-photo { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 50%; width: 24px; height: 24px; font-size: 14px; line-height: 24px; cursor: pointer; z-index: 10; display: none; }
-.photo-slot.filled:hover .remove-photo { display: block; } /* FIXED: added space */
+.photo-slot.filled:hover.remove-photo,.photo-slot.filled.active.remove-photo { display: block; } /* WORKS ON DESKTOP + MOBILE TAP */
 .remove-photo:hover { background: #dc2626; }
 .video-upload { border: 2px dashed #d1d5db; border-radius: 12px; padding: 32px 20px; text-align: center; background: #f9fafb; cursor: pointer; transition: 0.2s; position: relative; }
 .video-upload:hover { border-color: #2563eb; background: #eff6ff; }
@@ -56,7 +55,7 @@
         <input type="file" id="imageInput" accept="image/*" multiple class="d-none">
         <div class="photo-grid" id="photoGrid"><div class="photo-slot" id="addPhotoBtn"><div class="photo-placeholder"><i class="bi bi-camera fs-3"></i><span class="mt-1">Add Photos</span></div></div></div>
         <div class="mt-2"><span id="photoCount" class="text-primary fw-semibold">0</span> / 10 photos selected</div>
-        <div id="imageLoader" class="compression-loader d-none"><span class="spinner-border spinner-border-sm"></span> Compressing & Uploading...</div>
+        <div id="imageLoader" class="compression-loader d-none"><span class="spinner-border spinner-border-sm"></span> Uploading images...</div> <!-- REMOVED COMPRESSION WORD -->
       </div>
 
       <div class="form-section">
@@ -66,7 +65,7 @@
           <div id="videoEmpty"><i class="bi bi-camera-video fs-1 text-muted d-block mb-2"></i><p class="mb-2 fw-medium">Upload a short video</p><p class="text-muted mb-0" style="font-size: 13px;">MP4, MOV • Max 10MB</p></div>
           <div id="videoPreview" class="d-none"><video controls class="w-100 rounded" style="max-height:300px;"></video><button type="button" class="btn btn-sm btn-outline-danger mt-2" id="removeVideoBtnDirect"><i class="bi bi-trash"></i> Remove Video</button></div>
         </div>
-        <div id="videoLoader" class="compression-loader d-none"><span class="spinner-border spinner-border-sm"></span> Uploading Video...</div>
+        <div id="videoLoader" class="compression-loader d-none"><span class="spinner-border spinner-border-sm"></span> Uploading video...</div> <!-- REMOVED COMPRESSION WORD -->
         <div id="videoError" class="text-danger small mt-2 d-none"></div>
       </div>
 
@@ -103,7 +102,7 @@ const imageInput = document.getElementById('imageInput');
 const photoGrid = document.getElementById('photoGrid');
 const addPhotoBtn = document.getElementById('addPhotoBtn');
 const photoCount = document.getElementById('photoCount');
-let selectedFiles = []; // now only stores {url}
+let selectedFiles = [];
 let selectedVideoFile = null;
 let deleteType = null; let photoToDelete = null;
 const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
@@ -117,7 +116,7 @@ if (priceField) { priceField.setAttribute('type', 'text'); priceField.setAttribu
 
 addPhotoBtn.addEventListener('click', () => imageInput.click());
 
-// FINAL WORKING PHOTO UPLOAD
+// FINAL PHOTO UPLOAD - LOW MEMORY + CONFIRM MODAL + FASTER
 imageInput.addEventListener('change', async (e) => {
   const files = Array.from(e.target.files);
   const loader = document.getElementById('imageLoader');
@@ -125,7 +124,6 @@ imageInput.addEventListener('change', async (e) => {
   if (selectedFiles.length + files.length > maxPhotos) { alert(`Max ${maxPhotos} photos allowed`); loader.classList.add('d-none'); return; }
 
   for (const file of files) {
-    // 1. Show temp preview
     const tempUrl = URL.createObjectURL(file);
     const tempSlot = document.createElement('div');
     tempSlot.className = 'photo-slot filled uploading';
@@ -134,36 +132,38 @@ imageInput.addEventListener('change', async (e) => {
 
     let fileToUpload = file;
     try {
-      const options = { maxSizeMB: 0.5, maxWidthOrHeight: 1280, useWebWorker: true };
+      const options = { maxSizeMB: 0.3, maxWidthOrHeight: 1024, useWebWorker: true, maxIteration: 10 }; // LIGHTER FOR LOW RAM
       fileToUpload = await imageCompression(file, options);
-    } catch(err) { console.warn("Compression failed, using original", err); }
+    } catch(err) { console.warn("Compression failed", err); }
 
     const url = await uploadToCloudinary(fileToUpload);
-    
+    URL.revokeObjectURL(tempUrl); // FREE MEMORY
+
     if (url) {
       selectedFiles.push({url: url});
-      // 2. Convert temp to final
       tempSlot.classList.remove('uploading');
       tempSlot.innerHTML = `<img src="${url}" class="photo-preview"><button type="button" class="remove-photo">×</button>`;
-      
+
+      // TAP PHOTO TO SHOW X. TAP X TO SHOW MODAL
+      tempSlot.addEventListener('click', () => { tempSlot.classList.toggle('active'); });
       tempSlot.querySelector('.remove-photo').addEventListener('click', (ev) => {
         ev.stopPropagation();
-        const index = selectedFiles.findIndex(i => i.url === url);
-        selectedFiles.splice(index, 1);
-        tempSlot.remove();
-        photoCount.textContent = selectedFiles.length;
-        document.getElementById('imageUrls').value = JSON.stringify(selectedFiles.map(i => i.url));
-        addPhotoBtn.style.display = 'flex';
+        photoToDelete = url;
+        deleteType = 'photo';
+        document.getElementById('modalTitle').textContent = 'Remove Photo?';
+        document.getElementById('modalText').textContent = 'This photo will be removed.';
+        confirmModal.show();
       });
-      
+
       photoCount.textContent = selectedFiles.length;
       document.getElementById('imageUrls').value = JSON.stringify(selectedFiles.map(i => i.url));
       addPhotoBtn.style.display = selectedFiles.length >= maxPhotos? 'none' : 'flex';
     } else {
       tempSlot.remove();
     }
+    await new Promise(resolve => setTimeout(resolve, 400)); // 0.4s delay to prevent memory crash
   }
-  loader.classList.add('d-none'); 
+  loader.classList.add('d-none');
   imageInput.value = '';
 });
 
@@ -180,8 +180,6 @@ async function uploadToCloudinary(file) {
     return data.secure_url;
   } catch (err) { console.error("Upload failed", err); alert("Upload failed"); return null; }
 }
-
-// REMOVED updateFileInput and renderPhotos - they were causing the wipe
 
 // VIDEO
 const videoInput = document.getElementById('videoInput');
@@ -206,11 +204,19 @@ videoInput.addEventListener('change', async (e) => {
 });
 
 document.getElementById('confirmDeleteBtn').addEventListener('click', () => {
-  if (deleteType === 'video') { videoInput.value = ''; selectedVideoFile = null; document.getElementById('videoUrl').value = ''; document.getElementById('videoPreview').classList.add('d-none'); document.getElementById('videoEmpty').classList.remove('d-none'); videoUpload.classList.remove('has-video'); }
+  if (deleteType === 'photo' && photoToDelete) {
+    const index = selectedFiles.findIndex(i => i.url === photoToDelete);
+    selectedFiles.splice(index, 1);
+    document.querySelectorAll('.photo-slot.filled')[index].remove();
+    photoCount.textContent = selectedFiles.length;
+    document.getElementById('imageUrls').value = JSON.stringify(selectedFiles.map(i => i.url));
+    addPhotoBtn.style.display = 'flex';
+  }
+  else if (deleteType === 'video') { videoInput.value = ''; selectedVideoFile = null; document.getElementById('videoUrl').value = ''; document.getElementById('videoPreview').classList.add('d-none'); document.getElementById('videoEmpty').classList.remove('d-none'); videoUpload.classList.remove('has-video'); }
   confirmModal.hide(); deleteType = null; photoToDelete = null;
 });
 
-document.getElementById('removeVideoBtnDirect').addEventListener('click', (e) => { e.stopPropagation(); deleteType = 'video'; document.getElementById('modalTitle').textContent = 'Remove Video?'; confirmModal.show(); });
+document.getElementById('removeVideoBtnDirect').addEventListener('click', (e) => { e.stopPropagation(); deleteType = 'video'; document.getElementById('modalTitle').textContent = 'Remove Video?'; document.getElementById('modalText').textContent = 'This video will be removed.'; confirmModal.show(); });
 
 // GPS
 document.getElementById('gpsBtn').addEventListener('click', function() {
