@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
+import dj_database_url  # <-- ADDED FOR POSTGRES
 
 load_dotenv()
 
@@ -13,8 +14,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'h4q6%5=)m!n(hk6@g$ye4g9hd7htdwx@j13x)nwi+^25phj@x4'
 DEBUG = True
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '*']  
-CSRF_TRUSTED_ORIGINS = ['http://127.0.0.1:8000', 'http://localhost:8000']
+ALLOWED_HOSTS = ['lendogo-production.up.railway.app', '.up.railway.app', 'localhost', '127.0.0.1']  
+CSRF_TRUSTED_ORIGINS = [
+    'http://127.0.0.1:8000', 
+    'http://localhost:8000',
+    'https://lendogo-production.up.railway.app'
+]
 
 AUTH_USER_MODEL = 'lendogo.User'
 
@@ -68,12 +73,15 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
+# === DATABASE: POSTGRES VIA RAILWAY ===
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=os.environ.get('DATABASE_URL'),
+        conn_max_age=600,
+        ssl_require=True
+    )
 }
+
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
@@ -128,20 +136,8 @@ SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = 'DENY'
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
-
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# === Railway Production Settings - ADDED ===
-# This overrides ALLOWED_HOSTS and CSRF for Railway without deleting your dev ones above
-ALLOWED_HOSTS = ['lendogo-production.up.railway.app', '.up.railway.app', 'localhost', '127.0.0.1']
-
-CSRF_TRUSTED_ORIGINS = [
-    'http://127.0.0.1:8000', 
-    'http://localhost:8000',
-    'https://lendogo-production.up.railway.app'  # <-- this fixes the 403
-]
-
-# Tells Django Railway proxy is HTTPS
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 CSRF_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_SAMESITE = 'Lax'
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
