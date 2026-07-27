@@ -35,15 +35,14 @@ class UserProfile(models.Model):
     last_seen = models.DateTimeField(default=timezone.now, db_index=True)
     location = models.CharField(max_length=200, blank=True, default='')
     is_verified = models.BooleanField(default=False, db_index=True) # AUTO via sales
-    is_verified_manual = models.BooleanField(default=False, db_index=True, help_text="Manual tick by admin for friends") # NEW: Manual verify
     total_sales = models.PositiveIntegerField(default=0)
 
     def is_online(self):
         return timezone.now() - self.last_seen < timedelta(minutes=2)
 
     @property
-    def is_fully_verified(self): # NEW: Either auto or manual
-        return self.is_verified or self.is_verified_manual
+    def is_fully_verified(self): 
+        return self.is_verified 
 
     def __str__(self):
         return f'{self.user.username} profile'
