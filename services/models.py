@@ -120,7 +120,7 @@ class Worker(models.Model):
         ]
         constraints = [
             models.CheckConstraint(
-                condition=Q(rating__gte=1.0) & Q(rating__lte=5.0),  
+                check=Q(rating__gte=1.0) & Q(rating__lte=5.0),  
                 name='rating_range_check'
             ),
         ]
