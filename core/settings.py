@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
-import dj_database_url  # <-- ADDED FOR POSTGRES
+import dj_database_url  # <-- FOR POSTGRES
 
 load_dotenv()
 
@@ -73,14 +73,24 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
-# === DATABASE: POSTGRES VIA RAILWAY ===
-DATABASES = {
-    'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL'),
-        conn_max_age=600,
-        ssl_require=True
-    )
-}
+# === DATABASE: SQLITE LOCAL, POSTGRES ON RAILWAY ===
+if os.environ.get('DATABASE_URL'):
+    # Railway / Production - use Postgres
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=os.environ.get('DATABASE_URL'),
+            conn_max_age=600,
+            ssl_require=True
+        )
+    }
+else:
+    # Local - use SQLite
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -112,6 +122,9 @@ cloudinary.config(
   api_key = '619153399851344',        
   api_secret = 'RczBGOUCUFx6z_P8W3Oyi9qCIL8'   
 )
+
+# FIX FOR DJANGO ADMIN UPLOADS
+CLOUDINARY_URL = f"cloudinary://{cloudinary.config().api_key}:{cloudinary.config().api_secret}@{cloudinary.config().cloud_name}"
 
 # PAYCHANGU - LIVE KEYS
 PAYCHANGU_PUBLIC_KEY = 'pub-live-eDaKRML8UthiKOQsfJfBsidl.s1itBbT6'
