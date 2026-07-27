@@ -172,7 +172,7 @@
         <h3 class="section-title">Photos <span class="badge bg-light text-dark fw-normal">Optional</span></h3>
         <p class="section-subtitle">First photo will be your cover. Add up to 10 images</p>
 
-        <input type="file" id="imageInput" accept="image/*,video/*" multiple class="d-none">
+        <input type="file" id="imageInput" accept="image/*" multiple class="d-none">
 
         <div class="photo-grid" id="photoGrid">
           <div class="photo-slot" id="addPhotoBtn">
@@ -275,9 +275,9 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
 <script>
-// CONFIG - FIXED
+// CONFIG
 const CLOUD_NAME = "sbsdxiie";
-const UPLOAD_PRESET = "lendogo2"; // CHANGED
+const UPLOAD_PRESET = "lendogo2"; 
 
 // Setup form controls
 document.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(el => {
@@ -367,7 +367,6 @@ async function uploadToCloudinary(file) {
   formData.append('upload_preset', UPLOAD_PRESET);
   
   try {
-    // CHANGED: auto instead of image
     const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`, {
       method: 'POST',
       body: formData
@@ -522,6 +521,8 @@ document.getElementById('listingForm').addEventListener('submit', (e) => {
   if (priceField) {
     priceField.value = priceField.value.replace(/,/g, '');
   }
+  // CRITICAL FIX: Ensure URLs are in hidden inputs before submit
+  updateFileInput();
 });
 </script>
 {% endblock %}
