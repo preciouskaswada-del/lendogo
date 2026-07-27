@@ -1,0 +1,1 @@
+installCmds = ["apt-get update && apt-get install -y libmagic1"] 

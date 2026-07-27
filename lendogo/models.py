@@ -34,11 +34,16 @@ class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='userprofile')
     last_seen = models.DateTimeField(default=timezone.now, db_index=True)
     location = models.CharField(max_length=200, blank=True, default='')
-    is_verified = models.BooleanField(default=False, db_index=True)
+    is_verified = models.BooleanField(default=False, db_index=True) # AUTO via sales
+    is_verified_manual = models.BooleanField(default=False, db_index=True, help_text="Manual tick by admin for friends") # NEW: Manual verify
     total_sales = models.PositiveIntegerField(default=0)
 
     def is_online(self):
         return timezone.now() - self.last_seen < timedelta(minutes=2)
+
+    @property
+    def is_fully_verified(self): # NEW: Either auto or manual
+        return self.is_verified or self.is_verified_manual
 
     def __str__(self):
         return f'{self.user.username} profile'
@@ -113,7 +118,7 @@ class Listing(models.Model):
     view_count = models.PositiveIntegerField(default=0)
     whatsapp_clicks = models.PositiveIntegerField(default=0)
 
-    video = models.FileField(upload_to='listing_videos/', null=True, blank=True)
+    video = models.CharField(max_length=500, null=True, blank=True) # CHANGED: Was FileField. Now for Cloudinary URL
 
     # AUTO VERIFICATION + SCAM DETECTION
     photo_verified = models.BooleanField(default=False, db_index=True)
@@ -145,21 +150,21 @@ class Listing(models.Model):
 
     @property
     def display_image(self):
-        """Returns first image that actually has a file. Never crashes."""
+        """Returns first image that actually has a file/url. Never crashes."""
         if not self.pk:
             return None
         for img in self.images.all().order_by('id'):
-            if img.image and img.image.name:
-                try:
-                    img.image.file
-                    return img
-                except (ValueError, OSError):
-                    continue
+            if img.image and img.image != '': # CHANGED: Check for URL string
+                return img
         return None
 
     @property
     def has_valid_images(self):
         return self.display_image is not None
+
+    @property
+    def show_scam_modal(self): # NEW: Only show modal at level 3
+        return self.suspicion_level >= 3
 
     def run_scam_check(self):
         """AUTO: Compare price to category average. Flag if too low"""
@@ -194,19 +199,16 @@ class Listing(models.Model):
 
         # === BOOST LOGIC: 7 DAY AUTO EXPIRE ===
         if self.is_boosted:
-            # If just ticked now, set start time
             if not self.boost_started_at:
                 self.boost_started_at = timezone.now()
             
-            # If 7 days passed, auto unboost
             if self.boost_started_at and timezone.now() > self.boost_started_at + timedelta(days=7):
                 self.is_boosted = False
                 self.boost_started_at = None
         else:
-            # If unticked manually, clear the date
             self.boost_started_at = None
 
-        super().save(*args, **kwargs) # Save first to get PK
+        super().save(*args, **kwargs)
 
         self.run_scam_check()
 
@@ -220,7 +222,7 @@ class Listing(models.Model):
         if self.seller_id:
             try:
                 profile = self.seller.userprofile
-                seller_verified = profile.is_verified
+                seller_verified = profile.is_fully_verified # CHANGED: uses auto OR manual
                 seller_sales = profile.total_sales
             except UserProfile.DoesNotExist:
                 pass
@@ -247,10 +249,10 @@ class WhatsAppClick(models.Model):
 
 class ListingImage(models.Model):
     listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name='images')
-    image = models.ImageField(upload_to='listings/')
+    image = models.CharField(max_length=500) # CHANGED: Was ImageField. Now for Cloudinary URL
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
-class ListingVideo(models.Model):
+class ListingVideo(models.Model): # You can delete this model now. We use Listing.video CharField
     listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name='videos')
     video = models.FileField(upload_to='listings/videos/', help_text="MP4, max 50MB")
     uploaded_at = models.DateTimeField(auto_now_add=True)

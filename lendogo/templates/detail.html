@@ -76,7 +76,7 @@ body {
 .main-media {
     position: relative;
     width: 100%;
-    background: #000; /* Black background for letterboxing */
+    background: #000;
     border-radius: 16px;
     overflow: hidden;
     margin-bottom: 16px;
@@ -84,12 +84,12 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    aspect-ratio: 4 / 3; /* FIX: Keeps ratio instead of min-height */
+    aspect-ratio: 4 / 3;
 }
 .main-media img {
     width: 100%;
-    height: 100%; /* FIX: Fill container */
-    object-fit: contain; /* FIX: No squish, keeps aspect ratio */
+    height: 100%;
+    object-fit: contain;
     display: block;
 }
 .no-image { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--ink-light); text-align: center; }
@@ -154,9 +154,7 @@ body {
       {% if listing.video %}
       <div class="video-box">
         <div class="video-label"><i class="fas fa-video"></i> Product Video</div>
-        <video controls playsinline controlsList="nodownload">
-          <source src="{{ listing.video.url|slice:':50' }}q_auto/{{ listing.video.url|slice:'50:' }}" type="video/mp4">
-        </video>
+        <video controls playsinline controlsList="nodownload" src="{{ listing.video }}"></video> <!-- FIX 1: Direct URL -->
       </div>
       {% endif %}
 
@@ -176,10 +174,10 @@ body {
         {% for img in listing.images.all %}
           {% if img.image %}
           <div class="thumb"
-               data-src="{{ img.image.url|slice:':50' }}w_1200,q_auto,f_auto/{{ img.image.url|slice:'50:' }}"
-               data-width="{{ img.image.width|default:1200 }}"
-               data-height="{{ img.image.height|default:900 }}">
-            <img src="{{ img.image.url|slice:':50' }}w_300,q_auto,f_auto/{{ img.image.url|slice:'50:' }}" alt="{{ listing.product|default:'Product' }}" loading="lazy">
+               data-src="{{ img.image }}" <!-- FIX 2: Direct URL -->
+               data-width="1200"
+               data-height="900">
+            <img src="{{ img.image }}" alt="{{ listing.product|default:'Product' }}" loading="lazy"> <!-- FIX 3: Direct URL -->
           </div>
           {% endif %}
         {% endfor %}
@@ -219,19 +217,19 @@ body {
       </div>
       {% endif %}
 
-      {% if show_warning %}
-      <div class="risk-banner"><i class="fas fa-triangle-exclamation"></i><div><h4>High Risk Listing Detected</h4><p>{{ scam_warning }}{% if has_market_data %} Market avg: MK {{ market_avg|intcomma }}{% endif %}</p></div></div>
+      {% if listing.show_scam_modal %} <!-- FIX 4: Only level 3 -->
+      <div class="risk-banner"><i class="fas fa-triangle-exclamation"></i><div><h4>High Risk Listing Detected</h4><p>{{ listing.scam_warning }}{% if has_market_data %} Market avg: MK {{ market_avg|intcomma }}{% endif %}</p></div></div>
       {% endif %}
     </div>
   </div>
 </div>
 
-{% if show_warning %}
+{% if listing.show_scam_modal %} <!-- FIX 5: Only level 3 -->
 <div id="scamModal" class="modal">
   <div class="modal-card">
     <i class="fas fa-triangle-exclamation" style="font-size:56px;color:#DC2626;"></i>
     <h3>High Risk Listing Detected</h3>
-    <p id="modalWarningText" style="color:var(--ink-light);">{{ scam_warning|default:"" }}</p>
+    <p id="modalWarningText" style="color:var(--ink-light);">{{ listing.scam_warning|default:"" }}</p> <!-- NEW MESSAGE HERE -->
     {% if has_market_data %}<p style="font-weight:700;margin:12px 0;">Market average: MK {{ market_avg|default:0|intcomma }}</p>{% endif %}
     <p style="font-weight:700;margin:20px 0;">Safe buying rules:<br>1. Meet at public places<br>2. Check item works before paying<br>3. Never send money first</p>
     <div class="modal-btns"><button class="btn btn-gray" onclick="closeScamModal()">Cancel</button><button class="btn btn-brand" id="confirmContact">I Understand, Continue</button></div>
@@ -245,10 +243,10 @@ body {
 {% block extra_js %}
 <script>
 window.LENDOGO = {
-    isSuspicious: {{ show_warning|yesno:"true,false" }},
-    suspicionLevel: {{ suspicion_level|default:0 }},
+    isSuspicious: {{ listing.show_scam_modal|yesno:"true,false" }}, <!-- FIX 6 -->
+    suspicionLevel: {{ listing.suspicion_level|default:0 }},
     listingId: {{ listing.id|default:0 }},
-    warningText: "{{ scam_warning|escapejs|default:'' }}",
+    warningText: "{{ listing.scam_warning|escapejs|default:'' }}",
     csrfToken: "{{ csrf_token }}"
 };
 </script>

@@ -54,7 +54,8 @@ def home(request):
     sort = request.GET.get('sort', '').strip()
     category_slug = request.GET.get('category', '').strip()
 
-    all_listings = Listing.objects.select_related('seller', 'seller__userprofile', 'category').filter(
+    # FIX: Removed seller__userprofile to prevent DB crash on Railway SQLite
+    all_listings = Listing.objects.select_related('seller', 'category').filter(
         status='ACTIVE'
     )
 
@@ -94,6 +95,7 @@ def home(request):
             business_q |= Q(product__icontains=keyword) | Q(location__icontains=keyword)
         all_listings = all_listings.filter(business_q)
     elif sort == 'near_me':
+        # FIX: Added.user and fixed typo
         if request.user.is_authenticated and hasattr(request.user, 'userprofile') and request.user.userprofile.location:
             all_listings = all_listings.filter(location=request.user.userprofile.location)
     else:
@@ -159,7 +161,7 @@ def create_listing(request):
         form = ListingForm(request.POST, request.FILES)
         formset = ImageFormSet(request.POST, request.FILES)
 
-        if form.is_valid() and formset.is_valid():
+        if form.is_valid():
             with transaction.atomic():
                 listing = form.save(commit=False)
                 listing.seller = request.user
@@ -167,13 +169,37 @@ def create_listing(request):
                 listing.save()
                 form.save_m2m()
 
-                formset.instance = listing
-                formset.save()
+                # FIX 1: Handle Cloudinary URLs from JS
+                image_urls_json = request.POST.get('image_urls', '[]')
+                video_url = request.POST.get('video_url', '')
+
+                try:
+                    image_urls = json.loads(image_urls_json)
+                except:
+                    image_urls = []
+
+                # Save each uploaded image URL to ListingImage
+                # IMPORTANT: Your ListingImage.image field must be CharField(max_length=500) not ImageField
+                for url in image_urls:
+                    if url:
+                        ListingImage.objects.create(listing=listing, image=url)
+
+                # FIX 2: Save video URL
+                # IMPORTANT: Your Listing.video field must be CharField(max_length=500, blank=True, null=True)
+                if video_url and hasattr(listing, 'video'):
+                    listing.video = video_url
+                    listing.save(update_fields=['video'])
+
+                # Still save formset files in case someone bypasses JS
+                if formset.is_valid():
+                    formset.instance = listing
+                    formset.save()
 
             messages.success(request, 'Listing created successfully!')
             return redirect('listing_detail', pk=listing.pk)
         else:
             messages.error(request, 'Please fix the errors below')
+            print("FORM ERRORS:", form.errors)
     else:
         form = ListingForm()
         formset = ImageFormSet()
@@ -216,6 +242,24 @@ def edit_listing(request, pk):
                 listing.save()
                 form.save_m2m()
 
+                # FIX 3: Also handle Cloudinary URLs on edit
+                image_urls_json = request.POST.get('image_urls', '[]')
+                video_url = request.POST.get('video_url', '')
+                try:
+                    image_urls = json.loads(image_urls_json)
+                except:
+                    image_urls = []
+
+                # Clear old and add new
+                listing.images.all().delete()
+                for url in image_urls:
+                    if url:
+                        ListingImage.objects.create(listing=listing, image=url)
+
+                if video_url and hasattr(listing, 'video'):
+                    listing.video = video_url
+                    listing.save(update_fields=['video'])
+
                 formset.save()
 
             messages.success(request, 'Listing updated')
@@ -231,6 +275,19 @@ def edit_listing(request, pk):
         'listing': listing,
         'categories': categories
     })
+
+# FIX 4: MANUAL BOOST FOR FRIENDS/ADMIN
+@login_required
+def manual_boost(request, pk):
+    if not request.user.is_staff: # only staff/admin can do this
+        return HttpResponseForbidden("Not allowed")
+
+    listing = get_object_or_404(Listing, pk=pk)
+    listing.is_boosted = True
+    listing.boost_expiry = timezone.now() + timedelta(days=7)
+    listing.save()
+    messages.success(request, f'{listing.product} manually boosted for 7 days!')
+    return redirect('listing_detail', pk=pk)
 
 def login_view(request):
     if request.method == 'POST':
@@ -364,7 +421,7 @@ def password_reset_done(request):
 
 @login_required
 def dashboard(request):
-    user_listings = Listing.objects.filter(seller=request.user).select_related('seller__userprofile')
+    user_listings = Listing.objects.filter(seller=request.user).select_related('seller')
 
     active_listings = user_listings.filter(status='ACTIVE')
     sold_listings = user_listings.filter(status='SOLD')
@@ -673,8 +730,8 @@ def post_rental(request):
             price = Decimal(price_str) if price_str else Decimal('0')
             if price < 0:
                 price = Decimal('0')
-            elif price > Decimal('9999999.99'):
-                price = Decimal('9999999999.99')
+            elif price > Decimal('9999.99'):
+                price = Decimal('9999.99')
         except (InvalidOperation, ValueError, TypeError):
             price = Decimal('0')
 
@@ -692,8 +749,8 @@ def post_rental(request):
             deposit = Decimal(deposit_str) if deposit_str else Decimal('0')
             if deposit < 0:
                 deposit = Decimal('0')
-            elif deposit > Decimal('9999999.99'):
-                deposit = Decimal('9999999999.99')
+            elif deposit > Decimal('9999.99'):
+                deposit = Decimal('9999.99')
         except (InvalidOperation, ValueError, TypeError):
             deposit = Decimal('0')
 
@@ -746,6 +803,7 @@ def post_rental(request):
         return redirect('rental_page')
 
     return render(request, 'post_rental.html')
+
 from django.conf import settings
 
 def rental_detail(request, pk):
@@ -753,7 +811,6 @@ def rental_detail(request, pk):
     RentalListing.objects.filter(pk=pk).update(views=F('views') + 1)
     rental.refresh_from_db(fields=['views'])
 
-    # Safety: ensure images is always a list
     if not rental.images:
         rental.images = []
 

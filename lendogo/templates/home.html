@@ -86,7 +86,7 @@
     font-size: 14px;
   }
 
-  /* LISTING CARD */
+  /* LISTING CARD - GRID FLOW */
   .listings-container { padding: 16px; }
   .listing-card {
     background: #111;
@@ -96,16 +96,11 @@
     border: 1px solid #222;
   }
   
-  /* AUTO SWIPE SLIDER */
+  /* SINGLE IMAGE ONLY - NO SLIDER */
   .listing-img { width: 100%; height: 240px; background: #222; position: relative; overflow: hidden; }
-  .slider { display: flex; transition: transform 0.5s ease; height: 100%; }
-  .slide { min-width: 100%; height: 100%; }
-  .slide img { width: 100%; height: 100%; object-fit: cover; }
+  .listing-img img { width: 100%; height: 100%; object-fit: cover; }
   .no-image { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #555; }
   .no-image i { font-size: 50px; margin-bottom: 8px; }
-  .dots { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.4); }
-  .dot.active { background: white; }
 
   .badge { position: absolute; top: 10px; padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; color: white; z-index: 2; }
   .badge-photo { left: 10px; background: rgba(5,150,105,0.95); }
@@ -114,7 +109,7 @@
   .listing-info { padding: 12px; }
   .listing-price { color: var(--teal); font-size: 22px; font-weight: 800; }
   .listing-title { font-size: 16px; margin: 6px 0; font-weight: 600; }
-  .listing-desc { color: #aaa; font-size: 14px; margin-bottom: 10px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  /* REMOVED .listing-desc */
   .listing-meta { color: #888; font-size: 13px; display: flex; gap: 12px; margin-bottom: 12px; }
   .view-btn {
     display: block;
@@ -267,24 +262,17 @@
   {% if all_listings %}
     {% for listing in all_listings %}
     <div class="listing-card">
-      <div class="listing-img" id="slider-{{ listing.id }}">
-        <div class="slider">
-          {% if listing.images.all %}
-            {% for img in listing.images.all %}
-            <div class="slide">
-              <img src="{{ img.image.url }}" alt="{{ listing.product }}">
-            </div>
-            {% endfor %}
+      <div class="listing-img">
+        {% with first_img=listing.images.first %}
+          {% if first_img and first_img.image %}
+            <img src="{{ first_img.image }}" alt="{{ listing.product }}"> <!-- FIX: no .url, 1 image only -->
           {% else %}
-            <div class="slide no-image">
+            <div class="no-image">
               <i class="bi bi-image"></i>
               <span>No Photo</span>
             </div>
           {% endif %}
-        </div>
-        {% if listing.images.all|length > 1 %}
-        <div class="dots" id="dots-{{ listing.id }}"></div>
-        {% endif %}
+        {% endwith %}
         
         {% if listing.photo_verified %}<div class="badge badge-photo">📷 Verified</div>{% endif %}
         {% if listing.is_lendogo_verified %}<div class="badge badge-lendogo">✓ Lendogo</div>{% endif %}
@@ -293,7 +281,7 @@
       <div class="listing-info">
         <div class="listing-price">MK{{ listing.price|intcomma }}</div>
         <div class="listing-title">{{ listing.product }}</div>
-        <div class="listing-desc">{{ listing.description|truncatewords:20 }}</div>
+        <!-- REMOVED DESCRIPTION -->
         <div class="listing-meta">
           <span><i class="bi bi-geo-alt"></i> {{ listing.location }}</span>
           <span><i class="bi bi-eye"></i> {{ listing.view_count }} Views</span>
@@ -399,29 +387,7 @@ function showError(error) {
   window.location.href = "?location=Lilongwe";
 }
 
-// AUTO SWIPE SLIDER
-document.querySelectorAll('.listing-img').forEach(sliderContainer => {
-  const slider = sliderContainer.querySelector('.slider');
-  const slides = slider.querySelectorAll('.slide');
-  const dotsContainer = sliderContainer.querySelector('.dots');
-  if (slides.length <= 1) return;
-  
-  // Create dots
-  slides.forEach((_, i) => {
-    const dot = document.createElement('div');
-    dot.classList.add('dot');
-    if (i === 0) dot.classList.add('active');
-    dotsContainer.appendChild(dot);
-  });
-  const dots = dotsContainer.querySelectorAll('.dot');
-  
-  let current = 0;
-  setInterval(() => {
-    current = (current + 1) % slides.length;
-    slider.style.transform = `translateX(-${current * 100}%)`;
-    dots.forEach((d, i) => d.classList.toggle('active', i === current));
-  }, 3000);
-});
+// REMOVED AUTO SWIPE SLIDER JS COMPLETELY
 
 // Clear search
 const searchInput = document.getElementById('searchInput');
