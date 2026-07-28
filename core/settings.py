@@ -4,15 +4,15 @@ from dotenv import load_dotenv
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
-import dj_database_url  # <-- FOR POSTGRES
+import dj_database_url
 
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY
-SECRET_KEY = 'h4q6%5=)m!n(hk6@g$ye4g9hd7htdwx@j13x)nwi+^25phj@x4'
-DEBUG = True
+# SECURITY - NOW FROM ENV
+SECRET_KEY = os.environ.get('SECRET_KEY')
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = ['lendogo-production.up.railway.app', '.up.railway.app', 'localhost', '127.0.0.1']  
 CSRF_TRUSTED_ORIGINS = [
@@ -31,10 +31,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.humanize',
-
     'cloudinary',              
     'cloudinary_storage',      
-
     'lendogo',
     'lendogo.chat',
     'services',
@@ -73,9 +71,8 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
-# === DATABASE: SQLITE LOCAL, POSTGRES ON RAILWAY ===
+# DATABASE
 if os.environ.get('DATABASE_URL'):
-    # Railway / Production - use Postgres
     DATABASES = {
         'default': dj_database_url.config(
             default=os.environ.get('DATABASE_URL'),
@@ -84,14 +81,12 @@ if os.environ.get('DATABASE_URL'):
         )
     }
 else:
-    # Local - use SQLite
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
-
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
@@ -113,25 +108,25 @@ STATICFILES_DIRS = [
 STATIC_ROOT = BASE_DIR / "staticfiles" 
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# MEDIA FILES - CLOUDINARY
+# MEDIA FILES - CLOUDINARY FROM ENV
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 MEDIA_URL = '/media/'
 
 cloudinary.config( 
-  cloud_name = 'sbsdxiie',  
-  api_key = '619153399851344',        
-  api_secret = 'RczBGOUCUFx6z_P8W3Oyi9qCIL8'   
+  cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME'),  
+  api_key = os.environ.get('CLOUDINARY_API_KEY'),        
+  api_secret = os.environ.get('CLOUDINARY_API_SECRET')   
 )
 
-# FIX FOR DJANGO ADMIN UPLOADS
-CLOUDINARY_URL = f"cloudinary://{cloudinary.config().api_key}:{cloudinary.config().api_secret}@{cloudinary.config().cloud_name}"
+CLOUDINARY_URL = f"cloudinary://{os.environ.get('CLOUDINARY_API_KEY')}:{os.environ.get('CLOUDINARY_API_SECRET')}@{os.environ.get('CLOUDINARY_CLOUD_NAME')}"
 
-# PAYCHANGU - LIVE KEYS
-PAYCHANGU_PUBLIC_KEY = 'pub-live-eDaKRML8UthiKOQsfJfBsidl.s1itBbT6'
-PAYCHANGU_SECRET_KEY = 'sec-live-M4zsMpzeqkGUyHlwXhKoxJlQ5tz2c6iB'
-PAYCHANGU_MODE = 'live'
+# PAYCHANGU - FROM ENV
+PAYCHANGU_PUBLIC_KEY = os.environ.get('PAYCHANGU_PUBLIC_KEY')
+PAYCHANGU_SECRET_KEY = os.environ.get('PAYCHANGU_SECRET_KEY')
+PAYCHANGU_MODE = os.environ.get('PAYCHANGU_MODE', 'live')
 PAYCHANGU_VERIFY_SSL = True
-VERIFICATION_FEE = 2000
+VERIFICATION_FEE = int(os.environ.get('VERIFICATION_FEE', 2100))
+BOOST_FEE = int(os.environ.get('BOOST_FEE', 550))
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 DEFAULT_FROM_EMAIL = 'noreply@lendogo.com'
@@ -140,8 +135,8 @@ LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
 
-DATA_UPLOAD_MAX_MEMORY_SIZE = 31457280  # 30MB
-FILE_UPLOAD_MAX_MEMORY_SIZE = 31457280  # 30MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 31457280
+FILE_UPLOAD_MAX_MEMORY_SIZE = 31457280
 
 # SECURITY SETTINGS FOR PRODUCTION
 SECURE_CONTENT_TYPE_NOSNIFF = True
