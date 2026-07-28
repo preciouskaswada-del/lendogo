@@ -6,6 +6,14 @@ from django.core.validators import MinValueValidator
 from datetime import timedelta
 from decimal import Decimal
 from phonenumber_field.modelfields import PhoneNumberField
+from cloudinary.models import CloudinaryField # ADDED
+from django.conf import settings # ADDED
+import requests # ADDED FOR PAYCHANGU
+
+# PAYCHANGU SETTINGS
+PAYCHANGU_SECRET_KEY = getattr(settings, 'PAYCHANGU_SECRET_KEY', '')
+BOOST_FEE = getattr(settings, 'BOOST_FEE', 550) # SET TO 550
+PAYCHANGU_URL = "https://api.paychangu.com/payment"
 
 class User(AbstractUser):
     """
@@ -113,12 +121,12 @@ class Listing(models.Model):
     # BOOST: Manual tick in admin. Auto expires after 7 days
     is_boosted = models.BooleanField(default=False, db_index=True, help_text="Tick to boost for 7 days. Shows at top of home")
     boost_started_at = models.DateTimeField(null=True, blank=True, help_text="Auto set when you tick boost")
-    boost_tx_ref = models.CharField(max_length=100, null=True, blank=True, help_text="Keep for paychangu later")
+    boost_tx_ref = models.CharField(max_length=100, null=True, blank=True, help_text="Paychangu transaction ref")
 
     view_count = models.PositiveIntegerField(default=0)
     whatsapp_clicks = models.PositiveIntegerField(default=0)
 
-    video = models.CharField(max_length=500, null=True, blank=True) # CHANGED: Was FileField. Now for Cloudinary URL
+    video = CloudinaryField('video', blank=True, null=True, resource_type='video') # CHANGED TO CLOUDINARY
 
     # AUTO VERIFICATION + SCAM DETECTION
     photo_verified = models.BooleanField(default=False, db_index=True)
@@ -163,11 +171,11 @@ class Listing(models.Model):
         return self.display_image is not None
 
     @property
-    def show_scam_modal(self): # NEW: Only show modal at level 3
+    def show_scam_modal(self): # CHANGED: Only show modal at level 3
         return self.suspicion_level >= 3
 
     def run_scam_check(self):
-        """AUTO: Compare price to category average. Flag if too low"""
+        """AUTO: Compare price to category average. Flag if too low - LEVEL 3 ONLY"""
         if not self.category or not self.category.has_enough_data:
             self.suspicion_level = 0
             self.scam_warning = None
@@ -179,20 +187,40 @@ class Listing(models.Model):
 
         if avg_price > 0:
             price_diff_percent = ((avg_price - float(self.price)) / avg_price) * 100
-            if price_diff_percent >= 50:
+            if price_diff_percent >= 50: # ONLY LEVEL 3 NOW
                 self.suspicion_level = 3
                 self.scam_warning = f"WARNING: Price is {int(price_diff_percent)}% below market average of MK {avg_price:,}. Too good to be true?"
-            elif price_diff_percent >= 30:
-                self.suspicion_level = 2
-                self.scam_warning = f"Caution: Price is {int(price_diff_percent)}% below market average of MK {avg_price:,}"
-            elif price_diff_percent >= 15:
-                self.suspicion_level = 1
-                self.scam_warning = f"Note: Price is {int(price_diff_percent)}% below market average"
-            else:
+            else: # LEVEL 1 AND 2 DO NOTHING
                 self.suspicion_level = 0
                 self.scam_warning = None
         self.scam_score = self.suspicion_level * 30
         self.last_scanned = timezone.now()
+
+    def initiate_boost_payment(self, user_email): # NEW: PAYCHANGU CODE
+        """Returns Paychangu checkout URL for 550 MWK boost"""
+        payload = {
+            "amount": BOOST_FEE,
+            "currency": "MWK",
+            "email": user_email,
+            "callback_url": f"https://lendogo-production.up.railway.app/payments/boost-callback/",
+            "return_url": f"https://lendogo-production.up.railway.app/listing/{self.pk}/",
+            "tx_ref": f"boost_{self.pk}_{int(timezone.now().timestamp())}",
+            "description": f"Boost Listing: {self.product}"
+        }
+        headers = {
+            "Accept": "application/json",
+            "Authorization": f"Bearer {PAYCHANGU_SECRET_KEY}"
+        }
+        try:
+            response = requests.post(PAYCHANGU_URL, json=payload, headers=headers, timeout=20)
+            data = response.json()
+            if data.get('status') == 'success':
+                self.boost_tx_ref = payload['tx_ref']
+                self.save(update_fields=['boost_tx_ref'])
+                return data['data']['checkout_url']
+        except Exception as e:
+            print("Paychangu Error:", e)
+        return None
 
     def save(self, *args, **kwargs):
         self.is_sold = (self.status == 'SOLD')
@@ -214,7 +242,7 @@ class Listing(models.Model):
 
         # === AUTO VERIFICATION ===
         has_image = self.has_valid_images
-        price_ok = self.suspicion_level <= 1
+        price_ok = self.suspicion_level == 0 # CHANGED: Must be level 0 now
         new_photo_verified = has_image and price_ok
 
         seller_verified = False
@@ -249,10 +277,10 @@ class WhatsAppClick(models.Model):
 
 class ListingImage(models.Model):
     listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name='images')
-    image = models.CharField(max_length=500) # CHANGED: Was ImageField. Now for Cloudinary URL
+    image = CloudinaryField('image', blank=True, null=True) # CHANGED TO CLOUDINARY
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
-class ListingVideo(models.Model): # You can delete this model now. We use Listing.video CharField
+class ListingVideo(models.Model): # You can delete this model now. We use Listing.video CloudinaryField
     listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name='videos')
     video = models.FileField(upload_to='listings/videos/', help_text="MP4, max 50MB")
     uploaded_at = models.DateTimeField(auto_now_add=True)
