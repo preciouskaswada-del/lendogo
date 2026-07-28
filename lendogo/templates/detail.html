@@ -4,7 +4,7 @@
 {% block title %}{{ listing.product|default:"Listing" }} - Lendogo{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="https://unpkg.com/photoswipe@5/dist/photoswipe.css">
+<link rel="stylesheet" href="https://unpkg.com/photoswipe@5/dist/photoswipe.css?v=4">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -20,11 +20,11 @@ body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color
 .video-box video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; }
 .video-label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); color: white; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; z-index: 2; }
 
-/* FIXED: contain = no crop */
+/* FIXED: contain = no crop, shows full image */
 .main-media { position: relative; width: 100%; height: 400px; background: #000; border-radius: 16px; overflow: hidden; margin-bottom: 16px; cursor: zoom-in; display: flex; align-items: center; justify-content: center; }
 @media (max-width: 768px) {.main-media { height: 300px; }}
 
-.main-media img { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; } /* FIX 1 */
+.main-media img { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
 .no-image { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--ink-light); text-align: center; }
 .media-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.95); border: none; width: 44px; height: 44px; border-radius: 12px; cursor: pointer; font-size: 18px; color: var(--ink); display: flex; align-items: center; justify-content: center; z-index: 5; }
 .media-nav.prev { left: 16px; }.media-nav.next { right: 16px; }.media-nav.hide { display: none; }
@@ -88,7 +88,7 @@ body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color
         <div class="no-image" id="noImageMsg"><i class="fas fa-image" style="font-size:48px;margin-bottom:12px;opacity:0.3;"></i><p>No media uploaded</p></div>
       </div>
 
-      <!-- FIX 2: Real dimensions + fallback -->
+      <!-- FIX: Real dimensions from Django -->
       <div class="thumbs hide" id="thumbStrip">
         {% for img in listing.images.all %}
           {% if img.image %}
@@ -124,7 +124,7 @@ body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color
       <div class="desc">{{ listing.description|default:"No description provided." }}</div>
 
       <div class="actions">
-        {% if user.is_authenticated and user != listing.seller and listing.status == 'ACTIVE' %}
+        {% if user.is_authenticated and user!= listing.seller and listing.status == 'ACTIVE' %}
         <form method="POST" action="{% url 'start_conversation' listing.id %}" style="margin:0; flex:1;" id="messageForm">{% csrf_token %}<button type="submit" class="btn btn-brand" style="width:100%;"><i class="fas fa-comment-dots"></i> Message Seller</button></form>
         {% endif %}
         {% if listing.status == 'ACTIVE' %}<a href="https://wa.me/{{ listing.phone }}" target="_blank" class="btn btn-whatsapp" id="whatsappBtn"><i class="fab fa-whatsapp"></i> WhatsApp</a>{% endif %}
@@ -200,12 +200,16 @@ document.addEventListener('DOMContentLoaded', function() {
         if (noImageMsg) noImageMsg.style.display = 'none';
         if (zoomBtn) zoomBtn.classList.remove('hide');
 
+        // FIXED: Force actual size + zoom
         const lightbox = new PhotoSwipeLightbox({
             gallery: '#thumbStrip',
             children: 'a',
             pswpModule: () => import('https://unpkg.com/photoswipe@5/dist/photoswipe.esm.min.js'),
             wheelToZoom: true,
-            padding: { top: 20, bottom: 20, left: 20, right: 20 }
+            padding: { top: 20, bottom: 20, left: 20, right: 20 },
+            initialZoomLevel: 'fit', // shows whole image first
+            maxZoomLevel: 4, // allows 4x zoom to see actual pixels
+            imageClickAction: 'zoom' // tap to zoom
         });
         lightbox.init();
 
