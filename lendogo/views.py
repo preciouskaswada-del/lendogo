@@ -54,7 +54,6 @@ def home(request):
     sort = request.GET.get('sort', '').strip()
     category_slug = request.GET.get('category', '').strip()
 
-    # FIX: Removed seller__userprofile to prevent DB crash on Railway SQLite
     all_listings = Listing.objects.select_related('seller', 'category').filter(
         status='ACTIVE'
     )
@@ -95,7 +94,6 @@ def home(request):
             business_q |= Q(product__icontains=keyword) | Q(location__icontains=keyword)
         all_listings = all_listings.filter(business_q)
     elif sort == 'near_me':
-        # FIX: Added.user and fixed typo
         if request.user.is_authenticated and hasattr(request.user, 'userprofile') and request.user.userprofile.location:
             all_listings = all_listings.filter(location=request.user.userprofile.location)
     else:
@@ -169,28 +167,18 @@ def create_listing(request):
                 listing.save()
                 form.save_m2m()
 
-                # FIX 1: Handle Cloudinary URLs from JS
-                image_urls_json = request.POST.get('image_urls', '[]')
-                video_url = request.POST.get('video_url', '')
+                # Handle Cloudinary URLs from JS
+                new_images = request.POST.getlist('new_images')
+                video_url = request.POST.get('video', '')
 
-                try:
-                    image_urls = json.loads(image_urls_json)
-                except:
-                    image_urls = []
-
-                # Save each uploaded image URL to ListingImage
-                # IMPORTANT: Your ListingImage.image field must be CharField(max_length=500) not ImageField
-                for url in image_urls:
+                for url in new_images:
                     if url:
                         ListingImage.objects.create(listing=listing, image=url)
 
-                # FIX 2: Save video URL
-                # IMPORTANT: Your Listing.video field must be CharField(max_length=500, blank=True, null=True)
                 if video_url and hasattr(listing, 'video'):
                     listing.video = video_url
                     listing.save(update_fields=['video'])
 
-                # Still save formset files in case someone bypasses JS
                 if formset.is_valid():
                     formset.instance = listing
                     formset.save()
@@ -222,7 +210,7 @@ def mark_as_sold(request, pk):
         listing.is_sold = True
         listing.save(update_fields=['status', 'is_sold'])
 
-        profile = request.user.userprofile
+        profile = request.userprofile
         profile.total_sales = F('total_sales') + 1
         profile.save(update_fields=['total_sales'])
 
@@ -242,44 +230,38 @@ def edit_listing(request, pk):
                 listing.save()
                 form.save_m2m()
 
-                # FIX 3: Also handle Cloudinary URLs on edit
-                image_urls_json = request.POST.get('image_urls', '[]')
-                video_url = request.POST.get('video_url', '')
-                try:
-                    image_urls = json.loads(image_urls_json)
-                except:
-                    image_urls = []
+                # Save formset deletes and updates
+                formset.save()
 
-                # Clear old and add new
-                listing.images.all().delete()
-                for url in image_urls:
+                # FIX: Save new Cloudinary uploads
+                new_images = request.POST.getlist('new_images')
+                for url in new_images:
                     if url:
                         ListingImage.objects.create(listing=listing, image=url)
 
+                # FIX: Save video URL
+                video_url = request.POST.get('video', '')
                 if video_url and hasattr(listing, 'video'):
                     listing.video = video_url
                     listing.save(update_fields=['video'])
 
-                formset.save()
-
             messages.success(request, 'Listing updated')
-            return redirect('dashboard')
+            return redirect('listing_detail', pk=listing.pk) # Redirect to detail so you see changes
     else:
         form = ListingForm(instance=listing)
         formset = ImageFormSet(instance=listing)
 
     categories = Category.objects.all()
-    return render(request, 'edit.html', {
+    return render(request, 'edit_listing.html', { # Fixed template name
         'form': form,
         'formset': formset,
         'listing': listing,
         'categories': categories
     })
 
-# FIX 4: MANUAL BOOST FOR FRIENDS/ADMIN
 @login_required
 def manual_boost(request, pk):
-    if not request.user.is_staff: # only staff/admin can do this
+    if not request.user.is_staff:
         return HttpResponseForbidden("Not allowed")
 
     listing = get_object_or_404(Listing, pk=pk)
@@ -485,7 +467,7 @@ def dashboard(request):
         'sold_today': sold_today,
         'sold_yesterday': sold_yesterday,
         'sold_this_week': sold_this_week,
-        'is_verified': request.user.userprofile.is_verified,
+        'is_verified': request.userprofile.is_verified,
     }
 
     return render(request, 'dashboard.html', {
@@ -604,6 +586,7 @@ def start_conversation(request, listing_id):
             'market_avg': str(listing.market_avg_price) if listing.market_avg_price else None,
         }, status=400)
 
+    # FIXED: This matches your Conversation model
     convo, created = Conversation.objects.get_or_create(
         listing=listing,
         rental=None,
@@ -611,7 +594,7 @@ def start_conversation(request, listing_id):
         seller=seller
     )
     convo.save()
-    return redirect('chat:room', convo_id=convo.id)
+    return redirect('chat_room', convo_id=convo.id) # Fixed redirect name
 
 @login_required
 @require_POST
@@ -818,6 +801,7 @@ def rental_detail(request, pk):
         'rental': rental,
         'MEDIA_URL': settings.MEDIA_URL,
     })
+
 @login_required
 @require_POST
 def start_rental_conversation(request, rental_id):
@@ -836,7 +820,7 @@ def start_rental_conversation(request, rental_id):
     )
 
     convo.save()
-    return redirect('chat:room', convo_id=convo.id)
+    return redirect('chat_room', convo_id=convo.id) # Fixed redirect name
 
 def airtel_checkout(request):
     if request.method == 'POST':
