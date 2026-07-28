@@ -20,11 +20,11 @@ body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color
 .video-box video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; }
 .video-label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); color: white; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; z-index: 2; }
 
-/* CHANGED: FIXED HEIGHT + NO SQUISH */
+/* FIXED HEIGHT + NO SQUISH */
 .main-media { position: relative; width: 100%; height: 400px; background: #000; border-radius: 16px; overflow: hidden; margin-bottom: 16px; cursor: zoom-in; display: flex; align-items: center; justify-content: center; }
-@media (max-width: 768px) {.main-media { height: 300px; }} /* mobile smaller */
+@media (max-width: 768px) {.main-media { height: 300px; }}
 
-.main-media img { width: 100%; height: 100%; object-fit: contain; display: block; } /* contain = no squish */
+.main-media img { width: 100%; height: 100%; object-fit: cover; display: block; } /* CHANGED to cover */
 .no-image { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--ink-light); text-align: center; }
 .media-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.95); border: none; width: 44px; height: 44px; border-radius: 12px; cursor: pointer; font-size: 18px; color: var(--ink); display: flex; align-items: center; justify-content: center; z-index: 5; }
 .media-nav.prev { left: 16px; }.media-nav.next { right: 16px; }.media-nav.hide { display: none; }
@@ -35,7 +35,7 @@ body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color
 .thumbs.hide { display: none; }
 .thumb { flex-shrink: 0; width: 80px; height: 80px; border-radius: 12px; overflow: hidden; border: 2px solid var(--line); cursor: pointer; background: var(--bg); }
 .thumb.active { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(15,118,110,0.1); }
-.thumb img { width: 100%; height: 100%; object-fit: cover; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; } /* CHANGED to cover */
 .info { background: var(--card); border-radius: 20px; padding: 24px; box-shadow: 0 4px 12px rgb(0 0 0 / 0.05); border: 1px solid var(--line); height: fit-content; position: sticky; top: 16px; }
 .info h1 { font-size: 26px; font-weight: 800; margin: 0 0 12px 0; line-height: 1.2; }
 .price { font-size: 40px; font-weight: 800; color: var(--brand); margin: 20px 0; }
@@ -91,12 +91,14 @@ body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color
       <div class="thumbs hide" id="thumbStrip">
         {% for img in listing.images.all %}
           {% if img.image %}
-          <a href="{{ img.image.url }}"
+          <a href="{{ img.image }}"
              data-pswp-width="1200"
              data-pswp-height="900"
              class="thumb"
              target="_blank">
-            <img src="{{ img.image.url }}" alt="{{ listing.product|default:'Product' }}" loading="lazy">
+            <img src="{{ img.image }}"
+                 alt="{{ listing.product|default:'Product' }}"
+                 loading="lazy">
           </a>
           {% endif %}
         {% endfor %}
@@ -188,7 +190,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (totalCountEl) totalCountEl.textContent = images.length;
 
-    let autoSwipeInterval; // NEW
+    let autoSwipeInterval;
 
     if (images.length > 0) {
         if (mainImage) { mainImage.style.display = 'block'; mainImage.src = images[0].src; }
@@ -215,17 +217,17 @@ document.addEventListener('DOMContentLoaded', function() {
             if (mainImage) mainImage.src = images[idx].src;
         }
 
-        function startAutoSwipe() { // NEW
+        function startAutoSwipe() {
             if(images.length > 1) {
-                autoSwipeInterval = setInterval(() => showImage(current + 1), 3000); // 3 seconds
+                autoSwipeInterval = setInterval(() => showImage(current + 1), 3000);
             }
         }
-        function stopAutoSwipe() { clearInterval(autoSwipeInterval); } // NEW
+        function stopAutoSwipe() { clearInterval(autoSwipeInterval); }
 
         if (mainMedia) {
             mainMedia.onclick = () => { stopAutoSwipe(); lightbox.loadAndOpen(current); };
-            mainMedia.onmouseenter = stopAutoSwipe; // pause on hover
-            mainMedia.onmouseleave = startAutoSwipe; // resume
+            mainMedia.onmouseenter = stopAutoSwipe;
+            mainMedia.onmouseleave = startAutoSwipe;
         }
         if (zoomBtn) { zoomBtn.onclick = (e) => { e.stopPropagation(); stopAutoSwipe(); lightbox.loadAndOpen(current); }; }
 
@@ -237,7 +239,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (prevBtn) prevBtn.onclick = (e) => { e.stopPropagation(); stopAutoSwipe(); showImage(current - 1); startAutoSwipe(); };
             if (nextBtn) nextBtn.onclick = (e) => { e.stopPropagation(); stopAutoSwipe(); showImage(current + 1); startAutoSwipe(); };
             thumbs.forEach((thumb, idx) => { thumb.onclick = (e) => { e.preventDefault(); stopAutoSwipe(); showImage(idx); startAutoSwipe(); }; });
-            startAutoSwipe(); // START AUTOSWIPE
+            startAutoSwipe();
         }
         showImage(0);
     } else {
@@ -245,7 +247,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (noImageMsg) noImageMsg.style.display = 'block';
     }
 
-    // SCAM BLOCKER - LEVEL 3 ONLY - 1 PARAGRAPH TEXT
+    // SCAM BLOCKER - LEVEL 3 ONLY
     if (window.LENDOGO.suspicionLevel === 3) {
         const modal = document.getElementById('scamModal');
         const confirmBtn = document.getElementById('confirmContact');
