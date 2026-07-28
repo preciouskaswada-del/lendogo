@@ -31,6 +31,7 @@ import re
 import requests
 import urllib3
 import time
+from django.contrib.contenttypes.models import ContentType
 
 load_dotenv()
 
@@ -569,6 +570,7 @@ def log_blocked_attempt(request, pk):
     Listing.objects.filter(pk=pk).update(whatsapp_clicks=F('whatsapp_clicks') + 1)
     return JsonResponse({'status': 'logged'})
 
+
 @login_required
 @require_POST
 def start_conversation(request, listing_id):
@@ -586,15 +588,18 @@ def start_conversation(request, listing_id):
             'market_avg': str(listing.market_avg_price) if listing.market_avg_price else None,
         }, status=400)
 
-    # FIXED: This matches your Conversation model
+    # FIX: Use GenericForeignKey fields
+    content_type = ContentType.objects.get_for_model(Listing)
+    
     convo, created = Conversation.objects.get_or_create(
-        listing=listing,
-        rental=None,
+        content_type=content_type,
+        object_id=listing.id,
         buyer=request.user,
-        seller=seller
+        seller=seller,
+        defaults={'rental': None} # make sure rental is null
     )
     convo.save()
-    return redirect('chat_room', convo_id=convo.id) # Fixed redirect name
+    return redirect('chat_room', convo_id=convo.id)
 
 @login_required
 @require_POST
