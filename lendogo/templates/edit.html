@@ -10,54 +10,37 @@
 .form-wrapper { max-width: 800px; margin: 0 auto; }
 .form-card { background: white; border-radius: 16px; border: 1px solid #e5e7eb; }
 .form-section { border-bottom: 1px solid #f3f4f6; padding: 24px; }
-.form-section:last-child { border-bottom: none; }
 .section-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
-
-.photo-grid {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 12px;
-  }
-@media (max-width: 768px) {
-  .photo-grid { grid-template-columns: repeat(3, 1fr); }
-}
+.photo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+@media (max-width: 768px) {.photo-grid { grid-template-columns: repeat(3, 1fr); } }
 .photo-slot {
     aspect-ratio: 1; border-radius: 12px; border: 2px dashed #d1d5db; background: #f9fafb;
-    position: relative; overflow: hidden; cursor: pointer;
+    position: relative; overflow: hidden;
   }
-.photo-slot:hover { border-color: #2563eb; }
 .photo-slot.filled { border: 2px solid #e5e7eb; }
 .photo-preview { width: 100%; height: 100%; object-fit: cover; }
 .photo-actions {
     position: absolute; bottom: 4px; right: 4px; display: flex; gap: 4px;
-    background: rgba(0,0,0,0.5); padding: 3px; border-radius: 6px;
-  }
-.photo-actions.btn { padding: 2px 6px; font-size: 12px; }
-.photo-placeholder {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    height: 100%; color: #9ca3af; font-size: 11px; pointer-events: none;
+    background: rgba(0,0,0,0.6); padding: 4px; border-radius: 8px;
   }
 .uploading-overlay {
     position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.6);
     color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 12px; z-index: 5;
   }
+.add-more-btn { border: 2px dashed #d1d5db; background: #f9fafb; color: #6b7280; display: flex; align-items: center; justify-content: center; flex-direction: column; cursor: pointer; }
+.add-more-btn:hover { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
 .sticky-footer {
     position: sticky; bottom: 0; background: white; border-top: 1px solid #e5e7eb;
     padding: 16px 24px; margin: 0 -24px -24px; border-radius: 0 0 16px 16px; z-index: 10;
   }
 .btn-primary { background: #2563eb; border: none; }
-.btn-primary:hover { background: #1d4ed8; }
 .btn-primary:disabled { background: #93c5fd; }
-.add-more-btn { border: 2px dashed #d1d5db; background: #f9fafb; color: #6b7280; }
-.add-more-btn:hover { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container py-4 form-wrapper">
-  <a href="javascript:history.back()" class="btn btn-light mb-3">
-    <i class="bi bi-arrow-left"></i> Back
-  </a>
+  <a href="javascript:history.back()" class="btn btn-light mb-3"><i class="bi bi-arrow-left"></i> Back</a>
 
   <form method="POST" id="editForm">
     {% csrf_token %}
@@ -76,7 +59,7 @@
       <div class="form-section">
         <h3 class="section-title">Location</h3>
         <div class="mb-3"><label class="form-label fw-medium">Area / City</label>{{ form.location }}</div>
-        <div class="row g-3 d-none"><div class="col-6">{{ form.latitude }}</div><div class="col-6">{{ form.longitude }}</div></div>
+        {{ form.latitude }}{{ form.longitude }}
       </div>
 
       <div class="form-section">
@@ -84,47 +67,58 @@
         {{ formset.management_form }}
         <div class="photo-grid" id="photoGrid">
           {% for img_form in formset %}
-          {% if img_form.instance.image %}
-          <div class="photo-slot filled" data-index="{{ forloop.counter0 }}">
+          <div class="photo-slot {% if img_form.instance.image %}filled{% endif %}" data-index="{{ forloop.counter0 }}">
             {{ img_form.id }}
-            <input type="hidden" name="{{ img_form.image.html_name }}" value="{{ img_form.instance.image }}">
-            <input type="checkbox" name="{{ img_form.DELETE.html_name }}" class="d-none">
-            <img src="{{ img_form.instance.image }}" class="photo-preview">
-            <div class="photo-actions">
-                <button type="button" class="btn btn-sm btn-light delete-btn"><i class="bi bi-trash"></i></button>
-            </div>
+            {{ img_form.image }} <!-- This is the hidden URL field -->
+            {{ img_form.DELETE }}
+            <input type="file" accept="image/*" class="d-none file-input">
+
+            {% if img_form.instance.image %}
+              <img src="{{ img_form.instance.image }}" class="photo-preview">
+              <div class="photo-actions">
+                <button type="button" class="btn btn-sm btn-light change-btn"><i class="bi bi-arrow-repeat"></i></button>
+                <button type="button" class="btn btn-sm btn-danger delete-btn"><i class="bi bi-trash"></i></button>
+              </div>
+            {% else %}
+              <div class="add-more-btn h-100 w-100 slot-add-btn">
+                <i class="bi bi-plus-lg fs-3"></i>
+                <span>Add</span>
+              </div>
+            {% endif %}
           </div>
-          {% endif %}
           {% endfor %}
-          
+
           <div class="photo-slot add-more-btn" id="addPhotoBtn">
-            <div class="photo-placeholder">
-                <i class="bi bi-plus-lg fs-2 mb-1"></i>
-                <span>Add Photos</span>
-            </div>
+            <i class="bi bi-plus-lg fs-2"></i>
+            <span>Add Photos</span>
             <input type="file" id="multiFileInput" accept="image/*" multiple class="d-none">
           </div>
         </div>
-        <div id="hiddenInputs"></div>
+        <div id="newImageUrls"></div>
         <small class="text-muted mt-2 d-block">Tip: First photo = main photo. You can upload multiple at once.</small>
       </div>
 
       <div class="form-section">
         <h3 class="section-title">Video <span class="text-muted fw-normal fs-6">Optional</span></h3>
-        <input type="hidden" name="video" value="{{ form.instance.video|default:'' }}">
+        {{ form.video }}
         <input type="file" name="video_upload" accept="video/*" class="d-none">
         <div class="border rounded-3 p-4 text-center bg-light" id="videoBox">
-          <i class="bi bi-camera-video fs-1 text-muted d-block mb-2"></i>
-          <p class="text-muted mb-3">Add a short video to show your item in action</p>
-          <button type="button" class="btn btn-outline-primary" id="videoUploadBtn">
-            <i class="bi bi-upload"></i> Upload Video
-          </button>
-          <div id="videoPreview" class="mt-3 {% if not form.instance.video %}d-none{% endif %}">
-            {% if form.instance.video %}
+          {% if form.instance.video %}
+          <div id="videoPreview">
             <video src="{{ form.instance.video }}" controls class="w-100 rounded" style="max-height:250px;"></video>
-            {% endif %}
-            <button type="button" class="btn btn-sm btn-outline-danger mt-2" id="removeVideoBtn">Remove</button>
+            <div class="mt-2">
+                <button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button>
+                <button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn">Remove</button>
+            </div>
           </div>
+          {% else %}
+          <div id="videoUploadArea">
+            <i class="bi bi-camera-video fs-1 text-muted d-block mb-2"></i>
+            <p class="text-muted mb-3">Add a short video to show your item in action</p>
+            <button type="button" class="btn btn-outline-primary" id="videoUploadBtn"><i class="bi bi-upload"></i> Upload Video</button>
+          </div>
+          <div id="videoPreview" class="d-none"></div>
+          {% endif %}
         </div>
       </div>
 
@@ -138,145 +132,130 @@
     </div>
   </form>
 </div>
-
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-// CRITICAL FIX: This MUST match your Railway variable
-const CLOUD_NAME = "sbsdxiie"; 
-const UPLOAD_PRESET = "lendogo2"; // <-- CHANGED FROM lendogo_unsigned
+const CLOUD_NAME = "sbsdxiie";
+const UPLOAD_PRESET = "lendogo2";
 
-document.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(el => {
-  el.classList.add('form-control');
-});
+document.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(el => el.classList.add('form-control'));
 
 let isUploading = false;
 let uploadCount = 0;
 
 async function uploadToCloudinary(file, type = 'image') {
+  uploadCount++;
   isUploading = true;
   document.querySelector('#postBtn').disabled = true;
-  document.querySelector('#postBtn').innerHTML = '<i class="bi bi-arrow-repeat"></i> Uploading ' + (uploadCount+1) + '...';
+  document.querySelector('#postBtn').innerHTML = `<i class="bi bi-arrow-repeat"></i> Uploading ${uploadCount}...`;
 
   const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${type}/upload`;
   const formData = new FormData();
   formData.append('file', file);
   formData.append('upload_preset', UPLOAD_PRESET);
   formData.append('folder', 'lendogo');
-  try {
-    const res = await fetch(url, { method: 'POST', body: formData });
-    const data = await res.json();
-    if (data.secure_url) return data.secure_url;
-    throw new Error(data.error?.message || 'Upload failed');
-  } finally {
-    uploadCount--;
-    if(uploadCount <= 0) {
-        isUploading = false;
-        document.querySelector('#postBtn').disabled = false;
-        document.querySelector('#postBtn').innerHTML = '<i class="bi bi-check-lg"></i> Save Changes';
-    }
+  const res = await fetch(url, { method: 'POST', body: formData });
+  const data = await res.json();
+  uploadCount--;
+  if(uploadCount <= 0) {
+    isUploading = false;
+    document.querySelector('#postBtn').disabled = false;
+    document.querySelector('#postBtn').innerHTML = '<i class="bi bi-check-lg"></i> Save Changes';
   }
+  if (data.secure_url) return data.secure_url;
+  throw new Error(data.error?.message || 'Upload failed');
 }
 
-// BLOCK FORM SUBMIT IF UPLOADING
-document.getElementById('editForm').addEventListener('submit', function(e) {
-  if (isUploading) {
-    e.preventDefault();
-    alert('Still uploading. Please wait.');
+document.getElementById('editForm').addEventListener('submit', e => {
+  if (isUploading) { e.preventDefault(); alert('Still uploading. Please wait.'); }
+});
+
+// PHOTO LOGIC: Change, Delete, Add
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.change-btn, .slot-add-btn');
+  if(btn) {
+    const slot = btn.closest('.photo-slot');
+    slot.querySelector('.file-input').click();
   }
-});
-
-// MULTI PHOTO UPLOAD
-document.getElementById('addPhotoBtn').addEventListener('click', () => {
-    document.getElementById('multiFileInput').click();
-});
-
-document.getElementById('multiFileInput').addEventListener('change', async function(e){
-    const files = Array.from(e.target.files);
-    if(files.length === 0) return;
-    uploadCount = files.length;
-    
-    for(const file of files) {
-        const grid = document.getElementById('photoGrid');
-        const slot = document.createElement('div');
-        slot.className = 'photo-slot';
-        slot.innerHTML = '<div class="uploading-overlay">Uploading...</div>';
-        grid.insertBefore(slot, document.getElementById('addPhotoBtn'));
-        
-        try {
-            const cloudUrl = await uploadToCloudinary(file, 'image');
-            
-            // Add hidden input for Django
-            const hiddenInput = document.createElement('input');
-            hiddenInput.type = 'hidden';
-            hiddenInput.name = 'images[]'; // We'll handle this in view
-            hiddenInput.value = cloudUrl;
-            document.getElementById('hiddenInputs').appendChild(hiddenInput);
-            
-            slot.classList.add('filled');
-            slot.innerHTML = `
-                <img src="${cloudUrl}" class="photo-preview">
-                <div class="photo-actions">
-                    <button type="button" class="btn btn-sm btn-danger remove-new-btn"><i class="bi bi-trash"></i></button>
-                </div>
-            `;
-            slot.querySelector('.remove-new-btn').onclick = () => {
-                slot.remove();
-                hiddenInput.remove();
-            }
-        } catch (err) { 
-            alert('Upload failed: ' + err.message); 
-            slot.remove();
-        }
-    }
-    e.target.value = ''; // Reset input
-});
-
-// DELETE EXISTING PHOTOS
-document.addEventListener('click', function(e){
   const delBtn = e.target.closest('.delete-btn');
-  if (delBtn){
-    e.preventDefault();
+  if(delBtn){
     const slot = delBtn.closest('.photo-slot');
-    slot.querySelector('input[type="checkbox"]').checked = true;
+    slot.querySelector('input[name$="-DELETE"]').checked = true;
     slot.style.opacity = '0.4';
     slot.querySelector('.photo-actions').innerHTML = '<span class="badge bg-secondary">Will Delete</span>';
   }
 });
 
-// VIDEO LOGIC
-document.getElementById('videoUploadBtn').addEventListener('click', () => {
-  document.querySelector('input[name="video_upload"]').click();
+// Multi upload
+document.getElementById('addPhotoBtn').addEventListener('click', () => {
+    document.getElementById('multiFileInput').click();
 });
-document.querySelector('input[name="video_upload"]').addEventListener('change', async function(e){
+
+document.getElementById('multiFileInput').addEventListener('change', async e => {
+  const files = Array.from(e.target.files);
+  for(const file of files) {
+    const slot = document.createElement('div');
+    slot.className = 'photo-slot';
+    slot.innerHTML = '<div class="uploading-overlay">Uploading...</div>';
+    document.getElementById('photoGrid').insertBefore(slot, document.getElementById('addPhotoBtn'));
+
+    const cloudUrl = await uploadToCloudinary(file, 'image');
+    const hiddenInput = document.createElement('input');
+    hiddenInput.type = 'hidden';
+    hiddenInput.name = 'new_images'; // Key name for backend
+    hiddenInput.value = cloudUrl;
+    document.getElementById('newImageUrls').appendChild(hiddenInput);
+
+    slot.classList.add('filled');
+    slot.innerHTML = `<img src="${cloudUrl}" class="photo-preview"><div class="photo-actions"><button type="button" class="btn btn-sm btn-danger remove-new-btn"><i class="bi bi-trash"></i></button></div>`;
+    slot.querySelector('.remove-new-btn').onclick = () => { slot.remove(); hiddenInput.remove(); }
+  }
+  e.target.value = '';
+});
+
+// Single slot change
+document.addEventListener('change', async e => {
+    if(e.target.classList.contains('file-input') && e.target.files[0]){
+        const slot = e.target.closest('.photo-slot');
+        slot.insertAdjacentHTML('beforeend', '<div class="uploading-overlay">Uploading...</div>');
+        const cloudUrl = await uploadToCloudinary(e.target.files[0], 'image');
+        slot.querySelector('input[name$="-image"]').value = cloudUrl; // Update the hidden formset field
+        slot.querySelector('.photo-preview')?.remove();
+        slot.querySelector('.slot-add-btn')?.remove();
+        slot.insertAdjacentHTML('afterbegin', `<img src="${cloudUrl}" class="photo-preview">`);
+        slot.classList.add('filled');
+        if(!slot.querySelector('.photo-actions')){
+            slot.insertAdjacentHTML('beforeend', `<div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-btn"><i class="bi bi-trash"></i></button></div>`);
+        }
+        slot.querySelector('.uploading-overlay')?.remove();
+    }
+});
+
+// VIDEO LOGIC: Upload, Change, Remove
+const videoInput = document.querySelector('input[name="video_upload"]');
+document.getElementById('videoUploadBtn')?.addEventListener('click', () => videoInput.click());
+document.addEventListener('click', e => { if(e.target.id === 'changeVideoBtn') videoInput.click(); });
+
+videoInput.addEventListener('change', async e => {
   if (e.target.files[0]) {
-    const file = e.target.files[0];
     const box = document.getElementById('videoBox');
     box.insertAdjacentHTML('beforeend', '<div class="uploading-overlay">Uploading Video...</div>');
-    isUploading = true;
-    document.querySelector('#postBtn').disabled = true;
-    try {
-      const cloudUrl = await uploadToCloudinary(file, 'video');
-      document.querySelector('input[name="video"]').value = cloudUrl;
-      document.getElementById('videoPreview').innerHTML = `<video src="${cloudUrl}" controls class="w-100 rounded" style="max-height:250px;"></video><button type="button" class="btn btn-sm btn-outline-danger mt-2" id="removeVideoBtn">Remove</button>`;
-      document.getElementById('videoPreview').classList.remove('d-none');
-      box.classList.add('border-primary');
-    } catch (err) { alert('Video upload failed: ' + err.message); }
-    finally { 
-        box.querySelector('.uploading-overlay')?.remove(); 
-        isUploading = false;
-        document.querySelector('#postBtn').disabled = false;
-    }
+    const cloudUrl = await uploadToCloudinary(e.target.files[0], 'video');
+    document.querySelector('input[name="video"]').value = cloudUrl;
+    document.getElementById('videoUploadArea')?.classList.add('d-none');
+    document.getElementById('videoPreview').classList.remove('d-none');
+    document.getElementById('videoPreview').innerHTML = `<video src="${cloudUrl}" controls class="w-100 rounded" style="max-height:250px;"></video><div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button><button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn">Remove</button></div>`;
+    box.querySelector('.uploading-overlay')?.remove();
   }
 });
-document.addEventListener('click', function(e){
+
+document.addEventListener('click', e => {
   if(e.target.id === 'removeVideoBtn'){
     document.querySelector('input[name="video"]').value = '';
-    document.querySelector('input[name="video_upload"]').value = '';
     document.getElementById('videoPreview').classList.add('d-none');
-    document.getElementById('videoBox').classList.remove('border-primary');
+    document.getElementById('videoUploadArea')?.classList.remove('d-none');
   }
 });
 </script>
