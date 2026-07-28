@@ -19,8 +19,12 @@ body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color
 .video-box { width: 100%; background: #000; border-radius: 16px; overflow: hidden; margin-bottom: 16px; position: relative; aspect-ratio: 16 / 9; }
 .video-box video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; }
 .video-label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); color: white; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; z-index: 2; }
-.main-media { position: relative; width: 100%; background: #000; border-radius: 16px; overflow: hidden; margin-bottom: 16px; cursor: zoom-in; display: flex; align-items: center; justify-content: center; aspect-ratio: 4 / 3; }
-.main-media img { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+/* CHANGED: FIXED HEIGHT + NO SQUISH */
+.main-media { position: relative; width: 100%; height: 400px; background: #000; border-radius: 16px; overflow: hidden; margin-bottom: 16px; cursor: zoom-in; display: flex; align-items: center; justify-content: center; }
+@media (max-width: 768px) {.main-media { height: 300px; }} /* mobile smaller */
+
+.main-media img { width: 100%; height: 100%; object-fit: contain; display: block; } /* contain = no squish */
 .no-image { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--ink-light); text-align: center; }
 .media-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.95); border: none; width: 44px; height: 44px; border-radius: 12px; cursor: pointer; font-size: 18px; color: var(--ink); display: flex; align-items: center; justify-content: center; z-index: 5; }
 .media-nav.prev { left: 16px; }.media-nav.next { right: 16px; }.media-nav.hide { display: none; }
@@ -184,6 +188,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (totalCountEl) totalCountEl.textContent = images.length;
 
+    let autoSwipeInterval; // NEW
+
     if (images.length > 0) {
         if (mainImage) { mainImage.style.display = 'block'; mainImage.src = images[0].src; }
         if (noImageMsg) noImageMsg.style.display = 'none';
@@ -209,17 +215,29 @@ document.addEventListener('DOMContentLoaded', function() {
             if (mainImage) mainImage.src = images[idx].src;
         }
 
-        if (mainMedia) { mainMedia.onclick = () => lightbox.loadAndOpen(current); }
-        if (zoomBtn) { zoomBtn.onclick = (e) => { e.stopPropagation(); lightbox.loadAndOpen(current); }; }
+        function startAutoSwipe() { // NEW
+            if(images.length > 1) {
+                autoSwipeInterval = setInterval(() => showImage(current + 1), 3000); // 3 seconds
+            }
+        }
+        function stopAutoSwipe() { clearInterval(autoSwipeInterval); } // NEW
+
+        if (mainMedia) {
+            mainMedia.onclick = () => { stopAutoSwipe(); lightbox.loadAndOpen(current); };
+            mainMedia.onmouseenter = stopAutoSwipe; // pause on hover
+            mainMedia.onmouseleave = startAutoSwipe; // resume
+        }
+        if (zoomBtn) { zoomBtn.onclick = (e) => { e.stopPropagation(); stopAutoSwipe(); lightbox.loadAndOpen(current); }; }
 
         if (images.length > 1) {
             if (prevBtn) prevBtn.classList.remove('hide');
             if (nextBtn) nextBtn.classList.remove('hide');
             if (mediaCount) mediaCount.classList.remove('hide');
             if (thumbStrip) thumbStrip.classList.remove('hide');
-            if (prevBtn) prevBtn.onclick = (e) => { e.stopPropagation(); showImage(current - 1); };
-            if (nextBtn) nextBtn.onclick = (e) => { e.stopPropagation(); showImage(current + 1); };
-            thumbs.forEach((thumb, idx) => { thumb.onclick = (e) => { e.preventDefault(); showImage(idx); }; });
+            if (prevBtn) prevBtn.onclick = (e) => { e.stopPropagation(); stopAutoSwipe(); showImage(current - 1); startAutoSwipe(); };
+            if (nextBtn) nextBtn.onclick = (e) => { e.stopPropagation(); stopAutoSwipe(); showImage(current + 1); startAutoSwipe(); };
+            thumbs.forEach((thumb, idx) => { thumb.onclick = (e) => { e.preventDefault(); stopAutoSwipe(); showImage(idx); startAutoSwipe(); }; });
+            startAutoSwipe(); // START AUTOSWIPE
         }
         showImage(0);
     } else {
@@ -239,7 +257,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         function showScamModal(action, actionName) {
             pendingAction = action;
-            // ONE PARAGRAPH TEXT
             const warningText = `Mtengo ndi otsika kwambiri poyerekeza ndi pamsika. Tikukupemphani kuti mupange meet up pa public place ndipo musathamangire kulipira ndalama musanawone kaye katunduyo, pokhapokha mutatsimikiza kuti ali mu condition yabwino.`;
 
             if (modalWarningText) {
