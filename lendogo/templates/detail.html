@@ -4,7 +4,7 @@
 {% block title %}{{ listing.product|default:"Listing" }} - Lendogo{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="https://unpkg.com/photoswipe@5/dist/photoswipe.css?v=4">
+<link rel="stylesheet" href="https://unpkg.com/photoswipe@5/dist/photoswipe.css?v=5">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -25,6 +25,10 @@ body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color
 @media (max-width: 768px) {.main-media { height: 300px; }}
 
 .main-media img { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
+
+/* CRITICAL FIX: Stop PhotoSwipe from squishing images */
+.pswp__img { object-fit: contain!important; background: #000; }
+
 .no-image { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--ink-light); text-align: center; }
 .media-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.95); border: none; width: 44px; height: 44px; border-radius: 12px; cursor: pointer; font-size: 18px; color: var(--ink); display: flex; align-items: center; justify-content: center; z-index: 5; }
 .media-nav.prev { left: 16px; }.media-nav.next { right: 16px; }.media-nav.hide { display: none; }
@@ -88,7 +92,6 @@ body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color
         <div class="no-image" id="noImageMsg"><i class="fas fa-image" style="font-size:48px;margin-bottom:12px;opacity:0.3;"></i><p>No media uploaded</p></div>
       </div>
 
-      <!-- FIX: Real dimensions from Django -->
       <div class="thumbs hide" id="thumbStrip">
         {% for img in listing.images.all %}
           {% if img.image %}
@@ -143,7 +146,6 @@ body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color
   </div>
 </div>
 
-<!-- SCAM MODAL LEVEL 3 ONLY -->
 {% if listing.suspicion_level == 3 %}
 <div id="scamModal" class="modal">
   <div class="modal-card">
@@ -158,7 +160,6 @@ body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color
 </div>
 {% endif %}
 
-<!-- PhotoSwipe Container -->
 <div class="pswp" tabindex="-1" role="dialog" aria-hidden="true"></div>
 {% endblock %}
 
@@ -200,16 +201,18 @@ document.addEventListener('DOMContentLoaded', function() {
         if (noImageMsg) noImageMsg.style.display = 'none';
         if (zoomBtn) zoomBtn.classList.remove('hide');
 
-        // FIXED: Force actual size + zoom
+        // FIXED: padding 0 + maxZoom 5 + contain
         const lightbox = new PhotoSwipeLightbox({
             gallery: '#thumbStrip',
             children: 'a',
             pswpModule: () => import('https://unpkg.com/photoswipe@5/dist/photoswipe.esm.min.js'),
             wheelToZoom: true,
-            padding: { top: 20, bottom: 20, left: 20, right: 20 },
-            initialZoomLevel: 'fit', // shows whole image first
-            maxZoomLevel: 4, // allows 4x zoom to see actual pixels
-            imageClickAction: 'zoom' // tap to zoom
+            padding: { top: 0, bottom: 0, left: 0, right: 0 }, // no padding = more space
+            showHideAnimationType: 'fade',
+            initialZoomLevel: 'fit', // fits screen first
+            maxZoomLevel: 5, // allows deep zoom
+            imageClickAction: 'zoom-or-close',
+            bgOpacity: 0.95
         });
         lightbox.init();
 
@@ -254,7 +257,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (noImageMsg) noImageMsg.style.display = 'block';
     }
 
-    // SCAM BLOCKER - LEVEL 3 ONLY
     if (window.LENDOGO.suspicionLevel === 3) {
         const modal = document.getElementById('scamModal');
         const confirmBtn = document.getElementById('confirmContact');
@@ -267,7 +269,6 @@ document.addEventListener('DOMContentLoaded', function() {
         function showScamModal(action, actionName) {
             pendingAction = action;
             const warningText = `Mtengo ndi otsika kwambiri poyerekeza ndi pamsika. Tikukupemphani kuti mupange meet up pa public place ndipo musathamangire kulipira ndalama musanawone kaye katunduyo, pokhapokha mutatsimikiza kuti ali mu condition yabwino.`;
-
             if (modalWarningText) {
                 modalWarningText.innerHTML = `<strong>Action Blocked: ${actionName}</strong><br><br>${warningText}`;
             }
