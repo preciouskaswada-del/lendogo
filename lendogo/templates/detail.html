@@ -20,11 +20,11 @@ body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color
 .video-box video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; }
 .video-label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); color: white; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; z-index: 2; }
 
-/* FIXED HEIGHT + NO SQUISH */
+/* FIXED: contain = no crop */
 .main-media { position: relative; width: 100%; height: 400px; background: #000; border-radius: 16px; overflow: hidden; margin-bottom: 16px; cursor: zoom-in; display: flex; align-items: center; justify-content: center; }
 @media (max-width: 768px) {.main-media { height: 300px; }}
 
-.main-media img { width: 100%; height: 100%; object-fit: cover; display: block; } /* CHANGED to cover */
+.main-media img { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; } /* FIX 1 */
 .no-image { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--ink-light); text-align: center; }
 .media-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.95); border: none; width: 44px; height: 44px; border-radius: 12px; cursor: pointer; font-size: 18px; color: var(--ink); display: flex; align-items: center; justify-content: center; z-index: 5; }
 .media-nav.prev { left: 16px; }.media-nav.next { right: 16px; }.media-nav.hide { display: none; }
@@ -35,7 +35,7 @@ body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color
 .thumbs.hide { display: none; }
 .thumb { flex-shrink: 0; width: 80px; height: 80px; border-radius: 12px; overflow: hidden; border: 2px solid var(--line); cursor: pointer; background: var(--bg); }
 .thumb.active { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(15,118,110,0.1); }
-.thumb img { width: 100%; height: 100%; object-fit: cover; } /* CHANGED to cover */
+.thumb img { width: 100%; height: 100%; object-fit: cover; }
 .info { background: var(--card); border-radius: 20px; padding: 24px; box-shadow: 0 4px 12px rgb(0 0 0 / 0.05); border: 1px solid var(--line); height: fit-content; position: sticky; top: 16px; }
 .info h1 { font-size: 26px; font-weight: 800; margin: 0 0 12px 0; line-height: 1.2; }
 .price { font-size: 40px; font-weight: 800; color: var(--brand); margin: 20px 0; }
@@ -88,17 +88,20 @@ body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color
         <div class="no-image" id="noImageMsg"><i class="fas fa-image" style="font-size:48px;margin-bottom:12px;opacity:0.3;"></i><p>No media uploaded</p></div>
       </div>
 
+      <!-- FIX 2: Real dimensions + fallback -->
       <div class="thumbs hide" id="thumbStrip">
         {% for img in listing.images.all %}
           {% if img.image %}
           <a href="{{ img.image }}"
-             data-pswp-width="1200"
-             data-pswp-height="900"
+             data-pswp-width="{{ img.image.width|default:1200 }}"
+             data-pswp-height="{{ img.image.height|default:900 }}"
              class="thumb"
              target="_blank">
             <img src="{{ img.image }}"
                  alt="{{ listing.product|default:'Product' }}"
-                 loading="lazy">
+                 loading="lazy"
+                 width="{{ img.image.width|default:1200 }}"
+                 height="{{ img.image.height|default:900 }}">
           </a>
           {% endif %}
         {% endfor %}
@@ -121,7 +124,7 @@ body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg); color
       <div class="desc">{{ listing.description|default:"No description provided." }}</div>
 
       <div class="actions">
-        {% if user.is_authenticated and user != listing.seller and listing.status == 'ACTIVE' %}
+        {% if user.is_authenticated and user!= listing.seller and listing.status == 'ACTIVE' %}
         <form method="POST" action="{% url 'start_conversation' listing.id %}" style="margin:0; flex:1;" id="messageForm">{% csrf_token %}<button type="submit" class="btn btn-brand" style="width:100%;"><i class="fas fa-comment-dots"></i> Message Seller</button></form>
         {% endif %}
         {% if listing.status == 'ACTIVE' %}<a href="https://wa.me/{{ listing.phone }}" target="_blank" class="btn btn-whatsapp" id="whatsappBtn"><i class="fab fa-whatsapp"></i> WhatsApp</a>{% endif %}
