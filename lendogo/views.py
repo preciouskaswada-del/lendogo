@@ -95,7 +95,7 @@ def home(request):
             business_q |= Q(product__icontains=keyword) | Q(location__icontains=keyword)
         all_listings = all_listings.filter(business_q)
     elif sort == 'near_me':
-        if request.user.is_authenticated and hasattr(request.user, 'userprofile') and request.user.userprofile.location:
+        if request.user.is_authenticated and hasattr(request.user, 'userprofile') and request.userprofile.location:
             all_listings = all_listings.filter(location=request.user.userprofile.location)
     else:
         all_listings = all_listings.order_by('-is_boosted', '-bumped_at', '-id')
@@ -234,31 +234,35 @@ def edit_listing(request, pk):
 
                 # 1. HANDLE DELETES FIRST
                 if formset.is_valid():
-                    for obj in formset.deleted_objects:
-                        obj.delete()
-                    # Save existing images that weren't deleted
-                    formset.save()
+                    formset.save() # This deletes anything marked DELETE
 
-                # 2. ADD NEW IMAGES FROM CLOUDINARY URLS
-                new_images = request.POST.getlist('new_images')
+                # 2. REPLACE EXISTING IMAGES
+                # JS sends new_images_0, new_images_1 etc
+                existing_images = list(listing.images.all().order_by('id'))
+                for i, img_obj in enumerate(existing_images):
+                    new_url = request.POST.get(f'new_images_{i}')
+                    if new_url:
+                        img_obj.image = new_url
+                        img_obj.save(update_fields=['image'])
+
+                # 3. ADD COMPLETELY NEW IMAGES
+                new_images = request.POST.getlist('new_images') # for the + button
                 for url in new_images:
                     if url:
                         ListingImage.objects.create(listing=listing, image=url)
 
-                # 3. HANDLE VIDEO
+                # 4. HANDLE VIDEO
                 video_url = request.POST.get('video', '')
-                if video_url and hasattr(listing, 'video'):
-                    listing.video = video_url
+                if hasattr(listing, 'video'):
+                    listing.video = video_url # '' will clear it
                     listing.save(update_fields=['video'])
-                elif video_url == '': # If user removed video
-                    if hasattr(listing, 'video'):
-                        listing.video = ''
-                        listing.save(update_fields=['video'])
 
             messages.success(request, 'Listing updated successfully!')
             return redirect('listing_detail', pk=listing.pk)
         else:
             messages.error(request, 'Please fix the errors below')
+            print("EDIT FORM ERRORS:", form.errors)
+            print("EDIT FORMSET ERRORS:", formset.errors)
     else:
         form = ListingForm(instance=listing)
         formset = ImageFormSet(instance=listing)
@@ -328,8 +332,6 @@ def forgot_password(request):
             user = User.objects.filter(email__iexact=identifier).first()
             if user:
                 masked = user.email[:2] + '****' + user.email[user.email.find('@'):]
-        else:
-            return JsonResponse({'status': 'error', 'message': 'Please enter your email address.'})
 
         if not user:
             return JsonResponse({'status': 'error', 'message': 'No account found with that email.'})
