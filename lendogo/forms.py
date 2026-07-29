@@ -107,22 +107,29 @@ class ListingForm(forms.ModelForm):
         return desc
 
     def clean_video(self):
-        video: UploadedFile = self.cleaned_data.get('video')
+        video = self.cleaned_data.get('video')
         if not video:
             return video
-        if video.size > MAX_VIDEO_SIZE:
-            raise ValidationError(f"Video is {video.size / 1024 / 1024:.1f}MB. Max: 50MB")
-        if video.size < 1024:
-            raise ValidationError("Video file appears empty or corrupted")
-        try:
-            file_head = video.read(2048)
-            video.seek(0)
-            mime = magic.from_buffer(file_head, mime=True)
-            if mime not in ALLOWED_VIDEO_TYPES:
-                raise ValidationError("Only MP4, MOV, AVI, MKV allowed")
-        except Exception:
-            raise ValidationError("Cannot verify video. File may be corrupted.")
-        video.name = re.sub(r'[^a-zA-Z0-9._-]', '', video.name)[:100]
+        
+        # FIX 1: Skip validation if it's already a Cloudinary URL string
+        if isinstance(video, str):
+            return video
+            
+        # Only run file checks if it's an actual uploaded file
+        if isinstance(video, UploadedFile):
+            if video.size > MAX_VIDEO_SIZE:
+                raise ValidationError(f"Video is {video.size / 1024 / 1024:.1f}MB. Max: 50MB")
+            if video.size < 1024:
+                raise ValidationError("Video file appears empty or corrupted")
+            try:
+                file_head = video.read(2048)
+                video.seek(0)
+                mime = magic.from_buffer(file_head, mime=True)
+                if mime not in ALLOWED_VIDEO_TYPES:
+                    raise ValidationError("Only MP4, MOV, AVI, MKV allowed")
+            except Exception:
+                raise ValidationError("Cannot verify video. File may be corrupted.")
+            video.name = re.sub(r'[^a-zA-Z0-9._-]', '', video.name)[:100]
         return video
 
     def clean_latitude(self):
@@ -152,29 +159,37 @@ class ListingForm(forms.ModelForm):
 class ListingImageForm(forms.ModelForm):
     class Meta:
         model = ListingImage
-        fields = ['image']
+        fields = ['image', 'DELETE'] # ADD DELETE
         widgets = {
             'image': forms.FileInput(attrs={
                 'class': 'img-swap w-full p-2 border rounded',
                 'accept': 'image/jpeg,image/png,image/webp'
-            })
+            }),
+            'DELETE': forms.CheckboxInput(attrs={'class': 'd-none'}) # HIDE IT
         }
 
     def clean_image(self):
-        image: UploadedFile = self.cleaned_data.get('image')
+        image = self.cleaned_data.get('image')
         if not image:
             return image
-        if image.size > MAX_IMAGE_SIZE:
-            raise ValidationError(f"Image is {image.size / 1024 / 1024:.1f}MB. Max: 10MB")
-        try:
-            file_head = image.read(2048)
-            image.seek(0)
-            mime = magic.from_buffer(file_head, mime=True)
-            if mime not in ALLOWED_IMAGE_TYPES:
-                raise ValidationError("Only JPG, PNG, WebP images allowed")
-        except Exception:
-            raise ValidationError("Cannot verify image. File may be corrupted.")
-        image.name = re.sub(r'[^a-zA-Z0-9._-]', '', image.name)[:100]
+        
+        # FIX 2: Skip validation if it's already a Cloudinary URL string
+        if isinstance(image, str):
+            return image
+
+        # Only run file checks if it's an actual uploaded file
+        if isinstance(image, UploadedFile):
+            if image.size > MAX_IMAGE_SIZE:
+                raise ValidationError(f"Image is {image.size / 1024 / 1024:.1f}MB. Max: 10MB")
+            try:
+                file_head = image.read(2048)
+                image.seek(0)
+                mime = magic.from_buffer(file_head, mime=True)
+                if mime not in ALLOWED_IMAGE_TYPES:
+                    raise ValidationError("Only JPG, PNG, WebP images allowed")
+            except Exception:
+                raise ValidationError("Cannot verify image. File may be corrupted.")
+            image.name = re.sub(r'[^a-zA-Z0-9._-]', '', image.name)[:100]
         return image
 
 class SignUpForm(UserCreationForm):
@@ -311,21 +326,40 @@ class RentalListingForm(forms.ModelForm):
         return contact
 
     def clean_video(self):
-        return ListingForm.clean_video(self)
+        video = self.cleaned_data.get('video')
+        if not video:
+            return video
+        if isinstance(video, str):
+            return video
+        if isinstance(video, UploadedFile):
+            if video.size > MAX_VIDEO_SIZE:
+                raise ValidationError(f"Video is {video.size / 1024 / 1024:.1f}MB. Max: 50MB")
+            try:
+                file_head = video.read(2048)
+                video.seek(0)
+                mime = magic.from_buffer(file_head, mime=True)
+                if mime not in ALLOWED_VIDEO_TYPES:
+                    raise ValidationError("Only MP4, MOV, AVI, MKV allowed")
+            except Exception:
+                raise ValidationError("Cannot verify video. File may be corrupted.")
+        return video
 
     def clean_image(self):
-        image: UploadedFile = self.cleaned_data.get('image')
+        image = self.cleaned_data.get('image')
         if not image:
             return image
-        if image.size > MAX_IMAGE_SIZE:
-            raise ValidationError(f"Image is {image.size / 1024 / 1024:.1f}MB. Max: 10MB")
-        try:
-            file_head = image.read(2048)
-            image.seek(0)
-            mime = magic.from_buffer(file_head, mime=True)
-            if mime not in ALLOWED_IMAGE_TYPES:
-                raise ValidationError("Only JPG, PNG, WebP images allowed")
-        except Exception:
-            raise ValidationError("Cannot verify image. File may be corrupted.")
-        image.name = re.sub(r'[^a-zA-Z0-9._-]', '', image.name)[:100]
+        if isinstance(image, str):
+            return image
+        if isinstance(image, UploadedFile):
+            if image.size > MAX_IMAGE_SIZE:
+                raise ValidationError(f"Image is {image.size / 1024 / 1024:.1f}MB. Max: 10MB")
+            try:
+                file_head = image.read(2048)
+                image.seek(0)
+                mime = magic.from_buffer(file_head, mime=True)
+                if mime not in ALLOWED_IMAGE_TYPES:
+                    raise ValidationError("Only JPG, PNG, WebP images allowed")
+            except Exception:
+                raise ValidationError("Cannot verify image. File may be corrupted.")
+            image.name = re.sub(r'[^a-zA-Z0-9._-]', '', image.name)[:100]
         return image
