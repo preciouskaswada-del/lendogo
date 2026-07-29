@@ -165,6 +165,12 @@ class Listing(models.Model):
             if img.image and img.image != '': # CHANGED: Check for URL string
                 return img
         return None
+        
+    @property
+    def image(self):
+        """Returns first image for templates that expect listing.image"""
+        first = self.images.first()
+        return first.image if first else None   
 
     @property
     def has_valid_images(self):
