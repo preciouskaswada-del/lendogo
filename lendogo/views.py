@@ -96,7 +96,7 @@ def home(request):
         all_listings = all_listings.filter(business_q)
     elif sort == 'near_me':
         if request.user.is_authenticated and hasattr(request.user, 'userprofile') and request.user.userprofile.location:
-            all_listings = all_listings.filter(location=request.user.userprofile.location)
+            all_listings = all_listings.filter(location=request.userprofile.location)
     else:
         all_listings = all_listings.order_by('-is_boosted', '-bumped_at', '-id')
 
@@ -168,7 +168,6 @@ def create_listing(request):
                 listing.save()
                 form.save_m2m()
 
-                # Handle Cloudinary URLs from JS
                 new_images = request.POST.getlist('new_images')
                 video_url = request.POST.get('video', '')
 
@@ -231,29 +230,26 @@ def edit_listing(request, pk):
                 listing.save()
                 form.save_m2m()
 
-                # Save formset deletes and updates
                 formset.save()
 
-                # FIX: Save new Cloudinary uploads
                 new_images = request.POST.getlist('new_images')
                 for url in new_images:
                     if url:
                         ListingImage.objects.create(listing=listing, image=url)
 
-                # FIX: Save video URL
                 video_url = request.POST.get('video', '')
                 if video_url and hasattr(listing, 'video'):
                     listing.video = video_url
                     listing.save(update_fields=['video'])
 
             messages.success(request, 'Listing updated')
-            return redirect('listing_detail', pk=listing.pk) # Redirect to detail so you see changes
+            return redirect('listing_detail', pk=listing.pk)
     else:
         form = ListingForm(instance=listing)
         formset = ImageFormSet(instance=listing)
 
     categories = Category.objects.all()
-    return render(request, 'edit_listing.html', { # Fixed template name
+    return render(request, 'edit_listing.html', {
         'form': form,
         'formset': formset,
         'listing': listing,
@@ -570,7 +566,6 @@ def log_blocked_attempt(request, pk):
     Listing.objects.filter(pk=pk).update(whatsapp_clicks=F('whatsapp_clicks') + 1)
     return JsonResponse({'status': 'logged'})
 
-
 @login_required
 @require_POST
 def start_conversation(request, listing_id):
@@ -588,15 +583,13 @@ def start_conversation(request, listing_id):
             'market_avg': str(listing.market_avg_price) if listing.market_avg_price else None,
         }, status=400)
 
-    # FIX: Use GenericForeignKey fields
     content_type = ContentType.objects.get_for_model(Listing)
-    
+
     convo, created = Conversation.objects.get_or_create(
         content_type=content_type,
         object_id=listing.id,
         buyer=request.user,
-        seller=seller,
-        defaults={'rental': None} # make sure rental is null
+        seller=seller
     )
     convo.save()
     return redirect('chat_room', convo_id=convo.id)
@@ -654,7 +647,7 @@ def get_messages(request, convo_id):
 @login_required
 def chat_room(request, convo_id):
     convo = get_object_or_404(
-        Conversation.objects.select_related('buyer', 'seller', 'listing', 'rental'),
+        Conversation.objects.select_related('buyer', 'seller'),
         id=convo_id
     )
     if request.user!= convo.buyer and request.user!= convo.seller:
@@ -817,15 +810,17 @@ def start_rental_conversation(request, rental_id):
         messages.error(request, "You can't message yourself.")
         return redirect('rental_detail', pk=rental_id)
 
+    content_type = ContentType.objects.get_for_model(RentalListing)
+
     convo, created = Conversation.objects.get_or_create(
-        rental=rental,
-        listing=None,
+        content_type=content_type,
+        object_id=rental.id,
         buyer=request.user,
         seller=seller
     )
 
     convo.save()
-    return redirect('chat_room', convo_id=convo.id) # Fixed redirect name
+    return redirect('chat_room', convo_id=convo.id)
 
 def airtel_checkout(request):
     if request.method == 'POST':
