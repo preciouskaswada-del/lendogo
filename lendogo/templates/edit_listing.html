@@ -13,7 +13,7 @@
 .section-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
 
 .photo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
-@media (max-width: 768px) {.photo-grid { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 768px) {.photo-grid { grid-template-columns: repeat(3, 1fr); } }
 
 .photo-slot {
     aspect-ratio: 1; border-radius: 12px; border: 2px dashed #d1d5db; background: #f9fafb;
@@ -34,9 +34,11 @@ input[type="file"] { display: none!important; }
 .add-card i { font-size: 28px; }
 
 .photo-actions {
-    position: absolute; bottom: 4px; right: 4px; display: flex; gap: 4px;
-    background: rgba(0,0,0,0.6); padding: 4px; border-radius: 8px;
+    position: absolute; bottom: 6px; right: 6px; display: flex; gap: 6px;
+    background: rgba(0,0,0,0.7); padding: 6px; border-radius: 10px; z-index: 10;
   }
+.photo-actions .btn { padding: 8px 10px; font-size: 16px; } /* Bigger for mobile */
+
 .uploading-overlay {
     position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.75);
     color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; z-index: 5; border-radius: 12px;
@@ -46,7 +48,7 @@ input[type="file"] { display: none!important; }
     padding: 16px 24px; margin: 0 -24px -24px; border-radius: 0 0 16px 16px; z-index: 10;
   }
 .btn-primary { background: #2563eb; border: none; }
-.btn-primary:disabled { background: #93c5fd; }
+.btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
 </style>
 {% endblock %}
 
@@ -82,14 +84,13 @@ input[type="file"] { display: none!important; }
           <div class="photo-slot {% if img_form.instance.image %}filled{% endif %}" data-index="{{ forloop.counter0 }}">
             {{ img_form.id }}
             {{ img_form.DELETE }}
-            <!-- DO NOT RENDER img_form.image HERE -->
             <input type="file" accept="image/*" class="file-input">
 
             {% if img_form.instance.image %}
               <img src="{{ img_form.instance.image.url }}" class="photo-preview">
               <div class="photo-actions">
-                <button type="button" class="btn btn-sm btn-light change-btn"><i class="bi bi-arrow-repeat"></i></button>
-                <button type="button" class="btn btn-sm btn-danger delete-btn"><i class="bi bi-trash"></i></button>
+                <button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button>
+                <button type="button" class="btn btn-sm btn-danger delete-btn" title="Delete"><i class="bi bi-trash"></i></button>
               </div>
             {% else %}
               <div class="add-card slot-add-btn">
@@ -115,7 +116,6 @@ input[type="file"] { display: none!important; }
       <div class="form-section">
         <h3 class="section-title">Video <span class="text-muted fw-normal fs-6">Optional</span></h3>
         
-        <!-- IMPORTANT: USE HIDDEN TEXT INPUT FOR URL -->
         <input type="hidden" name="video" id="videoUrlInput" value="{{ form.instance.video|default:'' }}">
         <input type="file" name="video_upload" accept="video/*">
 
@@ -157,10 +157,19 @@ input[type="file"] { display: none!important; }
 <script>
 const CLOUD_NAME = "sbsdxiie";
 const UPLOAD_PRESET = "lendogo2";
+let isUploading = false;
 
 document.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(el => el.classList.add('form-control'));
 
+function setUploading(state){
+  isUploading = state;
+  const btn = document.getElementById('postBtn');
+  btn.disabled = state;
+  btn.innerHTML = state ? '<span class="spinner-border spinner-border-sm"></span> Uploading...' : '<i class="bi bi-check-lg"></i> Save Changes';
+}
+
 async function uploadToCloudinary(file, type = 'image') {
+  setUploading(true);
   const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${type}/upload`;
   const formData = new FormData();
   formData.append('file', file);
@@ -168,12 +177,12 @@ async function uploadToCloudinary(file, type = 'image') {
   formData.append('folder', 'lendogo');
   const res = await fetch(url, { method: 'POST', body: formData });
   const data = await res.json();
-  console.log("Cloudinary:", data);
+  setUploading(false);
   if (data.secure_url) return data.secure_url;
   throw new Error(data.error?.message || 'Upload failed');
 }
 
-// PHOTOS
+// PHOTOS: MULTI UPLOAD
 document.getElementById('addPhotoBtn').addEventListener('click', () => document.getElementById('multiFileInput').click());
 
 document.getElementById('multiFileInput').addEventListener('change', async e => {
@@ -189,13 +198,24 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
       const hiddenInput = document.createElement('input');
       hiddenInput.type = 'hidden'; hiddenInput.name = 'new_images'; hiddenInput.value = cloudUrl;
       document.getElementById('newImageUrls').appendChild(hiddenInput);
-      slot.innerHTML = `<img src="${cloudUrl}" class="photo-preview"><div class="photo-actions"><button type="button" class="btn btn-sm btn-danger remove-new-btn"><i class="bi bi-trash"></i></button></div>`;
+      
+      // FIX: ADDED CHANGE BUTTON HERE
+      slot.innerHTML = `
+        <img src="${cloudUrl}" class="photo-preview">
+        <div class="photo-actions">
+          <button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button>
+          <button type="button" class="btn btn-sm btn-danger remove-new-btn" title="Remove"><i class="bi bi-trash"></i></button>
+        </div>`;
       slot.querySelector('.remove-new-btn').onclick = () => { slot.remove(); hiddenInput.remove(); }
-    } catch(err){ slot.innerHTML = `<div class="add-card text-danger"><i class="bi bi-x-lg"></i><span>Failed</span></div>`; }
+    } catch(err){ 
+      setUploading(false);
+      slot.innerHTML = `<div class="add-card text-danger"><i class="bi bi-x-lg"></i><span>Failed</span></div>`; 
+    }
   }
   e.target.value = '';
 });
 
+// PHOTOS: CHANGE + DELETE FOR ALL
 document.addEventListener('click', e => {
   if(e.target.closest('.change-btn,.slot-add-btn')) e.target.closest('.photo-slot').querySelector('.file-input').click();
   if(e.target.closest('.delete-btn')){
@@ -206,6 +226,7 @@ document.addEventListener('click', e => {
   }
 });
 
+// PHOTOS: SINGLE CHANGE
 document.addEventListener('change', async e => {
     if(e.target.classList.contains('file-input') && e.target.files[0]){
         const file = e.target.files[0];
@@ -218,8 +239,19 @@ document.addEventListener('change', async e => {
           const hiddenInput = document.createElement('input');
           hiddenInput.type = 'hidden'; hiddenInput.name = 'new_images'; hiddenInput.value = cloudUrl;
           document.getElementById('newImageUrls').appendChild(hiddenInput);
-          slot.innerHTML = `<img src="${cloudUrl}" class="photo-preview"><div class="photo-actions"><button type="button" class="btn btn-sm btn-danger remove-new-btn"><i class="bi bi-trash"></i></button></div>`;
-        } catch(err){ slot.innerHTML = `<div class="add-card text-danger"><i class="bi bi-x-lg"></i><span>Failed</span></div>`; }
+          
+          // FIX: ADDED CHANGE BUTTON HERE TOO
+          slot.innerHTML = `
+            <img src="${cloudUrl}" class="photo-preview">
+            <div class="photo-actions">
+              <button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button>
+              <button type="button" class="btn btn-sm btn-danger remove-new-btn" title="Remove"><i class="bi bi-trash"></i></button>
+            </div>`;
+          slot.querySelector('.remove-new-btn').onclick = () => { slot.remove(); hiddenInput.remove(); }
+        } catch(err){ 
+          setUploading(false);
+          slot.innerHTML = `<div class="add-card text-danger"><i class="bi bi-x-lg"></i><span>Failed</span></div>`; 
+        }
     }
 });
 
@@ -237,9 +269,12 @@ videoInput.addEventListener('change', async e => {
     document.getElementById('videoPreview').innerHTML = `<video src="${localUrl}" controls class="w-100 rounded" style="max-height:250px;"></video><div class="uploading-overlay">Uploading Video...</div>`;
     try{
       const cloudUrl = await uploadToCloudinary(file, 'video');
-      document.getElementById('videoUrlInput').value = cloudUrl; // SET HIDDEN TEXT INPUT
+      document.getElementById('videoUrlInput').value = cloudUrl;
       document.getElementById('videoPreview').innerHTML = `<video src="${cloudUrl}" controls class="w-100 rounded" style="max-height:250px;"></video><div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button><button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn">Remove</button></div>`;
-    } catch(err){ alert("Video upload failed: " + err.message); }
+    } catch(err){ 
+      setUploading(false);
+      alert("Video upload failed: " + err.message); 
+    }
   }
 });
 
@@ -251,8 +286,9 @@ document.addEventListener('click', e => {
   }
 });
 
+// BLOCK SUBMIT WHILE UPLOADING
 document.getElementById('editForm').addEventListener('submit', e => {
-  if (document.querySelector('.uploading-overlay')) { 
+  if (isUploading) { 
     e.preventDefault(); 
     alert('Please wait for upload to finish'); 
   }
