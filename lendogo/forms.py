@@ -111,7 +111,7 @@ class ListingForm(forms.ModelForm):
         if not video:
             return video
         
-        # FIX 1: Skip validation if it's already a Cloudinary URL string
+        # FIX: Skip validation if it's already a Cloudinary URL string
         if isinstance(video, str):
             return video
             
@@ -159,13 +159,12 @@ class ListingForm(forms.ModelForm):
 class ListingImageForm(forms.ModelForm):
     class Meta:
         model = ListingImage
-        fields = ['image', 'DELETE'] # ADD DELETE
+        fields = ['image'] # FIX: Removed 'DELETE' - formset handles it
         widgets = {
             'image': forms.FileInput(attrs={
                 'class': 'img-swap w-full p-2 border rounded',
                 'accept': 'image/jpeg,image/png,image/webp'
-            }),
-            'DELETE': forms.CheckboxInput(attrs={'class': 'd-none'}) # HIDE IT
+            })
         }
 
     def clean_image(self):
@@ -173,7 +172,7 @@ class ListingImageForm(forms.ModelForm):
         if not image:
             return image
         
-        # FIX 2: Skip validation if it's already a Cloudinary URL string
+        # FIX: Skip validation if it's already a Cloudinary URL string
         if isinstance(image, str):
             return image
 
