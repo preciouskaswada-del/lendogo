@@ -13,13 +13,14 @@
 .section-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
 
 .photo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
-@media (max-width: 768px) {.photo-grid { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 768px) {.photo-grid { grid-template-columns: repeat(3, 1fr); }} /* FIXED MISSING } */
 
 .photo-slot {
     aspect-ratio: 1; border-radius: 12px; border: 2px dashed #d1d5db; background: #f9fafb;
     position: relative; overflow: hidden;
   }
 .photo-slot.filled { border: 2px solid #e5e7eb; }
+.photo-slot.deleted { opacity: 0.3; pointer-events: none; } /* NEW */
 
 .photo-preview { width: 100%; height: 100%; object-fit: cover; }
 
@@ -37,7 +38,7 @@ input[type="file"] { display: none!important; }
     position: absolute; top: 6px; right: 6px; display: flex; gap: 4px;
     background: rgba(0,0,0,0.6); padding: 3px; border-radius: 8px; z-index: 10;
   }
-.photo-actions .btn { padding: 4px 6px; font-size: 12px; line-height: 1; } /* Much smaller */
+.photo-actions.btn { padding: 4px 6px; font-size: 12px; line-height: 1; } /* Much smaller */
 
 .uploading-overlay {
     position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.75);
@@ -164,7 +165,7 @@ function setUploading(state){
   isUploading = state;
   const btn = document.getElementById('postBtn');
   btn.disabled = state;
-  btn.innerHTML = state ? '<span class="spinner-border spinner-border-sm"></span> Uploading...' : '<i class="bi bi-check-lg"></i> Save Changes';
+  btn.innerHTML = state? '<span class="spinner-border spinner-border-sm"></span> Uploading...' : '<i class="bi bi-check-lg"></i> Save Changes';
 }
 
 async function uploadToCloudinary(file, type = 'image') {
@@ -183,6 +184,7 @@ async function uploadToCloudinary(file, type = 'image') {
 
 document.getElementById('addPhotoBtn').addEventListener('click', () => document.getElementById('multiFileInput').click());
 
+// FIX 1: ADD NEW PHOTOS
 document.getElementById('multiFileInput').addEventListener('change', async e => {
   for(const file of Array.from(e.target.files)){
     const slot = document.createElement('div');
@@ -194,7 +196,7 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
     try{
       const cloudUrl = await uploadToCloudinary(file, 'image');
       const hiddenInput = document.createElement('input');
-      hiddenInput.type = 'hidden'; hiddenInput.name = 'new_images'; hiddenInput.value = cloudUrl;
+      hiddenInput.type = 'hidden'; hiddenInput.name = 'new_images'; hiddenInput.value = cloudUrl; // NEW IMAGES
       document.getElementById('newImageUrls').appendChild(hiddenInput);
       slot.innerHTML = `
         <img src="${cloudUrl}" class="photo-preview">
@@ -211,12 +213,13 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
   e.target.value = '';
 });
 
+// FIX 2: REPLACE EXISTING PHOTOS - SEND SLOT INDEX
 document.addEventListener('click', e => {
   if(e.target.closest('.change-btn,.slot-add-btn')) e.target.closest('.photo-slot').querySelector('.file-input').click();
   if(e.target.closest('.delete-btn')){
     const slot = e.target.closest('.photo-slot');
     slot.querySelector('input[name$="-DELETE"]').checked = true;
-    slot.style.opacity = '0.4';
+    slot.classList.add('deleted');
     slot.querySelector('.photo-actions').innerHTML = '<span class="badge bg-secondary">Will Delete</span>';
   }
 });
@@ -225,14 +228,20 @@ document.addEventListener('change', async e => {
     if(e.target.classList.contains('file-input') && e.target.files[0]){
         const file = e.target.files[0];
         const slot = e.target.closest('.photo-slot');
+        const slotIndex = slot.dataset.index; // GET SLOT NUMBER
         const localUrl = URL.createObjectURL(file);
         slot.innerHTML = `<img src="${localUrl}" class="photo-preview"><div class="uploading-overlay">Uploading...</div>`;
         slot.classList.add('filled');
         try{
           const cloudUrl = await uploadToCloudinary(file, 'image');
+          
+          // CRITICAL FIX: Use new_images_SLOTINDEX instead of new_images
           const hiddenInput = document.createElement('input');
-          hiddenInput.type = 'hidden'; hiddenInput.name = 'new_images'; hiddenInput.value = cloudUrl;
+          hiddenInput.type = 'hidden'; 
+          hiddenInput.name = `new_images_${slotIndex}`; // THIS TELLS VIEWS WHICH ONE TO REPLACE
+          hiddenInput.value = cloudUrl;
           document.getElementById('newImageUrls').appendChild(hiddenInput);
+
           slot.innerHTML = `
             <img src="${cloudUrl}" class="photo-preview">
             <div class="photo-actions">
