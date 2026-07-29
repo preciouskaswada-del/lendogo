@@ -13,7 +13,7 @@
 .section-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
 
 .photo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
-@media (max-width: 768px) {.photo-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 768px) {.photo-grid { grid-template-columns: repeat(3, 1fr); }
 
 .photo-slot {
     aspect-ratio: 1; border-radius: 12px; border: 2px dashed #d1d5db; background: #f9fafb;
@@ -23,10 +23,9 @@
 
 .photo-preview { width: 100%; height: 100%; object-fit: cover; }
 
-/* Hide Django's ugly inputs for good */
-.photo-slot input[type="file"], input[name="video"], input[name="video_upload"] { display: none!important; }
+/* Hide ALL django file inputs */
+input[type="file"] { display: none!important; }
 
-/* Centered Add Card */
 .add-card {
   display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 4px;
   cursor: pointer; color: #6b7280; font-weight: 500; font-size: 13px; width: 100%; height: 100%;
@@ -82,9 +81,9 @@
           {% for img_form in formset %}
           <div class="photo-slot {% if img_form.instance.image %}filled{% endif %}" data-index="{{ forloop.counter0 }}">
             {{ img_form.id }}
-            {{ img_form.image }}
             {{ img_form.DELETE }}
-            <input type="file" accept="image/*" class="d-none file-input">
+            <!-- DO NOT RENDER img_form.image HERE -->
+            <input type="file" accept="image/*" class="file-input">
 
             {% if img_form.instance.image %}
               <img src="{{ img_form.instance.image.url }}" class="photo-preview">
@@ -106,7 +105,7 @@
               <i class="bi bi-plus-lg"></i>
               <span>Add Photos</span>
             </div>
-            <input type="file" id="multiFileInput" accept="image/*" multiple class="d-none">
+            <input type="file" id="multiFileInput" accept="image/*" multiple>
           </div>
         </div>
         <div id="newImageUrls"></div>
@@ -115,14 +114,15 @@
 
       <div class="form-section">
         <h3 class="section-title">Video <span class="text-muted fw-normal fs-6">Optional</span></h3>
-        <!-- HIDDEN DJANGO FIELDS -->
-        {{ form.video }}
-        <input type="file" name="video_upload" accept="video/*" class="d-none">
+        
+        <!-- IMPORTANT: USE HIDDEN TEXT INPUT FOR URL -->
+        <input type="hidden" name="video" id="videoUrlInput" value="{{ form.instance.video|default:'' }}">
+        <input type="file" name="video_upload" accept="video/*">
 
         <div class="border rounded-3 p-4 text-center bg-light" id="videoBox">
           {% if form.instance.video %}
           <div id="videoPreview">
-            <video src="{{ form.instance.video.url }}" controls class="w-100 rounded" style="max-height:250px;"></video>
+            <video src="{{ form.instance.video }}" controls class="w-100 rounded" style="max-height:250px;"></video>
             <div class="mt-2">
                 <button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button>
                 <button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn">Remove</button>
@@ -157,58 +157,10 @@
 <script>
 const CLOUD_NAME = "sbsdxiie";
 const UPLOAD_PRESET = "lendogo2";
-const MAX_CONCURRENT_UPLOADS = 2;
 
 document.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(el => el.classList.add('form-control'));
 
-let uploadCount = 0;
-let uploadQueue = [];
-let activeUploads = 0;
-
-// Only show uploading under the photo, not on button
-function setUploadingState(count){
-  const btn = document.querySelector('#postBtn');
-  btn.disabled = count > 0;
-}
-
-async function processQueue() {
-  if(activeUploads >= MAX_CONCURRENT_UPLOADS || uploadQueue.length === 0) return;
-
-  activeUploads++;
-  const {file, slot, type, localUrl} = uploadQueue.shift();
-  slot.querySelector('.uploading-overlay').innerText = 'Uploading...';
-
-  try {
-    const cloudUrl = await uploadToCloudinary(file, type);
-
-    if(type === 'image'){
-      const hiddenInput = document.createElement('input');
-      hiddenInput.type = 'hidden';
-      hiddenInput.name = 'new_images';
-      hiddenInput.value = cloudUrl;
-      document.getElementById('newImageUrls').appendChild(hiddenInput);
-
-      slot.innerHTML = `<img src="${cloudUrl}" class="photo-preview"><div class="photo-actions"><button type="button" class="btn btn-sm btn-danger remove-new-btn"><i class="bi bi-trash"></i></button></div>`;
-      slot.querySelector('.remove-new-btn').onclick = () => { slot.remove(); hiddenInput.remove(); }
-    } else {
-      document.querySelector('input[name="video"]').value = cloudUrl;
-      document.getElementById('videoPreview').innerHTML = `<video src="${cloudUrl}" controls class="w-100 rounded" style="max-height:250px;"></video><div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button><button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn">Remove</button></div>`;
-    }
-
-    URL.revokeObjectURL(localUrl);
-
-  } catch(err){
-    slot.querySelector('.uploading-overlay').innerHTML = `<i class="bi bi-x-lg"></i> Failed`;
-  }
-
-  activeUploads--;
-  setUploadingState(uploadCount - uploadQueue.length);
-  processQueue();
-}
-
 async function uploadToCloudinary(file, type = 'image') {
-  uploadCount++;
-  setUploadingState(uploadCount);
   const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${type}/upload`;
   const formData = new FormData();
   formData.append('file', file);
@@ -216,89 +168,93 @@ async function uploadToCloudinary(file, type = 'image') {
   formData.append('folder', 'lendogo');
   const res = await fetch(url, { method: 'POST', body: formData });
   const data = await res.json();
+  console.log("Cloudinary:", data);
   if (data.secure_url) return data.secure_url;
   throw new Error(data.error?.message || 'Upload failed');
 }
 
-document.getElementById('editForm').addEventListener('submit', e => {
-  if (uploadCount > 0) { e.preventDefault(); alert('Still uploading. Please wait.'); }
+// PHOTOS
+document.getElementById('addPhotoBtn').addEventListener('click', () => document.getElementById('multiFileInput').click());
+
+document.getElementById('multiFileInput').addEventListener('change', async e => {
+  for(const file of Array.from(e.target.files)){
+    const slot = document.createElement('div');
+    slot.className = 'photo-slot filled';
+    const localUrl = URL.createObjectURL(file);
+    slot.innerHTML = `<img src="${localUrl}" class="photo-preview"><div class="uploading-overlay">Uploading...</div>`;
+    document.getElementById('photoGrid').insertBefore(slot, document.getElementById('addPhotoBtn'));
+
+    try{
+      const cloudUrl = await uploadToCloudinary(file, 'image');
+      const hiddenInput = document.createElement('input');
+      hiddenInput.type = 'hidden'; hiddenInput.name = 'new_images'; hiddenInput.value = cloudUrl;
+      document.getElementById('newImageUrls').appendChild(hiddenInput);
+      slot.innerHTML = `<img src="${cloudUrl}" class="photo-preview"><div class="photo-actions"><button type="button" class="btn btn-sm btn-danger remove-new-btn"><i class="bi bi-trash"></i></button></div>`;
+      slot.querySelector('.remove-new-btn').onclick = () => { slot.remove(); hiddenInput.remove(); }
+    } catch(err){ slot.innerHTML = `<div class="add-card text-danger"><i class="bi bi-x-lg"></i><span>Failed</span></div>`; }
+  }
+  e.target.value = '';
 });
 
-// PHOTO LOGIC
 document.addEventListener('click', e => {
-  const btn = e.target.closest('.change-btn,.slot-add-btn');
-  if(btn) {
-    const slot = btn.closest('.photo-slot');
-    slot.querySelector('.file-input').click();
-  }
-  const delBtn = e.target.closest('.delete-btn');
-  if(delBtn){
-    const slot = delBtn.closest('.photo-slot');
+  if(e.target.closest('.change-btn,.slot-add-btn')) e.target.closest('.photo-slot').querySelector('.file-input').click();
+  if(e.target.closest('.delete-btn')){
+    const slot = e.target.closest('.photo-slot');
     slot.querySelector('input[name$="-DELETE"]').checked = true;
     slot.style.opacity = '0.4';
     slot.querySelector('.photo-actions').innerHTML = '<span class="badge bg-secondary">Will Delete</span>';
   }
 });
 
-// MULTI UPLOAD
-document.getElementById('addPhotoBtn').addEventListener('click', () => {
-    document.getElementById('multiFileInput').click();
-});
-
-document.getElementById('multiFileInput').addEventListener('change', e => {
-  const files = Array.from(e.target.files).slice(0, 10);
-  files.forEach((file) => {
-    const slot = document.createElement('div');
-    slot.className = 'photo-slot filled';
-    const localUrl = URL.createObjectURL(file);
-    slot.innerHTML = `<img src="${localUrl}" class="photo-preview"><div class="uploading-overlay">Queued...</div>`;
-    document.getElementById('photoGrid').insertBefore(slot, document.getElementById('addPhotoBtn'));
-    uploadQueue.push({file, slot, type: 'image', localUrl});
-  });
-  processQueue();
-  e.target.value = '';
-});
-
-// SINGLE SLOT CHANGE
-document.addEventListener('change', e => {
+document.addEventListener('change', async e => {
     if(e.target.classList.contains('file-input') && e.target.files[0]){
         const file = e.target.files[0];
         const slot = e.target.closest('.photo-slot');
         const localUrl = URL.createObjectURL(file);
-
-        slot.querySelector('.slot-add-btn')?.remove();
-        slot.insertAdjacentHTML('afterbegin', `<img src="${localUrl}" class="photo-preview">`);
-        slot.insertAdjacentHTML('beforeend', `<div class="uploading-overlay">Queued...</div>`);
+        slot.innerHTML = `<img src="${localUrl}" class="photo-preview"><div class="uploading-overlay">Uploading...</div>`;
         slot.classList.add('filled');
-
-        uploadQueue.push({file, slot, type: 'image', localUrl});
-        processQueue();
+        try{
+          const cloudUrl = await uploadToCloudinary(file, 'image');
+          const hiddenInput = document.createElement('input');
+          hiddenInput.type = 'hidden'; hiddenInput.name = 'new_images'; hiddenInput.value = cloudUrl;
+          document.getElementById('newImageUrls').appendChild(hiddenInput);
+          slot.innerHTML = `<img src="${cloudUrl}" class="photo-preview"><div class="photo-actions"><button type="button" class="btn btn-sm btn-danger remove-new-btn"><i class="bi bi-trash"></i></button></div>`;
+        } catch(err){ slot.innerHTML = `<div class="add-card text-danger"><i class="bi bi-x-lg"></i><span>Failed</span></div>`; }
     }
 });
 
-// VIDEO LOGIC
+// VIDEO
 const videoInput = document.querySelector('input[name="video_upload"]');
 document.getElementById('videoUploadBtn')?.addEventListener('click', () => videoInput.click());
 document.addEventListener('click', e => { if(e.target.id === 'changeVideoBtn') videoInput.click(); });
 
-videoInput.addEventListener('change', e => {
+videoInput.addEventListener('change', async e => {
   if (e.target.files[0]) {
     const file = e.target.files[0];
     const localUrl = URL.createObjectURL(file);
     document.getElementById('videoUploadArea')?.classList.add('d-none');
     document.getElementById('videoPreview').classList.remove('d-none');
-    document.getElementById('videoPreview').innerHTML = `<video src="${localUrl}" controls class="w-100 rounded" style="max-height:250px;"></video><div class="uploading-overlay">Uploading...</div>`;
-
-    uploadQueue.push({file, slot: document.getElementById('videoPreview'), type: 'video', localUrl});
-    processQueue();
+    document.getElementById('videoPreview').innerHTML = `<video src="${localUrl}" controls class="w-100 rounded" style="max-height:250px;"></video><div class="uploading-overlay">Uploading Video...</div>`;
+    try{
+      const cloudUrl = await uploadToCloudinary(file, 'video');
+      document.getElementById('videoUrlInput').value = cloudUrl; // SET HIDDEN TEXT INPUT
+      document.getElementById('videoPreview').innerHTML = `<video src="${cloudUrl}" controls class="w-100 rounded" style="max-height:250px;"></video><div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button><button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn">Remove</button></div>`;
+    } catch(err){ alert("Video upload failed: " + err.message); }
   }
 });
 
 document.addEventListener('click', e => {
   if(e.target.id === 'removeVideoBtn'){
-    document.querySelector('input[name="video"]').value = '';
+    document.getElementById('videoUrlInput').value = '';
     document.getElementById('videoPreview').classList.add('d-none');
     document.getElementById('videoUploadArea')?.classList.remove('d-none');
+  }
+});
+
+document.getElementById('editForm').addEventListener('submit', e => {
+  if (document.querySelector('.uploading-overlay')) { 
+    e.preventDefault(); 
+    alert('Please wait for upload to finish'); 
   }
 });
 </script>
