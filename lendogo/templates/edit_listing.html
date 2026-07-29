@@ -23,8 +23,8 @@
 
 .photo-preview { width: 100%; height: 100%; object-fit: cover; }
 
-/* Hide Django's ugly inputs */
-.photo-slot input[type="file"], input[name="video"] { display: none!important; }
+/* Hide Django's ugly inputs for good */
+.photo-slot input[type="file"], input[name="video"], input[name="video_upload"] { display: none!important; }
 
 /* Centered Add Card */
 .add-card {
@@ -39,8 +39,8 @@
     background: rgba(0,0,0,0.6); padding: 4px; border-radius: 8px;
   }
 .uploading-overlay {
-    position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.6);
-    color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 12px; z-index: 5;
+    position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.75);
+    color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; z-index: 5; border-radius: 12px;
   }
 .sticky-footer {
     position: sticky; bottom: 0; background: white; border-top: 1px solid #e5e7eb;
@@ -115,11 +115,9 @@
 
       <div class="form-section">
         <h3 class="section-title">Video <span class="text-muted fw-normal fs-6">Optional</span></h3>
-        <!-- HIDE DJANGO INPUTS -->
-        <div class="d-none">
-          {{ form.video }}
-          <input type="file" name="video_upload" accept="video/*" class="d-none">
-        </div>
+        <!-- HIDDEN DJANGO FIELDS -->
+        {{ form.video }}
+        <input type="file" name="video_upload" accept="video/*" class="d-none">
 
         <div class="border rounded-3 p-4 text-center bg-light" id="videoBox">
           {% if form.instance.video %}
@@ -159,7 +157,7 @@
 <script>
 const CLOUD_NAME = "sbsdxiie";
 const UPLOAD_PRESET = "lendogo2";
-const MAX_CONCURRENT_UPLOADS = 2; // Don't kill the phone
+const MAX_CONCURRENT_UPLOADS = 2;
 
 document.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(el => el.classList.add('form-control'));
 
@@ -167,49 +165,45 @@ let uploadCount = 0;
 let uploadQueue = [];
 let activeUploads = 0;
 
+// Only show uploading under the photo, not on button
 function setUploadingState(count){
   const btn = document.querySelector('#postBtn');
-  if(count > 0){
-    btn.disabled = true;
-    btn.innerHTML = `<i class="bi bi-arrow-repeat"></i> Uploading ${count}...`;
-  } else {
-    btn.disabled = false;
-    btn.innerHTML = '<i class="bi bi-check-lg"></i> Save Changes';
-  }
+  btn.disabled = count > 0;
 }
 
 async function processQueue() {
   if(activeUploads >= MAX_CONCURRENT_UPLOADS || uploadQueue.length === 0) return;
-  
+
   activeUploads++;
   const {file, slot, type, localUrl} = uploadQueue.shift();
-  
+  slot.querySelector('.uploading-overlay').innerText = 'Uploading...';
+
   try {
     const cloudUrl = await uploadToCloudinary(file, type);
-    
+
     if(type === 'image'){
       const hiddenInput = document.createElement('input');
       hiddenInput.type = 'hidden';
       hiddenInput.name = 'new_images';
       hiddenInput.value = cloudUrl;
       document.getElementById('newImageUrls').appendChild(hiddenInput);
-      
+
       slot.innerHTML = `<img src="${cloudUrl}" class="photo-preview"><div class="photo-actions"><button type="button" class="btn btn-sm btn-danger remove-new-btn"><i class="bi bi-trash"></i></button></div>`;
       slot.querySelector('.remove-new-btn').onclick = () => { slot.remove(); hiddenInput.remove(); }
     } else {
       document.querySelector('input[name="video"]').value = cloudUrl;
       document.getElementById('videoPreview').innerHTML = `<video src="${cloudUrl}" controls class="w-100 rounded" style="max-height:250px;"></video><div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button><button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn">Remove</button></div>`;
     }
-    
-    URL.revokeObjectURL(localUrl); // FREE MEMORY
-    
+
+    URL.revokeObjectURL(localUrl);
+
   } catch(err){
-    slot.innerHTML = `<div class="add-card text-danger"><i class="bi bi-x-lg"></i><span>Failed</span></div>`;
+    slot.querySelector('.uploading-overlay').innerHTML = `<i class="bi bi-x-lg"></i> Failed`;
   }
-  
+
   activeUploads--;
   setUploadingState(uploadCount - uploadQueue.length);
-  processQueue(); // start next
+  processQueue();
 }
 
 async function uploadToCloudinary(file, type = 'image') {
@@ -246,20 +240,19 @@ document.addEventListener('click', e => {
   }
 });
 
-// MULTI UPLOAD - MEMORY SAFE
+// MULTI UPLOAD
 document.getElementById('addPhotoBtn').addEventListener('click', () => {
     document.getElementById('multiFileInput').click();
 });
 
 document.getElementById('multiFileInput').addEventListener('change', e => {
-  const files = Array.from(e.target.files).slice(0, 10); // max 10
+  const files = Array.from(e.target.files).slice(0, 10);
   files.forEach((file) => {
     const slot = document.createElement('div');
     slot.className = 'photo-slot filled';
     const localUrl = URL.createObjectURL(file);
     slot.innerHTML = `<img src="${localUrl}" class="photo-preview"><div class="uploading-overlay">Queued...</div>`;
     document.getElementById('photoGrid').insertBefore(slot, document.getElementById('addPhotoBtn'));
-    
     uploadQueue.push({file, slot, type: 'image', localUrl});
   });
   processQueue();
@@ -272,12 +265,12 @@ document.addEventListener('change', e => {
         const file = e.target.files[0];
         const slot = e.target.closest('.photo-slot');
         const localUrl = URL.createObjectURL(file);
-        
+
         slot.querySelector('.slot-add-btn')?.remove();
         slot.insertAdjacentHTML('afterbegin', `<img src="${localUrl}" class="photo-preview">`);
         slot.insertAdjacentHTML('beforeend', `<div class="uploading-overlay">Queued...</div>`);
         slot.classList.add('filled');
-        
+
         uploadQueue.push({file, slot, type: 'image', localUrl});
         processQueue();
     }
@@ -294,8 +287,8 @@ videoInput.addEventListener('change', e => {
     const localUrl = URL.createObjectURL(file);
     document.getElementById('videoUploadArea')?.classList.add('d-none');
     document.getElementById('videoPreview').classList.remove('d-none');
-    document.getElementById('videoPreview').innerHTML = `<video src="${localUrl}" controls class="w-100 rounded" style="max-height:250px;"></video><div class="uploading-overlay">Queued...</div>`;
-    
+    document.getElementById('videoPreview').innerHTML = `<video src="${localUrl}" controls class="w-100 rounded" style="max-height:250px;"></video><div class="uploading-overlay">Uploading...</div>`;
+
     uploadQueue.push({file, slot: document.getElementById('videoPreview'), type: 'video', localUrl});
     processQueue();
   }
