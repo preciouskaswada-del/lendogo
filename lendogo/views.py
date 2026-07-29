@@ -43,12 +43,11 @@ ImageFormSet = inlineformset_factory(
     Listing,
     ListingImage,
     form=ListingImageForm,
-    extra=10,
+    extra=0, # FIX: 0 because we add new ones via JS
     max_num=10,
     can_delete=True,
     can_delete_extra=False,
 )
-
 
 def home(request):
     query = request.GET.get('q', '').strip()
@@ -96,8 +95,8 @@ def home(request):
             business_q |= Q(product__icontains=keyword) | Q(location__icontains=keyword)
         all_listings = all_listings.filter(business_q)
     elif sort == 'near_me':
-        if request.user.is_authenticated and hasattr(request.user, 'userprofile') and request.userprofile.location:
-            all_listings = all_listings.filter(location=request.userprofile.location)
+        if request.user.is_authenticated and hasattr(request.user, 'userprofile') and request.user.userprofile.location:
+            all_listings = all_listings.filter(location=request.user.userprofile.location)
     else:
         all_listings = all_listings.order_by('-is_boosted', '-bumped_at', '-id')
 
@@ -115,7 +114,6 @@ def home(request):
         'active_category': category_slug,
         'get_params': get_params
     })
-
 
 def listing_detail(request, pk):
     listing = get_object_or_404(
@@ -156,12 +154,11 @@ def listing_detail(request, pk):
     }
     return render(request, 'detail.html', context)
 
-
 @login_required(login_url='login')
 def create_listing(request):
     if request.method == 'POST':
-        form = ListingForm(request.POST, request.FILES)
-        formset = ImageFormSet(request.POST, request.FILES)
+        form = ListingForm(request.POST)
+        formset = ImageFormSet(request.POST)
 
         if form.is_valid():
             with transaction.atomic():
@@ -198,14 +195,12 @@ def create_listing(request):
     categories = Category.objects.all()
     return render(request, 'create.html', {'form': form, 'formset': formset, 'categories': categories})
 
-
 @login_required
 def delete_listing(request, pk):
     listing = get_object_or_404(Listing, pk=pk, seller=request.user)
     listing.delete()
     messages.success(request, 'Listing deleted')
     return redirect('dashboard')
-
 
 @login_required
 def mark_as_sold(request, pk):
@@ -215,41 +210,55 @@ def mark_as_sold(request, pk):
         listing.is_sold = True
         listing.save(update_fields=['status', 'is_sold'])
 
-        profile, _ = UserProfile.objects.get_or_create(user=request.user) # FIXED
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
         profile.total_sales = F('total_sales') + 1
         profile.save(update_fields=['total_sales'])
 
     messages.success(request, f'{listing.product} marked as sold! This helps improve market prices for everyone.')
     return redirect('dashboard')
 
-
 @login_required
 def edit_listing(request, pk):
     listing = get_object_or_404(Listing, pk=pk, seller=request.user)
-    if request.method == 'POST':
-        form = ListingForm(request.POST, request.FILES, instance=listing)
-        formset = ImageFormSet(request.POST, request.FILES, instance=listing)
 
-        if form.is_valid() and formset.is_valid():
+    if request.method == 'POST':
+        form = ListingForm(request.POST, instance=listing)
+        # FIX: Don't pass request.FILES because we upload to cloudinary via JS
+        formset = ImageFormSet(request.POST, instance=listing)
+
+        if form.is_valid():
             with transaction.atomic():
                 listing = form.save(commit=False)
                 listing.save()
                 form.save_m2m()
 
-                formset.save()
+                # 1. HANDLE DELETES FIRST
+                if formset.is_valid():
+                    for obj in formset.deleted_objects:
+                        obj.delete()
+                    # Save existing images that weren't deleted
+                    formset.save()
 
+                # 2. ADD NEW IMAGES FROM CLOUDINARY URLS
                 new_images = request.POST.getlist('new_images')
                 for url in new_images:
                     if url:
                         ListingImage.objects.create(listing=listing, image=url)
 
+                # 3. HANDLE VIDEO
                 video_url = request.POST.get('video', '')
                 if video_url and hasattr(listing, 'video'):
                     listing.video = video_url
                     listing.save(update_fields=['video'])
+                elif video_url == '': # If user removed video
+                    if hasattr(listing, 'video'):
+                        listing.video = ''
+                        listing.save(update_fields=['video'])
 
-            messages.success(request, 'Listing updated')
+            messages.success(request, 'Listing updated successfully!')
             return redirect('listing_detail', pk=listing.pk)
+        else:
+            messages.error(request, 'Please fix the errors below')
     else:
         form = ListingForm(instance=listing)
         formset = ImageFormSet(instance=listing)
@@ -262,7 +271,6 @@ def edit_listing(request, pk):
         'categories': categories
     })
 
-
 @login_required
 def manual_boost(request, pk):
     if not request.user.is_staff:
@@ -274,7 +282,6 @@ def manual_boost(request, pk):
     listing.save()
     messages.success(request, f'{listing.product} manually boosted for 7 days!')
     return redirect('listing_detail', pk=pk)
-
 
 def login_view(request):
     if request.method == 'POST':
@@ -290,11 +297,9 @@ def login_view(request):
         form = AuthenticationForm()
     return render(request, 'login.html', {'form': form})
 
-
 def logout_view(request):
     logout(request)
     return redirect('/')
-
 
 def signup(request):
     if request.method == 'POST':
@@ -307,7 +312,6 @@ def signup(request):
     else:
         form = SignUpForm()
     return render(request, 'signup.html', {'form': form})
-
 
 @csrf_exempt
 def forgot_password(request):
@@ -354,7 +358,6 @@ def forgot_password(request):
 
     return render(request, 'forgot.html')
 
-
 def verify_code(request):
     if request.method == 'POST':
         code = request.POST.get('code', '').strip()
@@ -374,7 +377,6 @@ def verify_code(request):
 
     masked = request.session.get('masked_contact', 'your email')
     return render(request, 'verify_code.html', {'masked_contact': masked})
-
 
 def set_new_password(request):
     if request.method == 'POST':
@@ -408,10 +410,8 @@ def set_new_password(request):
 
     return render(request, 'set_new_password.html')
 
-
 def password_reset_done(request):
     return render(request, 'password_reset_done.html')
-
 
 @login_required
 def dashboard(request):
@@ -462,7 +462,6 @@ def dashboard(request):
     sold_yesterday = sold_listings.filter(updated_at__date=yesterday).count()
     sold_this_week = sold_listings.filter(updated_at__gte=week_ago).count()
 
-    # FIX: safe profile
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
     is_verified = profile.is_verified
 
@@ -492,7 +491,6 @@ def dashboard(request):
         'now': now
     })
 
-
 @csrf_exempt
 def paychangu_callback(request):
     if request.method == 'POST':
@@ -505,11 +503,10 @@ def paychangu_callback(request):
 
     return HttpResponse("OK", status=200)
 
-
 @login_required
-def boost_listing(request, pk): # NEW FUNCTION
+def boost_listing(request, pk):
     listing = get_object_or_404(Listing, pk=pk, seller=request.user)
-    
+
     if listing.status!= 'ACTIVE':
         messages.error(request, 'You can only boost active listings.')
         return redirect('dashboard')
@@ -520,14 +517,13 @@ def boost_listing(request, pk): # NEW FUNCTION
 
     amount = 550
     tx_ref = f"BOOST_{listing.id}_{uuid.uuid4().hex[:8]}"
-    
+
     request.session['boost_tx_ref'] = tx_ref
     request.session['boost_listing_id'] = listing.id
 
     checkout_url = f"https://checkout.paychangu.com/?amount={amount}&currency=MWK&email={request.user.email}&first_name={request.user.first_name}&tx_ref={tx_ref}&callback_url={request.build_absolute_uri('/boost/callback/')}&return_url={request.build_absolute_uri('/dashboard/')}&public_key={settings.PAYCHANGU_PUBLIC_KEY}"
 
     return redirect(checkout_url)
-
 
 @login_required
 def boost_callback(request):
@@ -577,7 +573,6 @@ def boost_callback(request):
 
     return redirect('dashboard')
 
-
 @require_GET
 def track_whatsapp_click(request, listing_id):
     listing = get_object_or_404(Listing, id=listing_id, status='ACTIVE')
@@ -605,13 +600,11 @@ def track_whatsapp_click(request, listing_id):
     whatsapp_url = f"https://wa.me/{whatsapp_number}?text=Hi, I'm interested in your {listing.product} on Lendogo"
     return redirect(whatsapp_url)
 
-
 @require_POST
 def log_blocked_attempt(request, pk):
     listing = get_object_or_404(Listing, pk=pk)
     Listing.objects.filter(pk=pk).update(whatsapp_clicks=F('whatsapp_clicks') + 1)
     return JsonResponse({'status': 'logged'})
-
 
 @login_required
 @require_POST
@@ -639,8 +632,7 @@ def start_conversation(request, listing_id):
         seller=seller
     )
     convo.save()
-    return redirect('chat:chat_room', convo_id=convo.id) # FIXED
-
+    return redirect('chat:chat_room', convo_id=convo.id)
 
 @login_required
 @require_POST
@@ -675,7 +667,6 @@ def send_message(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
 
-
 @login_required
 def get_messages(request, convo_id):
     convo = get_object_or_404(Conversation, id=convo_id)
@@ -692,7 +683,6 @@ def get_messages(request, convo_id):
         'time': m.created_at.strftime('%H:%M')
     } for m in msgs]
     return JsonResponse({'messages': data})
-
 
 @login_required
 def chat_room(request, convo_id):
@@ -711,7 +701,6 @@ def chat_room(request, convo_id):
         'messages': messages,
         'other_user': other_user
     })
-
 
 @login_required
 def rental_page(request):
@@ -746,7 +735,6 @@ def rental_page(request):
         'unread_count': unread_count,
         'MEDIA_URL': settings.MEDIA_URL,
     })
-
 
 @login_required
 def post_rental(request):
@@ -837,9 +825,6 @@ def post_rental(request):
 
     return render(request, 'post_rental.html')
 
-
-from django.conf import settings
-
 def rental_detail(request, pk):
     rental = get_object_or_404(RentalListing.objects.select_related('seller'), pk=pk, is_active=True)
     RentalListing.objects.filter(pk=pk).update(views=F('views') + 1)
@@ -852,7 +837,6 @@ def rental_detail(request, pk):
         'rental': rental,
         'MEDIA_URL': settings.MEDIA_URL,
     })
-
 
 @login_required
 @require_POST
@@ -874,8 +858,7 @@ def start_rental_conversation(request, rental_id):
     )
 
     convo.save()
-    return redirect('chat:chat_room', convo_id=convo.id) # FIXED
-
+    return redirect('chat:chat_room', convo_id=convo.id)
 
 def airtel_checkout(request):
     if request.method == 'POST':
@@ -897,7 +880,6 @@ def airtel_checkout(request):
             })
 
     return render(request, 'checkout.html')
-
 
 VERIFY_TOKEN = "mabvuto123"
 
