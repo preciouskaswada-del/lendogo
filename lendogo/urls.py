@@ -25,6 +25,10 @@ urlpatterns = [
     path('listing/<int:pk>/sold/', views.mark_as_sold, name='mark_as_sold'),
     path('listing/<int:listing_id>/chat/', views.start_conversation, name='start_conversation'),
     
+    # BOOST PAYMENT
+    path('boost/<int:pk>/', views.boost_listing, name='boost_listing'),
+    path('boost/callback/', views.boost_callback, name='boost_callback'),
+    
     path('checkout/airtel/', views.airtel_checkout, name='airtel_checkout'),
     
     
