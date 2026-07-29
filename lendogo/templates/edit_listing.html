@@ -13,7 +13,7 @@
 .section-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
 
 .photo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
-@media (max-width: 768px) {.photo-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 768px) {.photo-grid { grid-template-columns: repeat(3, 1fr); }
 
 .photo-slot {
     aspect-ratio: 1; border-radius: 12px; border: 2px dashed #d1d5db; background: #f9fafb;
@@ -23,25 +23,25 @@
 
 .photo-preview { width: 100%; height: 100%; object-fit: cover; }
 
-/* Hide ALL django file inputs */
 input[type="file"] { display: none!important; }
 
 .add-card {
   display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 4px;
-  cursor: pointer; color: #6b7280; font-weight: 500; font-size: 13px; width: 100%; height: 100%;
+  cursor: pointer; color: #6b7280; font-weight: 500; font-size: 12px; width: 100%; height: 100%;
 }
 .add-card:hover { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
-.add-card i { font-size: 28px; }
+.add-card i { font-size: 22px; }
 
+/* FIX: SMALLER BUTTONS TOP RIGHT */
 .photo-actions {
-    position: absolute; bottom: 6px; right: 6px; display: flex; gap: 6px;
-    background: rgba(0,0,0,0.7); padding: 6px; border-radius: 10px; z-index: 10;
+    position: absolute; top: 6px; right: 6px; display: flex; gap: 4px;
+    background: rgba(0,0,0,0.6); padding: 3px; border-radius: 8px; z-index: 10;
   }
-.photo-actions .btn { padding: 8px 10px; font-size: 16px; } /* Bigger for mobile */
+.photo-actions .btn { padding: 4px 6px; font-size: 12px; line-height: 1; } /* Much smaller */
 
 .uploading-overlay {
     position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.75);
-    color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; z-index: 5; border-radius: 12px;
+    color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; z-index: 5; border-radius: 12px;
   }
 .sticky-footer {
     position: sticky; bottom: 0; background: white; border-top: 1px solid #e5e7eb;
@@ -110,12 +110,11 @@ input[type="file"] { display: none!important; }
           </div>
         </div>
         <div id="newImageUrls"></div>
-        <small class="text-muted mt-2 d-block">Tip: First photo = main photo. You can upload multiple at once.</small>
+        <small class="text-muted mt-2 d-block">Tip: First photo = main photo.</small>
       </div>
 
       <div class="form-section">
         <h3 class="section-title">Video <span class="text-muted fw-normal fs-6">Optional</span></h3>
-        
         <input type="hidden" name="video" id="videoUrlInput" value="{{ form.instance.video|default:'' }}">
         <input type="file" name="video_upload" accept="video/*">
 
@@ -182,7 +181,6 @@ async function uploadToCloudinary(file, type = 'image') {
   throw new Error(data.error?.message || 'Upload failed');
 }
 
-// PHOTOS: MULTI UPLOAD
 document.getElementById('addPhotoBtn').addEventListener('click', () => document.getElementById('multiFileInput').click());
 
 document.getElementById('multiFileInput').addEventListener('change', async e => {
@@ -198,8 +196,6 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
       const hiddenInput = document.createElement('input');
       hiddenInput.type = 'hidden'; hiddenInput.name = 'new_images'; hiddenInput.value = cloudUrl;
       document.getElementById('newImageUrls').appendChild(hiddenInput);
-      
-      // FIX: ADDED CHANGE BUTTON HERE
       slot.innerHTML = `
         <img src="${cloudUrl}" class="photo-preview">
         <div class="photo-actions">
@@ -215,7 +211,6 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
   e.target.value = '';
 });
 
-// PHOTOS: CHANGE + DELETE FOR ALL
 document.addEventListener('click', e => {
   if(e.target.closest('.change-btn,.slot-add-btn')) e.target.closest('.photo-slot').querySelector('.file-input').click();
   if(e.target.closest('.delete-btn')){
@@ -226,7 +221,6 @@ document.addEventListener('click', e => {
   }
 });
 
-// PHOTOS: SINGLE CHANGE
 document.addEventListener('change', async e => {
     if(e.target.classList.contains('file-input') && e.target.files[0]){
         const file = e.target.files[0];
@@ -239,8 +233,6 @@ document.addEventListener('change', async e => {
           const hiddenInput = document.createElement('input');
           hiddenInput.type = 'hidden'; hiddenInput.name = 'new_images'; hiddenInput.value = cloudUrl;
           document.getElementById('newImageUrls').appendChild(hiddenInput);
-          
-          // FIX: ADDED CHANGE BUTTON HERE TOO
           slot.innerHTML = `
             <img src="${cloudUrl}" class="photo-preview">
             <div class="photo-actions">
@@ -255,7 +247,6 @@ document.addEventListener('change', async e => {
     }
 });
 
-// VIDEO
 const videoInput = document.querySelector('input[name="video_upload"]');
 document.getElementById('videoUploadBtn')?.addEventListener('click', () => videoInput.click());
 document.addEventListener('click', e => { if(e.target.id === 'changeVideoBtn') videoInput.click(); });
@@ -286,7 +277,6 @@ document.addEventListener('click', e => {
   }
 });
 
-// BLOCK SUBMIT WHILE UPLOADING
 document.getElementById('editForm').addEventListener('submit', e => {
   if (isUploading) { 
     e.preventDefault(); 
