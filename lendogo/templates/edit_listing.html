@@ -27,7 +27,7 @@ input[type="file"] { display: none!important; }
 .uploading-overlay { position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.75); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; z-index: 5; border-radius: 12px; flex-direction: column; }
 .sticky-footer { position: sticky; bottom: 0; background: white; border-top: 1px solid #e5e7eb; padding: 16px 24px; margin: 0 -24px -24px; border-radius: 0 0 16px 16px; z-index: 10; }
 .btn-primary { background: #2563eb; border: none; }
-.btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+.btn-primary:disabled,.btn-primary.disabled { background: #93c5fd; cursor: not-allowed; pointer-events: none; }
 </style>
 {% endblock %}
 
@@ -68,8 +68,8 @@ input[type="file"] { display: none!important; }
             {% if img_form.instance.image %}
               <img src="{{ img_form.instance.image }}" class="photo-preview">
               <div class="photo-actions">
-                <button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button>
-                <button type="button" class="btn btn-sm btn-danger delete-btn" title="Delete"><i class="bi bi-trash"></i></button>
+                <button type="button" class="btn btn-sm btn-light change-btn"><i class="bi bi-arrow-repeat"></i></button>
+                <button type="button" class="btn btn-sm btn-danger delete-btn"><i class="bi bi-trash"></i></button>
               </div>
             {% else %}
               <div class="add-card slot-add-btn">
@@ -128,17 +128,17 @@ input[type="file"] { display: none!important; }
   </form>
 </div>
 
-<div class="modal fade" id="confirmModal" tabindex="-1">
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="modalTitle">Confirm</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <h5 class="modal-title fw-semibold" id="modalTitle"></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body" id="modalText">Are you sure?</div>
+      <div class="modal-body" id="modalText"></div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-danger" id="confirmActionBtn">Confirm</button>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="confirmActionBtn">Confirm</button>
       </div>
     </div>
   </div>
@@ -161,6 +161,7 @@ function setUploading(state){
   isUploading = state;
   const btn = document.getElementById('postBtn');
   btn.disabled = state;
+  btn.classList.toggle('disabled', state);
   btn.innerHTML = state? '<span class="spinner-border spinner-border-sm"></span> Uploading...' : '<i class="bi bi-check-lg"></i> Save Changes';
 }
 
@@ -185,7 +186,8 @@ async function uploadToCloudinary(file, type = 'image') {
     xhr.upload.onprogress = (e) => {
         if (e.lengthComputable && type === 'video') {
             let percent = Math.round((e.loaded / e.total) * 100);
-            document.querySelector('.uploading-overlay').innerHTML = `Uploading...<br>${percent}%`;
+            const overlay = document.querySelector('.uploading-overlay');
+            if(overlay) overlay.innerHTML = `Uploading...<br>${percent}%`;
         }
     };
     xhr.onload = () => {
@@ -226,16 +228,18 @@ document.addEventListener('click', e => {
   if(e.target.closest('.change-btn')){
     currentSlot = e.target.closest('.photo-slot');
     currentAction = 'change';
-    document.getElementById('modalTitle').textContent = 'Change Photo?';
-    document.getElementById('modalText').textContent = 'Replace this photo with a new one.';
+    document.getElementById('modalTitle').textContent = 'Change Photo';
+    document.getElementById('modalText').textContent = 'Are you sure you want to replace this photo?';
+    document.getElementById('confirmActionBtn').className = 'btn btn-primary';
     confirmModal.show();
   }
   if(e.target.closest('.slot-add-btn')) e.target.closest('.photo-slot').querySelector('.file-input').click();
   if(e.target.closest('.delete-btn')){
     currentSlot = e.target.closest('.photo-slot');
     currentAction = 'delete';
-    document.getElementById('modalTitle').textContent = 'Delete Photo?';
-    document.getElementById('modalText').textContent = 'This photo will be removed when you save.';
+    document.getElementById('modalTitle').textContent = 'Delete Photo';
+    document.getElementById('modalText').textContent = 'This photo will be removed when you save changes.';
+    document.getElementById('confirmActionBtn').className = 'btn btn-danger';
     confirmModal.show();
   }
 });
@@ -256,21 +260,21 @@ document.addEventListener('change', async e => {
     if(e.target.classList.contains('file-input') && e.target.files[0]){
         const file = e.target.files[0];
         const slot = e.target.closest('.photo-slot');
-        const slotIndex = slot.dataset.index;
         const localUrl = URL.createObjectURL(file);
-        slot.innerHTML = `<img src="${localUrl}" class="photo-preview"><div class="uploading-overlay">Uploading...</div>`;
+        slot.insertAdjacentHTML('beforeend', `<div class="uploading-overlay">Uploading...</div>`);
         slot.classList.add('filled');
         try{
           const cloudUrl = await uploadToCloudinary(file, 'image');
           const hiddenInput = document.createElement('input');
           hiddenInput.type = 'hidden';
-          hiddenInput.name = `new_images_${slotIndex}`;
+          hiddenInput.name = 'new_images';
           hiddenInput.value = cloudUrl;
           document.getElementById('newImageUrls').appendChild(hiddenInput);
-          slot.innerHTML = `<img src="${cloudUrl}" class="photo-preview"><div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger remove-new-btn"><i class="bi bi-trash"></i></button></div>`;
-          slot.querySelector('.remove-new-btn').onclick = () => { slot.remove(); hiddenInput.remove(); }
+          slot.querySelector('.photo-preview').src = cloudUrl;
+          slot.querySelector('.uploading-overlay').remove();
         } catch(err){
-          slot.innerHTML = `<div class="add-card text-danger"><i class="bi bi-x-lg"></i><span>Failed</span></div>`;
+          slot.querySelector('.uploading-overlay').remove();
+          alert('Upload failed');
         }
     }
 });
@@ -291,7 +295,7 @@ videoFileInput.addEventListener('change', async e => {
       document.getElementById('videoUrlInput').value = cloudUrl;
       document.getElementById('videoPreview').innerHTML = `<video src="${cloudUrl}" controls class="w-100 rounded" style="max-height:300px;"></video><div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button><button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn">Remove</button></div>`;
     } catch(err){
-      alert("Video upload failed: " + err.message);
+      alert("Upload failed: " + err.message);
       document.getElementById('videoPreview').classList.add('d-none');
       document.getElementById('videoUploadArea')?.classList.remove('d-none');
     }
