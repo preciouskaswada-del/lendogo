@@ -43,7 +43,7 @@ ImageFormSet = inlineformset_factory(
     Listing,
     ListingImage,
     form=ListingImageForm,
-    extra=0, # FIX: 0 because we add new ones via JS
+    extra=0,
     max_num=10,
     can_delete=True,
     can_delete_extra=False,
@@ -96,7 +96,7 @@ def home(request):
         all_listings = all_listings.filter(business_q)
     elif sort == 'near_me':
         if request.user.is_authenticated and hasattr(request.user, 'userprofile') and request.userprofile.location:
-            all_listings = all_listings.filter(location=request.user.userprofile.location)
+            all_listings = all_listings.filter(location=request.userprofile.location)
     else:
         all_listings = all_listings.order_by('-is_boosted', '-bumped_at', '-id')
 
@@ -158,6 +158,7 @@ def listing_detail(request, pk):
 def create_listing(request):
     if request.method == 'POST':
         form = ListingForm(request.POST)
+        # DON'T bind formset to request.FILES. We use URLs from JS
         formset = ImageFormSet(request.POST)
 
         if form.is_valid():
@@ -165,20 +166,22 @@ def create_listing(request):
                 listing = form.save(commit=False)
                 listing.seller = request.user
                 listing.status = 'ACTIVE'
+
+                # FIX 1: SAVE VIDEO URL FIRST
+                video_url = request.POST.get('video', '').strip()
+                if video_url and hasattr(listing, 'video'):
+                    listing.video = video_url
+
                 listing.save()
                 form.save_m2m()
 
+                # FIX 2: SAVE IMAGES FROM CLOUDINARY URLs
                 new_images = request.POST.getlist('new_images')
-                video_url = request.POST.get('video', '')
-
-                for url in new_images:
+                for order, url in enumerate(new_images):
                     if url:
-                        ListingImage.objects.create(listing=listing, image=url)
+                        ListingImage.objects.create(listing=listing, image=url, order=order)
 
-                if video_url and hasattr(listing, 'video'):
-                    listing.video = video_url
-                    listing.save(update_fields=['video'])
-
+                # FIX 3: Still process formset deletes if any
                 if formset.is_valid():
                     formset.instance = listing
                     formset.save()
@@ -223,15 +226,22 @@ def edit_listing(request, pk):
 
     if request.method == 'POST':
         form = ListingForm(request.POST, instance=listing)
+        # DON'T pass request.FILES here either
         formset = ImageFormSet(request.POST, instance=listing)
 
-        if form.is_valid() and formset.is_valid(): # VALIDATE BOTH
+        if form.is_valid() and formset.is_valid():
             with transaction.atomic():
                 listing = form.save(commit=False)
+
+                # FIX 1: INSTANT VIDEO SAVE
+                video_url = request.POST.get('video', None)
+                if video_url is not None and hasattr(listing, 'video'):
+                    listing.video = video_url # '' will clear it
+
                 listing.save()
                 form.save_m2m()
 
-                # 1. REPLACE EXISTING IMAGES FIRST - using formset forms to keep order
+                # FIX 2: REPLACE EXISTING IMAGES
                 for i, img_form in enumerate(formset.forms):
                     if img_form.instance.pk and not img_form.cleaned_data.get('DELETE'):
                         new_url = request.POST.get(f'new_images_{i}')
@@ -239,20 +249,14 @@ def edit_listing(request, pk):
                             img_form.instance.image = new_url
                             img_form.instance.save(update_fields=['image'])
 
-                # 2. HANDLE DELETES + SAVE REMAINING
-                formset.save() # This deletes anything marked DELETE
+                # FIX 3: HANDLE DELETES
+                formset.save()
 
-                # 3. ADD COMPLETELY NEW IMAGES from + button
+                # FIX 4: ADD NEW IMAGES
                 new_images = request.POST.getlist('new_images')
-                for url in new_images:
+                for order, url in enumerate(new_images):
                     if url:
-                        ListingImage.objects.create(listing=listing, image=url)
-
-                # 4. HANDLE VIDEO
-                video_url = request.POST.get('video', None)
-                if video_url is not None and hasattr(listing, 'video'):
-                    listing.video = video_url # '' will clear it
-                    listing.save(update_fields=['video'])
+                        ListingImage.objects.create(listing=listing, image=url, order=100+order)
 
             messages.success(request, 'Listing updated successfully!')
             return redirect('listing_detail', pk=listing.pk)
@@ -271,6 +275,7 @@ def edit_listing(request, pk):
         'listing': listing,
         'categories': categories
     })
+
 @login_required
 def manual_boost(request, pk):
     if not request.user.is_staff:
