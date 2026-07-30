@@ -6,60 +6,50 @@ from django.core.validators import MinValueValidator
 from datetime import timedelta
 from decimal import Decimal
 from phonenumber_field.modelfields import PhoneNumberField
-from cloudinary.models import CloudinaryField # ADDED
-from django.conf import settings # ADDED
-import requests # ADDED FOR PAYCHANGU
+import requests
+from django.conf import settings
 
 # PAYCHANGU SETTINGS
 PAYCHANGU_SECRET_KEY = getattr(settings, 'PAYCHANGU_SECRET_KEY', '')
-BOOST_FEE = getattr(settings, 'BOOST_FEE', 550) # SET TO 550
+BOOST_FEE = getattr(settings, 'BOOST_FEE', 550)
 PAYCHANGU_URL = "https://api.paychangu.com/payment"
 
 class User(AbstractUser):
-    """
-    Custom user for future auth flexibility.
-    Phone is REQUIRED for SMS password reset. Email is optional backup.
-    """
     email = models.EmailField(blank=True, null=True, db_index=True, help_text="Optional. Used for email password reset if provided")
 
+    # FIX 1: null=True so multiple users can have no phone
     phone_number = PhoneNumberField(
         unique=True,
+        null=True, blank=True,
         db_index=True,
         help_text="REQUIRED. E.164 format: +265991234567. Used for SMS reset + WhatsApp + Airtel Money"
     )
 
     USERNAME_FIELD = 'username'
-    REQUIRED_FIELDS = ['phone_number']
+    REQUIRED_FIELDS = [] # phone not required for createsuperuser
 
     def __str__(self):
         return self.username or str(self.phone_number) or str(self.id)
 
 class UserProfile(models.Model):
-    """
-    OneToOne for profile data. Keeps User table lean.
-    is_verified drives 'Lendogo Verified' badge = trust = higher prices.
-    """
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='userprofile')
     last_seen = models.DateTimeField(default=timezone.now, db_index=True)
     location = models.CharField(max_length=200, blank=True, default='')
-    is_verified = models.BooleanField(default=False, db_index=True) # AUTO via sales
-    is_verified_manual = models.BooleanField(default=False, db_index=True, help_text="Manual tick by admin for friends") # NEW: Manual verify
+    is_verified = models.BooleanField(default=False, db_index=True)
+    is_verified_manual = models.BooleanField(default=False, db_index=True, help_text="Manual tick by admin for friends")
     total_sales = models.PositiveIntegerField(default=0)
 
     def is_online(self):
         return timezone.now() - self.last_seen < timedelta(minutes=2)
 
     @property
-    def is_fully_verified(self): # NEW: Either auto or manual
+    def is_fully_verified(self):
         return self.is_verified or self.is_verified_manual
 
     def __str__(self):
         return f'{self.user.username} profile'
 
 class Category(models.Model):
-    """
-    Categories auto-learn market prices from ACTIVE listings.
-    """
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True, db_index=True)
     scam_keywords = models.TextField(blank=True, default='')
@@ -67,7 +57,6 @@ class Category(models.Model):
 
     @property
     def market_avg_price(self):
-        """AUTO-CALCULATED: Average price from ACTIVE listings in last 90 days"""
         ninety_days_ago = timezone.now() - timedelta(days=90)
         avg = self.listings.filter(
             status='ACTIVE',
@@ -118,7 +107,6 @@ class Listing(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='ACTIVE', db_index=True)
     is_sold = models.BooleanField(default=False, db_index=True)
 
-    # BOOST: Manual tick in admin. Auto expires after 7 days
     is_boosted = models.BooleanField(default=False, db_index=True, help_text="Tick to boost for 7 days. Shows at top of home")
     boost_started_at = models.DateTimeField(null=True, blank=True, help_text="Auto set when you tick boost")
     boost_tx_ref = models.CharField(max_length=100, null=True, blank=True, help_text="Paychangu transaction ref")
@@ -126,9 +114,9 @@ class Listing(models.Model):
     view_count = models.PositiveIntegerField(default=0)
     whatsapp_clicks = models.PositiveIntegerField(default=0)
 
-    video = CloudinaryField('video', blank=True, null=True, resource_type='video') # CHANGED TO CLOUDINARY
+    # FIX 2: URLField instead of CloudinaryField. JS sends URL string
+    video = models.URLField(max_length=500, blank=True, null=True)
 
-    # AUTO VERIFICATION + SCAM DETECTION
     photo_verified = models.BooleanField(default=False, db_index=True)
     is_lendogo_verified = models.BooleanField(default=False, db_index=True)
     suspicion_level = models.IntegerField(default=0, db_index=True, help_text="0=safe, 1=low, 2=medium, 3=high. Auto")
@@ -142,7 +130,7 @@ class Listing(models.Model):
     bumped_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
     class Meta:
-        ordering = ['-is_boosted', '-bumped_at', '-created_at']  # Boosted always first
+        ordering = ['-is_boosted', '-bumped_at', '-created_at']
         indexes = [
             models.Index(fields=['status', '-created_at']),
             models.Index(fields=['location', 'status']),
@@ -158,17 +146,15 @@ class Listing(models.Model):
 
     @property
     def display_image(self):
-        """Returns first image that actually has a file/url. Never crashes."""
         if not self.pk:
             return None
-        for img in self.images.all().order_by('id'):
-            if img.image and img.image != '': # CHANGED: Check for URL string
+        for img in self.images.all().order_by('order'):
+            if img.image and img.image != '':
                 return img
         return None
         
     @property
     def image(self):
-        """Returns first image for templates that expect listing.image"""
         first = self.images.first()
         return first.image if first else None   
 
@@ -177,11 +163,10 @@ class Listing(models.Model):
         return self.display_image is not None
 
     @property
-    def show_scam_modal(self): # CHANGED: Only show modal at level 3
+    def show_scam_modal(self):
         return self.suspicion_level >= 3
 
     def run_scam_check(self):
-        """AUTO: Compare price to category average. Flag if too low - LEVEL 3 ONLY"""
         if not self.category or not self.category.has_enough_data:
             self.suspicion_level = 0
             self.scam_warning = None
@@ -193,17 +178,16 @@ class Listing(models.Model):
 
         if avg_price > 0:
             price_diff_percent = ((avg_price - float(self.price)) / avg_price) * 100
-            if price_diff_percent >= 50: # ONLY LEVEL 3 NOW
+            if price_diff_percent >= 50:
                 self.suspicion_level = 3
                 self.scam_warning = f"WARNING: Price is {int(price_diff_percent)}% below market average of MK {avg_price:,}. Too good to be true?"
-            else: # LEVEL 1 AND 2 DO NOTHING
+            else:
                 self.suspicion_level = 0
                 self.scam_warning = None
         self.scam_score = self.suspicion_level * 30
         self.last_scanned = timezone.now()
 
-    def initiate_boost_payment(self, user_email): # NEW: PAYCHANGU CODE
-        """Returns Paychangu checkout URL for 550 MWK boost"""
+    def initiate_boost_payment(self, user_email):
         payload = {
             "amount": BOOST_FEE,
             "currency": "MWK",
@@ -231,7 +215,6 @@ class Listing(models.Model):
     def save(self, *args, **kwargs):
         self.is_sold = (self.status == 'SOLD')
 
-        # === BOOST LOGIC: 7 DAY AUTO EXPIRE ===
         if self.is_boosted:
             if not self.boost_started_at:
                 self.boost_started_at = timezone.now()
@@ -246,21 +229,20 @@ class Listing(models.Model):
 
         self.run_scam_check()
 
-        # === AUTO VERIFICATION ===
         has_image = self.has_valid_images
-        price_ok = self.suspicion_level == 0 # CHANGED: Must be level 0 now
-        new_photo_verified = has_image and price_ok
+        price_ok = self.suspicion_level == 0
 
         seller_verified = False
         seller_sales = 0
         if self.seller_id:
             try:
                 profile = self.seller.userprofile
-                seller_verified = profile.is_fully_verified # CHANGED: uses auto OR manual
+                seller_verified = profile.is_fully_verified
                 seller_sales = profile.total_sales
             except UserProfile.DoesNotExist:
                 pass
 
+        new_photo_verified = has_image and price_ok
         new_lendogo_verified = (seller_verified and self.suspicion_level == 0 and seller_sales >= 1 and has_image)
 
         if (self.photo_verified != new_photo_verified or self.is_lendogo_verified != new_lendogo_verified):
@@ -283,13 +265,13 @@ class WhatsAppClick(models.Model):
 
 class ListingImage(models.Model):
     listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name='images')
-    image = CloudinaryField('image', blank=True, null=True) # CHANGED TO CLOUDINARY
+    # FIX 3: URLField + order field
+    image = models.URLField(max_length=500, blank=True, null=True)
+    order = models.PositiveIntegerField(default=0)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
-class ListingVideo(models.Model): # You can delete this model now. We use Listing.video CloudinaryField
-    listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name='videos')
-    video = models.FileField(upload_to='listings/videos/', help_text="MP4, max 50MB")
-    uploaded_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        ordering = ['order']
 
 class Conversation(models.Model):
     listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name='conversations', null=True, blank=True)
