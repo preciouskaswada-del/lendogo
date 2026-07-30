@@ -95,9 +95,8 @@ def home(request):
             business_q |= Q(product__icontains=keyword) | Q(location__icontains=keyword)
         all_listings = all_listings.filter(business_q)
     elif sort == 'near_me':
-        # FIXED: was request.userprofile, should be request.user.userprofile
         if request.user.is_authenticated and hasattr(request.user, 'userprofile') and request.userprofile.location:
-            all_listings = all_listings.filter(location=request.user.userprofile.location)
+            all_listings = all_listings.filter(location=request.userprofile.location)
     else:
         all_listings = all_listings.order_by('-is_boosted', '-bumped_at', '-id')
 
@@ -236,19 +235,22 @@ def edit_listing(request, pk):
                 listing.save()
                 form.save_m2m()
 
+                for img_form in formset.deleted_forms:
+                    if img_form.instance.pk:
+                        img_form.instance.delete()
+
                 for i, img_form in enumerate(formset.forms):
-                    if img_form.instance.pk and not img_form.cleaned_data.get('DELETE'):
+                    if img_form.instance.pk and img_form not in formset.deleted_forms:
                         new_url = request.POST.get(f'new_images_{i}')
                         if new_url:
                             img_form.instance.image = new_url
                             img_form.instance.save(update_fields=['image'])
 
-                formset.save()
-
                 new_images = request.POST.getlist('new_images')
+                existing_count = listing.images.count()
                 for order, url in enumerate(new_images):
                     if url:
-                        ListingImage.objects.create(listing=listing, image=url, order=100+order)
+                        ListingImage.objects.create(listing=listing, image=url, order=existing_count+order)
 
             messages.success(request, 'Listing updated successfully!')
             return redirect('listing_detail', pk=listing.pk)
@@ -303,9 +305,7 @@ def signup(request):
         form = SignUpForm(request.POST)
         if form.is_valid():
             user = form.save()
-            # FIX: Don't create empty phone_number. Let it be NULL
             profile, _ = UserProfile.objects.get_or_create(user=user)
-            # Only set phone if form has it and it's not empty
             phone = form.cleaned_data.get('phone')
             if phone:
                 profile.phone_number = phone
@@ -674,12 +674,13 @@ def get_messages(request, convo_id):
     if request.user not in [convo.buyer, convo.seller]:
         return JsonResponse({'error': 'Not allowed'}, status=403)
 
-    msgs = convo.messages.select_related('sender').all().order_by('created_at')
+    msgs = convo.messages.select_related('sender', 'sender__userprofile').all().order_by('created_at')
     msgs.filter(is_read=False).exclude(sender=request.user).update(is_read=True)
 
     data = [{
         'text': m.content,
         'sender': m.sender.username,
+        'sender_avatar': str(m.sender.userprofile.avatar) if hasattr(m.sender, 'userprofile') and m.sender.userprofile.avatar else '',
         'is_me': m.sender == request.user,
         'time': m.created_at.strftime('%H:%M')
     } for m in msgs]
@@ -688,13 +689,13 @@ def get_messages(request, convo_id):
 @login_required
 def chat_room(request, convo_id):
     convo = get_object_or_404(
-        Conversation.objects.select_related('buyer', 'seller'),
+        Conversation.objects.select_related('buyer', 'seller', 'buyer__userprofile', 'seller__userprofile'),
         id=convo_id
     )
     if request.user!= convo.buyer and request.user!= convo.seller:
         return HttpResponseForbidden("Not your chat")
 
-    messages = convo.messages.select_related('sender').all().order_by('created_at')
+    messages = convo.messages.select_related('sender', 'sender__userprofile').all().order_by('created_at')
     other_user = convo.seller if request.user == convo.buyer else convo.buyer
 
     return render(request, 'chat/room.html', {
