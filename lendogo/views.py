@@ -223,37 +223,34 @@ def edit_listing(request, pk):
 
     if request.method == 'POST':
         form = ListingForm(request.POST, instance=listing)
-        # FIX: Don't pass request.FILES because we upload to cloudinary via JS
         formset = ImageFormSet(request.POST, instance=listing)
 
-        if form.is_valid():
+        if form.is_valid() and formset.is_valid(): # VALIDATE BOTH
             with transaction.atomic():
                 listing = form.save(commit=False)
                 listing.save()
                 form.save_m2m()
 
-                # 1. HANDLE DELETES FIRST
-                if formset.is_valid():
-                    formset.save() # This deletes anything marked DELETE
+                # 1. REPLACE EXISTING IMAGES FIRST - using formset forms to keep order
+                for i, img_form in enumerate(formset.forms):
+                    if img_form.instance.pk and not img_form.cleaned_data.get('DELETE'):
+                        new_url = request.POST.get(f'new_images_{i}')
+                        if new_url:
+                            img_form.instance.image = new_url
+                            img_form.instance.save(update_fields=['image'])
 
-                # 2. REPLACE EXISTING IMAGES
-                # JS sends new_images_0, new_images_1 etc
-                existing_images = list(listing.images.all().order_by('id'))
-                for i, img_obj in enumerate(existing_images):
-                    new_url = request.POST.get(f'new_images_{i}')
-                    if new_url:
-                        img_obj.image = new_url
-                        img_obj.save(update_fields=['image'])
+                # 2. HANDLE DELETES + SAVE REMAINING
+                formset.save() # This deletes anything marked DELETE
 
-                # 3. ADD COMPLETELY NEW IMAGES
-                new_images = request.POST.getlist('new_images') # for the + button
+                # 3. ADD COMPLETELY NEW IMAGES from + button
+                new_images = request.POST.getlist('new_images')
                 for url in new_images:
                     if url:
                         ListingImage.objects.create(listing=listing, image=url)
 
                 # 4. HANDLE VIDEO
-                video_url = request.POST.get('video', '')
-                if hasattr(listing, 'video'):
+                video_url = request.POST.get('video', None)
+                if video_url is not None and hasattr(listing, 'video'):
                     listing.video = video_url # '' will clear it
                     listing.save(update_fields=['video'])
 
@@ -261,8 +258,8 @@ def edit_listing(request, pk):
             return redirect('listing_detail', pk=listing.pk)
         else:
             messages.error(request, 'Please fix the errors below')
-            print("EDIT FORM ERRORS:", form.errors)
-            print("EDIT FORMSET ERRORS:", formset.errors)
+            print("FORM ERRORS:", form.errors)
+            print("FORMSET ERRORS:", formset.errors)
     else:
         form = ListingForm(instance=listing)
         formset = ImageFormSet(instance=listing)
@@ -274,7 +271,6 @@ def edit_listing(request, pk):
         'listing': listing,
         'categories': categories
     })
-
 @login_required
 def manual_boost(request, pk):
     if not request.user.is_staff:
