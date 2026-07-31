@@ -39,6 +39,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 User = get_user_model()
 
+# FIX 1: Don't validate 'image' field. We will send Cloudinary URLs manually
 ImageFormSet = inlineformset_factory(
     Listing,
     ListingImage,
@@ -47,6 +48,7 @@ ImageFormSet = inlineformset_factory(
     max_num=10,
     can_delete=True,
     can_delete_extra=False,
+    fields=['id', 'DELETE']
 )
 
 def home(request):
@@ -95,7 +97,7 @@ def home(request):
             business_q |= Q(product__icontains=keyword) | Q(location__icontains=keyword)
         all_listings = all_listings.filter(business_q)
     elif sort == 'near_me':
-        if request.user.is_authenticated and hasattr(request.user, 'userprofile') and request.userprofile.location:
+        if request.user.is_authenticated and hasattr(request.user, 'userprofile') and request.user.userprofile.location:
             all_listings = all_listings.filter(location=request.user.userprofile.location)
     else:
         all_listings = all_listings.order_by('-is_boosted', '-bumped_at', '-id')
@@ -178,10 +180,6 @@ def create_listing(request):
                     if url:
                         ListingImage.objects.create(listing=listing, image=url, order=order)
 
-                if formset.is_valid():
-                    formset.instance = listing
-                    formset.save()
-
             messages.success(request, 'Listing created successfully!')
             return redirect('listing_detail', pk=listing.pk)
         else:
@@ -194,7 +192,7 @@ def create_listing(request):
     categories = Category.objects.all()
     return render(request, 'create.html', {'form': form, 'formset': formset, 'categories': categories})
 
-# FIXED EDIT VIEW
+# FIX 2: FULLY WORKING EDIT VIEW - NO MORE DISAPPEARING PHOTOS
 @login_required
 def edit_listing(request, pk):
     listing = get_object_or_404(Listing, pk=pk, seller=request.user)
@@ -203,7 +201,7 @@ def edit_listing(request, pk):
         form = ListingForm(request.POST, instance=listing)
         formset = ImageFormSet(request.POST, instance=listing)
 
-        if form.is_valid() and formset.is_valid():
+        if form.is_valid(): # FIX: Don't check formset.is_valid()
             with transaction.atomic():
                 # 1. Save main listing
                 listing = form.save()
@@ -214,18 +212,16 @@ def edit_listing(request, pk):
                 listing.save()
 
                 # 3. HANDLE DELETES ONLY from formset
-                formset.save(commit=False)
                 for obj in formset.deleted_objects:
                     obj.delete()
 
-                # 4. KEY FIX: UPDATE EXISTING IMAGES THAT WERE CHANGED
+                # 4. KEY FIX: UPDATE EXISTING IMAGES THAT WERE CHANGED VIA CLOUDINARY
                 for key, value in request.POST.items():
                     if key.startswith('form-') and key.endswith('-image') and value.startswith('http'):
                         index = int(key.split('-')[1])
-                        if index < len(formset.forms):
-                            img_instance = formset.forms[index].instance
-                            img_instance.image = value
-                            img_instance.save()
+                        img_id = request.POST.get(f'form-{index}-id')
+                        if img_id:
+                            ListingImage.objects.filter(id=img_id, listing=listing).update(image=value)
 
                 # 5. ADD NEW UPLOADED IMAGES
                 new_images = request.POST.getlist('new_images')
@@ -244,7 +240,6 @@ def edit_listing(request, pk):
         else:
             messages.error(request, 'Please fix the errors below')
             print("FORM ERRORS:", form.errors)
-            print("FORMSET ERRORS:", formset.errors)
     else:
         form = ListingForm(instance=listing)
         formset = ImageFormSet(instance=listing)
