@@ -149,21 +149,22 @@ input[type="file"] { display: none!important; }
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 const CLOUD_NAME = "sbsdxiie";
-const UPLOAD_PRESET = "lendogo3"; // FIXED: New preset
-let isUploading = false;
+const UPLOAD_PRESET = "lendogo3";
+let activeUploads = 0; // FIX: count uploads instead of boolean
 let currentSlot = null;
 let currentAction = null;
 const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
-let uploadProgress = {};
+let uploadPromises = []; // FIX: track all uploads
 
 document.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(el => el.classList.add('form-control'));
 
-function setUploading(state){
-  isUploading = state;
+function setUploading(change){
+  activeUploads += change;
   const btn = document.getElementById('postBtn');
-  btn.disabled = state;
-  btn.classList.toggle('disabled', state);
-  btn.innerHTML = state? '<span class="spinner-border spinner-border-sm"></span> Uploading...' : '<i class="bi bi-check-lg"></i> Save Changes';
+  const uploading = activeUploads > 0;
+  btn.disabled = uploading;
+  btn.classList.toggle('disabled', uploading);
+  btn.innerHTML = uploading? '<span class="spinner-border spinner-border-sm"></span> Uploading...' : '<i class="bi bi-check-lg"></i> Save Changes';
 }
 
 function updateProgressOverlay(slot, percent, text='Uploading...'){
@@ -176,7 +177,6 @@ function updateProgressOverlay(slot, percent, text='Uploading...'){
     overlay.innerHTML = `${text}<br>${percent}%`;
 }
 
-// NEW: Compress image in browser before upload
 function compressImage(file) {
     return new Promise((resolve) => {
         const reader = new FileReader();
@@ -201,7 +201,7 @@ function compressImage(file) {
 }
 
 async function uploadToCloudinary(file, type = 'image', slotId = 'default') {
-  setUploading(true);
+  setUploading(1);
   const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${type}/upload`;
   const formData = new FormData();
   formData.append('file', file);
@@ -214,18 +214,17 @@ async function uploadToCloudinary(file, type = 'image', slotId = 'default') {
     xhr.upload.onprogress = (e) => {
         if (e.lengthComputable) {
             let percent = Math.round((e.loaded / e.total) * 100);
-            uploadProgress[slotId] = percent;
             const slot = document.querySelector(`[data-progress-id="${slotId}"]`);
             if(slot) updateProgressOverlay(slot, percent);
         }
     };
     xhr.onload = () => {
-      setUploading(false);
+      setUploading(-1);
       const data = JSON.parse(xhr.responseText);
       if (data.secure_url) resolve(data.secure_url);
       else reject(new Error(data.error?.message || 'Upload failed'));
     };
-    xhr.onerror = () => { setUploading(false); reject(new Error('Network error')); };
+    xhr.onerror = () => { setUploading(-1); reject(new Error('Network error')); };
     xhr.send(formData);
   });
 }
@@ -245,16 +244,16 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
     updateProgressOverlay(slot, 0);
     document.getElementById('photoGrid').insertBefore(slot, document.getElementById('addPhotoBtn'));
 
-    try{
-      const cloudUrl = await uploadToCloudinary(compressedFile, 'image', slotId);
+    const uploadPromise = uploadToCloudinary(compressedFile, 'image', slotId).then(cloudUrl => {
       const hiddenInput = document.createElement('input');
       hiddenInput.type = 'hidden'; hiddenInput.name = 'new_images'; hiddenInput.value = cloudUrl;
       document.getElementById('newImageUrls').appendChild(hiddenInput);
       slot.innerHTML = `<img src="${cloudUrl}" class="photo-preview"><div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger remove-new-btn"><i class="bi bi-trash"></i></button></div>`;
       slot.querySelector('.remove-new-btn').onclick = () => { slot.remove(); hiddenInput.remove(); }
-    } catch(err){
-      slot.innerHTML = `<div class="add-card text-danger"><i class="bi bi-x-lg"></i><span>Failed: ${err.message}</span></div>`;
-    }
+    }).catch(err => {
+      slot.innerHTML = `<div class="add-card text-danger"><i class="bi bi-x-lg"></i><span>Failed</span></div>`;
+    });
+    uploadPromises.push(uploadPromise);
   }
   e.target.value = '';
 });
@@ -266,67 +265,27 @@ document.addEventListener('change', async e => {
         const slot = e.target.closest('.photo-slot');
         const slotId = 'slot_' + slot.dataset.index;
         slot.setAttribute('data-progress-id', slotId);
-
         const localUrl = URL.createObjectURL(compressedFile);
-        if(!slot.querySelector('.photo-preview')){
-            slot.innerHTML = `<img src="${localUrl}" class="photo-preview">`;
-        } else {
-            slot.querySelector('.photo-preview').src = localUrl;
-        }
+        if(!slot.querySelector('.photo-preview')) slot.innerHTML = `<img src="${localUrl}" class="photo-preview">`;
+        else slot.querySelector('.photo-preview').src = localUrl;
         slot.classList.add('filled');
         updateProgressOverlay(slot, 0);
 
-        try{
-          const cloudUrl = await uploadToCloudinary(compressedFile, 'image', slotId);
+        const uploadPromise = uploadToCloudinary(compressedFile, 'image', slotId).then(cloudUrl => {
           const hiddenInput = document.createElement('input');
-          hiddenInput.type = 'hidden';
-          hiddenInput.name = 'new_images';
-          hiddenInput.value = cloudUrl;
+          hiddenInput.type = 'hidden'; hiddenInput.name = 'new_images'; hiddenInput.value = cloudUrl;
           document.getElementById('newImageUrls').appendChild(hiddenInput);
           slot.querySelector('.photo-preview').src = cloudUrl;
           slot.querySelector('.uploading-overlay').remove();
-          if(!slot.querySelector('.photo-actions')){
-            slot.innerHTML += `<div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-btn"><i class="bi bi-trash"></i></button></div>`;
-          }
-        } catch(err){
-          slot.querySelector('.uploading-overlay').innerHTML = `Failed<br>${err.message}`;
-          setTimeout(()=>{ if(slot.querySelector('.uploading-overlay')) slot.querySelector('.uploading-overlay').remove(); }, 3000);
-        }
+          if(!slot.querySelector('.photo-actions')) slot.innerHTML += `<div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-btn"><i class="bi bi-trash"></i></button></div>`;
+        }).catch(err => {
+          slot.querySelector('.uploading-overlay').innerHTML = `Failed`;
+        });
+        uploadPromises.push(uploadPromise);
     }
 });
 
-document.addEventListener('click', e => {
-  if(e.target.closest('.change-btn')){
-    currentSlot = e.target.closest('.photo-slot');
-    currentAction = 'change';
-    document.getElementById('modalTitle').textContent = 'Change Photo';
-    document.getElementById('modalText').textContent = 'Are you sure you want to replace this photo?';
-    document.getElementById('confirmActionBtn').className = 'btn btn-primary';
-    confirmModal.show();
-  }
-  if(e.target.closest('.slot-add-btn')) e.target.closest('.photo-slot').querySelector('.file-input').click();
-  if(e.target.closest('.delete-btn')){
-    currentSlot = e.target.closest('.photo-slot');
-    currentAction = 'delete';
-    document.getElementById('modalTitle').textContent = 'Delete Photo';
-    document.getElementById('modalText').textContent = 'This photo will be removed when you save changes.';
-    document.getElementById('confirmActionBtn').className = 'btn btn-danger';
-    confirmModal.show();
-  }
-});
-
-document.getElementById('confirmActionBtn').onclick = () => {
-  if(currentAction === 'delete'){
-    currentSlot.querySelector('input[name$="-DELETE"]').checked = true;
-    currentSlot.classList.add('deleted');
-    currentSlot.querySelector('.photo-actions').innerHTML = '<span class="badge bg-secondary">Will Delete</span>';
-  }
-  if(currentAction === 'change'){
-    currentSlot.querySelector('.file-input').click();
-  }
-  confirmModal.hide();
-}
-
+// Video
 const videoFileInput = document.getElementById('videoFileInput');
 document.getElementById('videoUploadBtn')?.addEventListener('click', () => videoFileInput.click());
 document.addEventListener('click', e => { if(e.target.id === 'changeVideoBtn') videoFileInput.click(); });
@@ -341,17 +300,37 @@ videoFileInput.addEventListener('change', async e => {
     const videoSlot = document.getElementById('videoPreview');
     videoSlot.setAttribute('data-progress-id', 'video1');
     updateProgressOverlay(videoSlot, 0, 'Uploading Video');
-    try{
-      const cloudUrl = await uploadToCloudinary(file, 'video', 'video1');
+
+    const uploadPromise = uploadToCloudinary(file, 'video', 'video1').then(cloudUrl => {
       document.getElementById('videoUrlInput').value = cloudUrl;
       document.getElementById('videoPreview').innerHTML = `<video src="${cloudUrl}" controls class="w-100 rounded" style="max-height:300px;"></video><div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button><button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn">Remove</button></div>`;
-    } catch(err){
+    }).catch(err => {
       alert("Upload failed: " + err.message);
       document.getElementById('videoPreview').classList.add('d-none');
       document.getElementById('videoUploadArea')?.classList.remove('d-none');
-    }
+    });
+    uploadPromises.push(uploadPromise);
   }
 });
+
+// DELETE MODAL
+document.addEventListener('click', e => {
+  if(e.target.closest('.change-btn')){ currentSlot = e.target.closest('.photo-slot'); currentAction = 'change'; document.getElementById('modalTitle').textContent = 'Change Photo'; document.getElementById('modalText').textContent = 'Replace this photo?'; confirmModal.show(); }
+  if(e.target.closest('.slot-add-btn')) e.target.closest('.photo-slot').querySelector('.file-input').click();
+  if(e.target.closest('.delete-btn')){ currentSlot = e.target.closest('.photo-slot'); currentAction = 'delete'; document.getElementById('modalTitle').textContent = 'Delete Photo'; document.getElementById('modalText').textContent = 'Remove this photo?'; confirmModal.show(); }
+});
+
+document.getElementById('confirmActionBtn').onclick = () => {
+  if(currentAction === 'delete'){
+    currentSlot.querySelector('input[name$="-DELETE"]').checked = true;
+    currentSlot.classList.add('deleted');
+    currentSlot.querySelector('.photo-actions').innerHTML = '<span class="badge bg-secondary">Will Delete</span>';
+  }
+  if(currentAction === 'change'){
+    currentSlot.querySelector('.file-input').click();
+  }
+  confirmModal.hide();
+}
 
 document.addEventListener('click', e => {
   if(e.target.id === 'removeVideoBtn'){
@@ -361,10 +340,15 @@ document.addEventListener('click', e => {
   }
 });
 
-document.getElementById('editForm').addEventListener('submit', e => {
-  if (isUploading) {
+// KEY FIX: WAIT FOR ALL UPLOADS BEFORE SUBMIT
+document.getElementById('editForm').addEventListener('submit', async e => {
+  if (activeUploads > 0) {
     e.preventDefault();
-    alert('Please wait for upload to finish');
+    const btn = document.getElementById('postBtn');
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Finishing uploads...';
+    await Promise.all(uploadPromises);
+    uploadPromises = [];
+    e.target.submit();
   }
 });
 </script>
