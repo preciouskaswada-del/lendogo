@@ -191,8 +191,6 @@ def create_listing(request):
 
     categories = Category.objects.all()
     return render(request, 'create.html', {'form': form, 'formset': formset, 'categories': categories})
-
-# FINAL FIXED EDIT VIEW - NO MORE DISAPPEARING PHOTOS
 @login_required
 def edit_listing(request, pk):
     listing = get_object_or_404(Listing, pk=pk, seller=request.user)
@@ -201,21 +199,19 @@ def edit_listing(request, pk):
         form = ListingForm(request.POST, instance=listing)
         formset = ImageFormSet(request.POST, instance=listing)
 
-        if form.is_valid(): # Don't check formset.is_valid() because image field has URLs
-            with transaction.atomic():
-                # 1. Save main listing
-                listing = form.save()
+        formset.is_valid() # KEY FIX: Call this so deleted_objects gets populated, but don't check result
 
-                # 2. HANDLE VIDEO
-                video_url = request.POST.get('video', '')
-                listing.video = video_url
+        if form.is_valid():
+            with transaction.atomic():
+                listing = form.save()
+                listing.video = request.POST.get('video', '')
                 listing.save()
 
-                # 3. HANDLE DELETES
+                # 1. HANDLE DELETES - Now this will work
                 for obj in formset.deleted_objects:
                     obj.delete()
 
-                # 4. UPDATE EXISTING IMAGES THAT WERE CHANGED VIA CLOUDINARY
+                # 2. UPDATE EXISTING IMAGES CHANGED VIA CLOUDINARY
                 for key, value in request.POST.items():
                     if key.startswith('form-') and key.endswith('-image') and value.startswith('http'):
                         index = int(key.split('-')[1])
@@ -223,7 +219,7 @@ def edit_listing(request, pk):
                         if img_id and img_id.isdigit():
                             ListingImage.objects.filter(id=int(img_id), listing=listing).update(image=value)
 
-                # 5. ADD NEW UPLOADED IMAGES
+                # 3. ADD NEW IMAGES
                 new_images = request.POST.getlist('new_images')
                 if new_images:
                     existing_count = listing.images.count()
@@ -251,7 +247,6 @@ def edit_listing(request, pk):
         'listing': listing,
         'categories': categories
     })
-
 @login_required
 def delete_listing(request, pk):
     listing = get_object_or_404(Listing, pk=pk, seller=request.user)
