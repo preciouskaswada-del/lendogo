@@ -24,7 +24,7 @@ input[type="file"] { display: none!important; }
 .add-card i { font-size: 22px; }
 .photo-actions { position: absolute; top: 6px; right: 6px; display: flex; gap: 4px; background: rgba(0,0,0,0.6); padding: 3px; border-radius: 8px; z-index: 10; }
 .photo-actions.btn { padding: 4px 6px; font-size: 12px; line-height: 1; }
-.uploading-overlay { position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.75); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; z-index: 5; border-radius: 12px; flex-direction: column; }
+.uploading-overlay { position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.75); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 18px; z-index: 5; border-radius: 12px; flex-direction: column; }
 .sticky-footer { position: sticky; bottom: 0; background: white; border-top: 1px solid #e5e7eb; padding: 16px 24px; margin: 0 -24px -24px; border-radius: 0 0 16px 16px; z-index: 10; }
 .btn-primary { background: #2563eb; border: none; }
 .btn-primary:disabled,.btn-primary.disabled { background: #93c5fd; cursor: not-allowed; pointer-events: none; }
@@ -154,6 +154,7 @@ let isUploading = false;
 let currentSlot = null;
 let currentAction = null;
 const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+let uploadProgress = {};
 
 document.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(el => el.classList.add('form-control'));
 
@@ -165,13 +166,28 @@ function setUploading(state){
   btn.innerHTML = state? '<span class="spinner-border spinner-border-sm"></span> Uploading...' : '<i class="bi bi-check-lg"></i> Save Changes';
 }
 
-async function uploadToCloudinary(file, type = 'image') {
+function updateProgressOverlay(slot, percent, text='Uploading...'){
+    let overlay = slot.querySelector('.uploading-overlay');
+    if(!overlay){
+        overlay = document.createElement('div');
+        overlay.className = 'uploading-overlay';
+        slot.appendChild(overlay);
+    }
+    overlay.innerHTML = `${text}<br>${percent}%`;
+}
+
+async function uploadToCloudinary(file, type = 'image', slotId = 'default') {
   setUploading(true);
   const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${type}/upload`;
   const formData = new FormData();
   formData.append('file', file);
   formData.append('upload_preset', UPLOAD_PRESET);
   formData.append('folder', 'lendogo');
+
+  // KEY FIX: Compress all images before upload so Railway doesn't timeout
+  if(type === 'image'){
+    formData.append('transformation', 'q_auto:low,w_1200');
+  }
 
   if(type === 'video'){
     formData.append('resource_type', 'video');
@@ -184,10 +200,11 @@ async function uploadToCloudinary(file, type = 'image') {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', url);
     xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable && type === 'video') {
+        if (e.lengthComputable) {
             let percent = Math.round((e.loaded / e.total) * 100);
-            const overlay = document.querySelector('.uploading-overlay');
-            if(overlay) overlay.innerHTML = `Uploading...<br>${percent}%`;
+            uploadProgress[slotId] = percent;
+            const slot = document.querySelector(`[data-progress-id="${slotId}"]`);
+            if(slot) updateProgressOverlay(slot, percent);
         }
     };
     xhr.onload = () => {
@@ -201,17 +218,22 @@ async function uploadToCloudinary(file, type = 'image') {
   });
 }
 
+// Multi upload - slots 2-10
 document.getElementById('addPhotoBtn').addEventListener('click', () => document.getElementById('multiFileInput').click());
 
 document.getElementById('multiFileInput').addEventListener('change', async e => {
   for(const file of Array.from(e.target.files)){
+    const slotId = 'new_' + Date.now() + Math.random();
     const slot = document.createElement('div');
     slot.className = 'photo-slot filled';
+    slot.setAttribute('data-progress-id', slotId);
     const localUrl = URL.createObjectURL(file);
-    slot.innerHTML = `<img src="${localUrl}" class="photo-preview"><div class="uploading-overlay">Uploading...</div>`;
+    slot.innerHTML = `<img src="${localUrl}" class="photo-preview">`;
+    updateProgressOverlay(slot, 0);
     document.getElementById('photoGrid').insertBefore(slot, document.getElementById('addPhotoBtn'));
+
     try{
-      const cloudUrl = await uploadToCloudinary(file, 'image');
+      const cloudUrl = await uploadToCloudinary(file, 'image', slotId);
       const hiddenInput = document.createElement('input');
       hiddenInput.type = 'hidden'; hiddenInput.name = 'new_images'; hiddenInput.value = cloudUrl;
       document.getElementById('newImageUrls').appendChild(hiddenInput);
@@ -222,6 +244,42 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
     }
   }
   e.target.value = '';
+});
+
+// Single upload - FIXED SLOT 1
+document.addEventListener('change', async e => {
+    if(e.target.classList.contains('file-input') && e.target.files[0]){
+        const file = e.target.files[0];
+        const slot = e.target.closest('.photo-slot');
+        const slotId = 'slot_' + slot.dataset.index;
+        slot.setAttribute('data-progress-id', slotId);
+
+        const localUrl = URL.createObjectURL(file);
+        if(!slot.querySelector('.photo-preview')){
+            slot.innerHTML = `<img src="${localUrl}" class="photo-preview">`;
+        } else {
+            slot.querySelector('.photo-preview').src = localUrl;
+        }
+        slot.classList.add('filled');
+        updateProgressOverlay(slot, 0);
+
+        try{
+          const cloudUrl = await uploadToCloudinary(file, 'image', slotId);
+          const hiddenInput = document.createElement('input');
+          hiddenInput.type = 'hidden';
+          hiddenInput.name = 'new_images';
+          hiddenInput.value = cloudUrl;
+          document.getElementById('newImageUrls').appendChild(hiddenInput);
+          slot.querySelector('.photo-preview').src = cloudUrl;
+          slot.querySelector('.uploading-overlay').remove();
+          if(!slot.querySelector('.photo-actions')){
+            slot.innerHTML += `<div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-btn"><i class="bi bi-trash"></i></button></div>`;
+          }
+        } catch(err){
+          slot.querySelector('.uploading-overlay').innerHTML = `Failed<br>Try smaller`;
+          setTimeout(()=>{ if(slot.querySelector('.uploading-overlay')) slot.querySelector('.uploading-overlay').remove(); }, 2000);
+        }
+    }
 });
 
 document.addEventListener('click', e => {
@@ -256,29 +314,6 @@ document.getElementById('confirmActionBtn').onclick = () => {
   confirmModal.hide();
 }
 
-document.addEventListener('change', async e => {
-    if(e.target.classList.contains('file-input') && e.target.files[0]){
-        const file = e.target.files[0];
-        const slot = e.target.closest('.photo-slot');
-        const localUrl = URL.createObjectURL(file);
-        slot.insertAdjacentHTML('beforeend', `<div class="uploading-overlay">Uploading...</div>`);
-        slot.classList.add('filled');
-        try{
-          const cloudUrl = await uploadToCloudinary(file, 'image');
-          const hiddenInput = document.createElement('input');
-          hiddenInput.type = 'hidden';
-          hiddenInput.name = 'new_images';
-          hiddenInput.value = cloudUrl;
-          document.getElementById('newImageUrls').appendChild(hiddenInput);
-          slot.querySelector('.photo-preview').src = cloudUrl;
-          slot.querySelector('.uploading-overlay').remove();
-        } catch(err){
-          slot.querySelector('.uploading-overlay').remove();
-          alert('Upload failed');
-        }
-    }
-});
-
 const videoFileInput = document.getElementById('videoFileInput');
 document.getElementById('videoUploadBtn')?.addEventListener('click', () => videoFileInput.click());
 document.addEventListener('click', e => { if(e.target.id === 'changeVideoBtn') videoFileInput.click(); });
@@ -289,9 +324,12 @@ videoFileInput.addEventListener('change', async e => {
     const localUrl = URL.createObjectURL(file);
     document.getElementById('videoUploadArea')?.classList.add('d-none');
     document.getElementById('videoPreview').classList.remove('d-none');
-    document.getElementById('videoPreview').innerHTML = `<video src="${localUrl}" controls class="w-100 rounded" style="max-height:300px;"></video><div class="uploading-overlay">Uploading...<br>0%</div>`;
+    document.getElementById('videoPreview').innerHTML = `<video src="${localUrl}" controls class="w-100 rounded" style="max-height:300px;"></video>`;
+    const videoSlot = document.getElementById('videoPreview');
+    videoSlot.setAttribute('data-progress-id', 'video1');
+    updateProgressOverlay(videoSlot, 0, 'Uploading Video');
     try{
-      const cloudUrl = await uploadToCloudinary(file, 'video');
+      const cloudUrl = await uploadToCloudinary(file, 'video', 'video1');
       document.getElementById('videoUrlInput').value = cloudUrl;
       document.getElementById('videoPreview').innerHTML = `<video src="${cloudUrl}" controls class="w-100 rounded" style="max-height:300px;"></video><div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button><button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn">Remove</button></div>`;
     } catch(err){
