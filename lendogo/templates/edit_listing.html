@@ -102,7 +102,7 @@ input[type="file"] { display: none!important; }
             <video src="{{ form.instance.video }}" controls class="w-100 rounded" style="max-height:300px;"></video>
             <div class="mt-2">
                 <button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button>
-                <button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn">Remove</button>
+                <button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn"><i class="bi bi-trash"></i> Remove</button>
             </div>
           </div>
           {% else %}
@@ -127,6 +127,7 @@ input[type="file"] { display: none!important; }
   </form>
 </div>
 
+<!-- Photo Confirm Modal -->
 <div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -142,6 +143,23 @@ input[type="file"] { display: none!important; }
     </div>
   </div>
 </div>
+
+<!-- Video Delete Modal -->
+<div class="modal fade" id="videoConfirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-semibold">Remove Video</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">Are you sure you want to remove this video?</div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmVideoRemoveBtn">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -153,6 +171,7 @@ let activeUploads = 0;
 let currentSlot = null;
 let currentAction = null;
 const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+const videoConfirmModal = new bootstrap.Modal(document.getElementById('videoConfirmModal'));
 let uploadPromises = [];
 
 document.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(el => el.classList.add('form-control'));
@@ -257,7 +276,7 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
   e.target.value = '';
 });
 
-// Single upload - REPLACE EXISTING PHOTO - THIS IS THE FIX
+// Single upload - REPLACE EXISTING PHOTO - KEY FIX HERE
 document.addEventListener('change', async e => {
     if(e.target.classList.contains('file-input') && e.target.files[0]){
         const compressedFile = await compressImage(e.target.files[0]);
@@ -275,27 +294,22 @@ document.addEventListener('change', async e => {
           const idInput = slot.querySelector('input[name$="-id"]');
           const deleteInput = slot.querySelector('input[name$="-DELETE"]');
 
-          // KEY FIX: If this slot has an ID, update the formset field directly
-          if(idInput){
-            let updateInput = slot.querySelector(`input[name="form-${slotIndex}-image"]`);
-            if(!updateInput){
-              updateInput = document.createElement('input');
-              updateInput.type = 'hidden';
-              updateInput.name = `form-${slotIndex}-image`;
-              document.getElementById('newImageUrls').appendChild(updateInput);
-            }
-            updateInput.value = cloudUrl;
-            if(deleteInput) deleteInput.checked = false; // uncheck delete
-          } else {
-            // New slot, use new_images
-            const hiddenInput = document.createElement('input');
-            hiddenInput.type = 'hidden'; hiddenInput.name = 'new_images'; hiddenInput.value = cloudUrl;
-            document.getElementById('newImageUrls').appendChild(hiddenInput);
+          // KEY FIX: Create/update form-X-image input so backend saves it
+          let updateInput = document.querySelector(`input[name="form-${slotIndex}-image"]`);
+          if(!updateInput){
+            updateInput = document.createElement('input');
+            updateInput.type = 'hidden';
+            updateInput.name = `form-${slotIndex}-image`;
+            document.getElementById('newImageUrls').appendChild(updateInput);
           }
+          updateInput.value = cloudUrl;
+          if(deleteInput) deleteInput.checked = false;
 
           slot.querySelector('.photo-preview').src = cloudUrl;
           slot.querySelector('.uploading-overlay').remove();
-          if(!slot.querySelector('.photo-actions')) slot.innerHTML += `<div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-btn"><i class="bi bi-trash"></i></button></div>`;
+          if(!slot.querySelector('.photo-actions')) {
+            slot.innerHTML += `<div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-btn"><i class="bi bi-trash"></i></button></div>`;
+          }
         }).catch(err => {
           slot.querySelector('.uploading-overlay').innerHTML = `Failed`;
         });
@@ -321,7 +335,7 @@ videoFileInput.addEventListener('change', async e => {
 
     const uploadPromise = uploadToCloudinary(file, 'video', 'video1').then(cloudUrl => {
       document.getElementById('videoUrlInput').value = cloudUrl;
-      document.getElementById('videoPreview').innerHTML = `<video src="${cloudUrl}" controls class="w-100 rounded" style="max-height:300px;"></video><div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button><button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn">Remove</button></div>`;
+      document.getElementById('videoPreview').innerHTML = `<video src="${cloudUrl}" controls class="w-100 rounded" style="max-height:300px;"></video><div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button><button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn"><i class="bi bi-trash"></i> Remove</button></div>`;
     }).catch(err => {
       alert("Upload failed: " + err.message);
       document.getElementById('videoPreview').classList.add('d-none');
@@ -331,7 +345,7 @@ videoFileInput.addEventListener('change', async e => {
   }
 });
 
-// DELETE MODAL
+// DELETE MODAL FOR PHOTOS
 document.addEventListener('click', e => {
   if(e.target.closest('.change-btn')){ currentSlot = e.target.closest('.photo-slot'); currentAction = 'change'; document.getElementById('modalTitle').textContent = 'Change Photo'; document.getElementById('modalText').textContent = 'Replace this photo?'; confirmModal.show(); }
   if(e.target.closest('.slot-add-btn')) e.target.closest('.photo-slot').querySelector('.file-input').click();
@@ -350,13 +364,19 @@ document.getElementById('confirmActionBtn').onclick = () => {
   confirmModal.hide();
 }
 
+// VIDEO DELETE MODAL
 document.addEventListener('click', e => {
   if(e.target.id === 'removeVideoBtn'){
-    document.getElementById('videoUrlInput').value = '';
-    document.getElementById('videoPreview').classList.add('d-none');
-    document.getElementById('videoUploadArea')?.classList.remove('d-none');
+    videoConfirmModal.show();
   }
 });
+
+document.getElementById('confirmVideoRemoveBtn').onclick = () => {
+  document.getElementById('videoUrlInput').value = '';
+  document.getElementById('videoPreview').classList.add('d-none');
+  document.getElementById('videoUploadArea')?.classList.remove('d-none');
+  videoConfirmModal.hide();
+}
 
 // WAIT FOR ALL UPLOADS BEFORE SUBMIT
 document.getElementById('editForm').addEventListener('submit', async e => {
