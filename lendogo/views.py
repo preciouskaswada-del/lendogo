@@ -96,7 +96,7 @@ def home(request):
         all_listings = all_listings.filter(business_q)
     elif sort == 'near_me':
         if request.user.is_authenticated and hasattr(request.user, 'userprofile') and request.userprofile.location:
-            all_listings = all_listings.filter(location=request.userprofile.location)
+            all_listings = all_listings.filter(location=request.user.userprofile.location)
     else:
         all_listings = all_listings.order_by('-is_boosted', '-bumped_at', '-id')
 
@@ -193,6 +193,69 @@ def create_listing(request):
 
     categories = Category.objects.all()
     return render(request, 'create.html', {'form': form, 'formset': formset, 'categories': categories})
+
+# FIXED EDIT VIEW
+@login_required
+def edit_listing(request, pk):
+    listing = get_object_or_404(Listing, pk=pk, seller=request.user)
+
+    if request.method == 'POST':
+        form = ListingForm(request.POST, instance=listing)
+        formset = ImageFormSet(request.POST, instance=listing)
+
+        if form.is_valid() and formset.is_valid():
+            with transaction.atomic():
+                # 1. Save main listing
+                listing = form.save()
+
+                # 2. HANDLE VIDEO
+                video_url = request.POST.get('video', '')
+                listing.video = video_url
+                listing.save()
+
+                # 3. HANDLE DELETES ONLY from formset
+                formset.save(commit=False)
+                for obj in formset.deleted_objects:
+                    obj.delete()
+
+                # 4. KEY FIX: UPDATE EXISTING IMAGES THAT WERE CHANGED
+                for key, value in request.POST.items():
+                    if key.startswith('form-') and key.endswith('-image') and value.startswith('http'):
+                        index = int(key.split('-')[1])
+                        if index < len(formset.forms):
+                            img_instance = formset.forms[index].instance
+                            img_instance.image = value
+                            img_instance.save()
+
+                # 5. ADD NEW UPLOADED IMAGES
+                new_images = request.POST.getlist('new_images')
+                if new_images:
+                    existing_count = listing.images.count()
+                    for order, url in enumerate(new_images):
+                        if url:
+                            ListingImage.objects.create(
+                                listing=listing,
+                                image=url,
+                                order=existing_count+order
+                            )
+
+            messages.success(request, 'Listing updated successfully!')
+            return redirect('listing_detail', pk=listing.pk)
+        else:
+            messages.error(request, 'Please fix the errors below')
+            print("FORM ERRORS:", form.errors)
+            print("FORMSET ERRORS:", formset.errors)
+    else:
+        form = ListingForm(instance=listing)
+        formset = ImageFormSet(instance=listing)
+
+    categories = Category.objects.all()
+    return render(request, 'edit_listing.html', {
+        'form': form,
+        'formset': formset,
+        'listing': listing,
+        'categories': categories
+    })
 
 @login_required
 def delete_listing(request, pk):
