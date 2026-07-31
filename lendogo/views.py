@@ -191,6 +191,7 @@ def create_listing(request):
 
     categories = Category.objects.all()
     return render(request, 'create.html', {'form': form, 'formset': formset, 'categories': categories})
+
 @login_required
 def edit_listing(request, pk):
     listing = get_object_or_404(Listing, pk=pk, seller=request.user)
@@ -199,7 +200,8 @@ def edit_listing(request, pk):
         form = ListingForm(request.POST, instance=listing)
         formset = ImageFormSet(request.POST, instance=listing)
 
-        formset.is_valid() # KEY FIX: Call this so deleted_objects gets populated, but don't check result
+        # FORCE DJANGO TO BUILD deleted_objects
+        formset.is_valid() 
 
         if form.is_valid():
             with transaction.atomic():
@@ -207,14 +209,16 @@ def edit_listing(request, pk):
                 listing.video = request.POST.get('video', '')
                 listing.save()
 
-                # 1. HANDLE DELETES - Now this will work
-                for obj in formset.deleted_objects:
-                    obj.delete()
+                # 1. HANDLE DELETES - This will now exist
+                if hasattr(formset, 'deleted_objects'):
+                    for obj in formset.deleted_objects:
+                        obj.delete()
 
-                # 2. UPDATE EXISTING IMAGES CHANGED VIA CLOUDINARY
+                # 2. UPDATE EXISTING IMAGES FROM CLOUDINARY
                 for key, value in request.POST.items():
                     if key.startswith('form-') and key.endswith('-image') and value.startswith('http'):
-                        index = int(key.split('-')[1])
+                        parts = key.split('-')
+                        index = int(parts[1])
                         img_id = request.POST.get(f'form-{index}-id')
                         if img_id and img_id.isdigit():
                             ListingImage.objects.filter(id=int(img_id), listing=listing).update(image=value)
@@ -247,6 +251,7 @@ def edit_listing(request, pk):
         'listing': listing,
         'categories': categories
     })
+
 @login_required
 def delete_listing(request, pk):
     listing = get_object_or_404(Listing, pk=pk, seller=request.user)
