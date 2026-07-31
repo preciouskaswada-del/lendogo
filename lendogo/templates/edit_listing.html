@@ -23,7 +23,6 @@ input[type="file"] { display: none!important; }
 .add-card:hover { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
 .add-card i { font-size: 22px; }
 .photo-actions { position: absolute; top: 6px; right: 6px; display: flex; gap: 4px; background: rgba(0,0,0,0.6); padding: 3px; border-radius: 8px; z-index: 10; }
-.photo-actions.btn { padding: 4px 6px; font-size: 12px; line-height: 1; }
 .uploading-overlay { position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.75); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 18px; z-index: 5; border-radius: 12px; flex-direction: column; }
 .sticky-footer { position: sticky; bottom: 0; background: white; border-top: 1px solid #e5e7eb; padding: 16px 24px; margin: 0 -24px -24px; border-radius: 0 0 16px 16px; z-index: 10; }
 .btn-primary { background: #2563eb; border: none; }
@@ -150,11 +149,11 @@ input[type="file"] { display: none!important; }
 <script>
 const CLOUD_NAME = "sbsdxiie";
 const UPLOAD_PRESET = "lendogo3";
-let activeUploads = 0; // FIX: count uploads instead of boolean
+let activeUploads = 0;
 let currentSlot = null;
 let currentAction = null;
 const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
-let uploadPromises = []; // FIX: track all uploads
+let uploadPromises = [];
 
 document.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(el => el.classList.add('form-control'));
 
@@ -229,7 +228,7 @@ async function uploadToCloudinary(file, type = 'image', slotId = 'default') {
   });
 }
 
-// Multi upload
+// Multi upload - ADD NEW PHOTOS
 document.getElementById('addPhotoBtn').addEventListener('click', () => document.getElementById('multiFileInput').click());
 
 document.getElementById('multiFileInput').addEventListener('change', async e => {
@@ -258,12 +257,13 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
   e.target.value = '';
 });
 
-// Single upload
+// Single upload - REPLACE EXISTING PHOTO - THIS IS THE FIX
 document.addEventListener('change', async e => {
     if(e.target.classList.contains('file-input') && e.target.files[0]){
         const compressedFile = await compressImage(e.target.files[0]);
         const slot = e.target.closest('.photo-slot');
-        const slotId = 'slot_' + slot.dataset.index;
+        const slotIndex = slot.dataset.index;
+        const slotId = 'slot_' + slotIndex;
         slot.setAttribute('data-progress-id', slotId);
         const localUrl = URL.createObjectURL(compressedFile);
         if(!slot.querySelector('.photo-preview')) slot.innerHTML = `<img src="${localUrl}" class="photo-preview">`;
@@ -272,9 +272,27 @@ document.addEventListener('change', async e => {
         updateProgressOverlay(slot, 0);
 
         const uploadPromise = uploadToCloudinary(compressedFile, 'image', slotId).then(cloudUrl => {
-          const hiddenInput = document.createElement('input');
-          hiddenInput.type = 'hidden'; hiddenInput.name = 'new_images'; hiddenInput.value = cloudUrl;
-          document.getElementById('newImageUrls').appendChild(hiddenInput);
+          const idInput = slot.querySelector('input[name$="-id"]');
+          const deleteInput = slot.querySelector('input[name$="-DELETE"]');
+
+          // KEY FIX: If this slot has an ID, update the formset field directly
+          if(idInput){
+            let updateInput = slot.querySelector(`input[name="form-${slotIndex}-image"]`);
+            if(!updateInput){
+              updateInput = document.createElement('input');
+              updateInput.type = 'hidden';
+              updateInput.name = `form-${slotIndex}-image`;
+              document.getElementById('newImageUrls').appendChild(updateInput);
+            }
+            updateInput.value = cloudUrl;
+            if(deleteInput) deleteInput.checked = false; // uncheck delete
+          } else {
+            // New slot, use new_images
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden'; hiddenInput.name = 'new_images'; hiddenInput.value = cloudUrl;
+            document.getElementById('newImageUrls').appendChild(hiddenInput);
+          }
+
           slot.querySelector('.photo-preview').src = cloudUrl;
           slot.querySelector('.uploading-overlay').remove();
           if(!slot.querySelector('.photo-actions')) slot.innerHTML += `<div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-btn"><i class="bi bi-trash"></i></button></div>`;
@@ -340,7 +358,7 @@ document.addEventListener('click', e => {
   }
 });
 
-// KEY FIX: WAIT FOR ALL UPLOADS BEFORE SUBMIT
+// WAIT FOR ALL UPLOADS BEFORE SUBMIT
 document.getElementById('editForm').addEventListener('submit', async e => {
   if (activeUploads > 0) {
     e.preventDefault();
