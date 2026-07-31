@@ -215,60 +215,7 @@ def mark_as_sold(request, pk):
 
     messages.success(request, f'{listing.product} marked as sold! This helps improve market prices for everyone.')
     return redirect('dashboard')
-@login_required
-def edit_listing(request, pk):
-    listing = get_object_or_404(Listing, pk=pk, seller=request.user)
 
-    if request.method == 'POST':
-        form = ListingForm(request.POST, instance=listing)
-        formset = ImageFormSet(request.POST, instance=listing)
-
-        if form.is_valid() and formset.is_valid():
-            with transaction.atomic():
-                listing = form.save(commit=False)
-
-                # 1. HANDLE VIDEO FIRST
-                video_url = request.POST.get('video', None)
-                if video_url:
-                    listing.video = video_url
-                elif 'video' in request.POST and request.POST.get('video') == '': # if removed
-                    listing.video = ''
-
-                listing.save()
-                form.save_m2m()
-
-                # 2. HANDLE DELETED IMAGES FROM FORMSET
-                formset.save() # this already handles DELETE checkboxes
-
-                # 3. HANDLE NEW UPLOADED IMAGES FROM CLOUDINARY
-                new_images = request.POST.getlist('new_images')
-                if new_images:
-                    existing_count = listing.images.count()
-                    for order, url in enumerate(new_images):
-                        if url:
-                            ListingImage.objects.create(
-                                listing=listing, 
-                                image=url, 
-                                order=existing_count+order
-                            )
-
-            messages.success(request, 'Listing updated successfully!')
-            return redirect('listing_detail', pk=listing.pk)
-        else:
-            messages.error(request, 'Please fix the errors below')
-            print("FORM ERRORS:", form.errors)
-            print("FORMSET ERRORS:", formset.errors)
-    else:
-        form = ListingForm(instance=listing)
-        formset = ImageFormSet(instance=listing)
-
-    categories = Category.objects.all()
-    return render(request, 'edit_listing.html', {
-        'form': form,
-        'formset': formset,
-        'listing': listing,
-        'categories': categories
-    })
 @login_required
 def manual_boost(request, pk):
     if not request.user.is_staff:
