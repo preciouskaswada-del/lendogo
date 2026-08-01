@@ -10,7 +10,7 @@ from.models import Listing, ListingImage, RentalListing
 
 User = get_user_model()
 
-MAX_PRICE = Decimal('999999999.99')
+MAX_PRICE = Decimal('999.99')
 MAX_VIDEO_SIZE = 50 * 1024 * 1024
 MAX_IMAGE_SIZE = 10 * 1024 * 1024
 ALLOWED_VIDEO_TYPES = {'video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska'}
@@ -111,11 +111,9 @@ class ListingForm(forms.ModelForm):
         if not video:
             return video
         
-        # FIX: Skip validation if it's already a Cloudinary URL string
         if isinstance(video, str):
             return video
             
-        # Only run file checks if it's an actual uploaded file
         if isinstance(video, UploadedFile):
             if video.size > MAX_VIDEO_SIZE:
                 raise ValidationError(f"Video is {video.size / 1024 / 1024:.1f}MB. Max: 50MB")
@@ -159,7 +157,7 @@ class ListingForm(forms.ModelForm):
 class ListingImageForm(forms.ModelForm):
     class Meta:
         model = ListingImage
-        fields = ['image'] # FIX: Removed 'DELETE' - formset handles it
+        fields = ['image']
         widgets = {
             'image': forms.FileInput(attrs={
                 'class': 'img-swap w-full p-2 border rounded',
@@ -172,11 +170,9 @@ class ListingImageForm(forms.ModelForm):
         if not image:
             return image
         
-        # FIX: Skip validation if it's already a Cloudinary URL string
         if isinstance(image, str):
             return image
 
-        # Only run file checks if it's an actual uploaded file
         if isinstance(image, UploadedFile):
             if image.size > MAX_IMAGE_SIZE:
                 raise ValidationError(f"Image is {image.size / 1024 / 1024:.1f}MB. Max: 10MB")
@@ -362,3 +358,17 @@ class RentalListingForm(forms.ModelForm):
                 raise ValidationError("Cannot verify image. File may be corrupted.")
             image.name = re.sub(r'[^a-zA-Z0-9._-]', '', image.name)[:100]
         return image
+
+
+# ADD THIS - THIS IS THE MISSING PIECE
+from django.forms import inlineformset_factory
+
+ImageFormSet = inlineformset_factory(
+    Listing,
+    ListingImage,
+    form=ListingImageForm,
+    extra=0,
+    max_num=10,
+    can_delete=True,
+    can_delete_extra=False,
+    exclude=('image',)
