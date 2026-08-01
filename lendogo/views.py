@@ -198,22 +198,34 @@ def edit_listing(request, pk):
 
     if request.method == 'POST':
         form = ListingForm(request.POST, instance=listing)
-        formset = ImageFormSet(request.POST, request.FILES, instance=listing)
+        formset = ImageFormSet(request.POST, instance=listing) # REMOVED request.FILES
 
-        if form.is_valid() and formset.is_valid():
+        if form.is_valid(): # Don't require formset.is_valid()
             with transaction.atomic():
                 # 1. Save listing details
                 listing = form.save()
                 listing.video = request.POST.get('video', '')
                 listing.save()
 
-                # 2. Save formset: this handles DELETE checked + UPDATE existing image URLs
-                formset.save()
+                # 2. HANDLE DELETES from formset
+                if formset.is_valid():
+                    formset.save() # this handles DELETE checked
+                else:
+                    print("FORMSET ERRORS:", formset.errors) # log but don't block
 
-                # 3. ADD NEW IMAGES uploaded via JS to Cloudinary
+                # 3. HANDLE REPLACE: JS uploads new URL for existing image
+                for key, value in request.POST.items():
+                    if key.startswith('form-') and key.endswith('-image') and value.startswith('http'):
+                        parts = key.split('-')
+                        form_index = parts[1]
+                        img_id = request.POST.get(f'form-{form_index}-id')
+                        if img_id:
+                            ListingImage.objects.filter(id=img_id).update(image=value)
+
+                # 4. ADD NEW IMAGES uploaded via JS to Cloudinary
                 new_images = request.POST.getlist('new_images')
                 for url in new_images:
-                    if url:
+                    if url and url.startswith('http'):
                         ListingImage.objects.create(listing=listing, image=url)
 
             messages.success(request, 'Listing updated successfully!')
