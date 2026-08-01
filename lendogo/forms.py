@@ -111,10 +111,10 @@ class ListingForm(forms.ModelForm):
         video = self.cleaned_data.get('video')
         if not video:
             return video
-        
+
         if isinstance(video, str):
             return video
-            
+
         if isinstance(video, UploadedFile):
             if video.size > MAX_VIDEO_SIZE:
                 raise ValidationError(f"Video is {video.size / 1024 / 1024:.1f}MB. Max: 50MB")
@@ -170,7 +170,7 @@ class ListingImageForm(forms.ModelForm):
         image = self.cleaned_data.get('image')
         if not image:
             return image
-        
+
         if isinstance(image, str):
             return image
 
@@ -360,8 +360,7 @@ class RentalListingForm(forms.ModelForm):
             image.name = re.sub(r'[^a-zA-Z0-9._-]', '', image.name)[:100]
         return image
 
-
-# THIS IS THE FIX - CLOSED PARENTHESIS ADDED
+# FIX: CHANGED FROM exclude TO fields SO CLOUDINARY URLS SAVE
 ImageFormSet = inlineformset_factory(
     Listing,
     ListingImage,
@@ -370,5 +369,5 @@ ImageFormSet = inlineformset_factory(
     max_num=10,
     can_delete=True,
     can_delete_extra=False,
-    exclude=('image',)
+    fields=('image',)
 )
