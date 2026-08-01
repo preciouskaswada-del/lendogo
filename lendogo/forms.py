@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import UploadedFile
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import get_user_model
+from django.forms import inlineformset_factory
 from decimal import Decimal, InvalidOperation
 import re
 import magic
@@ -311,14 +312,14 @@ class RentalListingForm(forms.ModelForm):
             raise ValidationError("Invalid deposit amount")
 
     def clean_contact(self):
-        contact = str(self.cleaned_data.get('contact', '')).strip()
-        if contact:
-            contact = re.sub(r'[\s\-\(\)]', '', contact)
-            if not MW_PHONE_REGEX.match(contact):
-                raise ValidationError("Use: +265991234567 or 0991234567 or 0881234567")
-            if contact.startswith('0'):
-                contact = '+265' + contact[1:]
-        return contact
+            contact = str(self.cleaned_data.get('contact', '')).strip()
+            if contact:
+                contact = re.sub(r'[\s\-\(\)]', '', contact)
+                if not MW_PHONE_REGEX.match(contact):
+                    raise ValidationError("Use: +265991234567 or 0991234567 or 0881234567")
+                if contact.startswith('0'):
+                    contact = '+265' + contact[1:]
+            return contact
 
     def clean_video(self):
         video = self.cleaned_data.get('video')
@@ -360,9 +361,7 @@ class RentalListingForm(forms.ModelForm):
         return image
 
 
-# ADD THIS - THIS IS THE MISSING PIECE
-from django.forms import inlineformset_factory
-
+# THIS IS THE FIX - CLOSED PARENTHESIS ADDED
 ImageFormSet = inlineformset_factory(
     Listing,
     ListingImage,
@@ -372,3 +371,4 @@ ImageFormSet = inlineformset_factory(
     can_delete=True,
     can_delete_extra=False,
     exclude=('image',)
+)
