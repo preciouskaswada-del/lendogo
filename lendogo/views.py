@@ -39,7 +39,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 User = get_user_model()
 
-# FIX: Use exclude instead of fields to allow Cloudinary URLs
+# FIX: Use fields instead of exclude so Cloudinary URLs can be saved
 ImageFormSet = inlineformset_factory(
     Listing,
     ListingImage,
@@ -48,7 +48,7 @@ ImageFormSet = inlineformset_factory(
     max_num=10,
     can_delete=True,
     can_delete_extra=False,
-    exclude=('image',) # Don't validate image field so Cloudinary URLs work
+    fields=('image',) # CHANGED: was exclude
 )
 
 def home(request):
@@ -199,29 +199,18 @@ def edit_listing(request, pk):
     if request.method == 'POST':
         form = ListingForm(request.POST, instance=listing)
         formset = ImageFormSet(request.POST, request.FILES, instance=listing)
-        formset.is_valid()
 
-        if form.is_valid():
+        if form.is_valid() and formset.is_valid():
             with transaction.atomic():
+                # 1. Save listing details
                 listing = form.save()
                 listing.video = request.POST.get('video', '')
                 listing.save()
 
-                # 1. HANDLE DELETES
-                for obj in formset.deleted_objects:
-                    obj.delete()
+                # 2. Save formset: this handles DELETE checked + UPDATE existing image URLs
+                formset.save()
 
-                # 2. HANDLE REPLACE: DELETE OLD + CREATE NEW
-                for i in range(formset.total_form_count()):
-                    img_id = request.POST.get(f'form-{i}-id')
-                    new_url = request.POST.get(f'form-{i}-image')
-                    delete_flag = request.POST.get(f'form-{i}-DELETE')
-                    
-                    if img_id and new_url and new_url.startswith('http') and not delete_flag:
-                        ListingImage.objects.filter(id=img_id).delete()
-                        ListingImage.objects.create(listing=listing, image=new_url)
-
-                # 3. ADD NEW IMAGES
+                # 3. ADD NEW IMAGES uploaded via JS to Cloudinary
                 new_images = request.POST.getlist('new_images')
                 for url in new_images:
                     if url:
@@ -232,6 +221,7 @@ def edit_listing(request, pk):
         else:
             messages.error(request, 'Please fix the errors below')
             print("FORM ERRORS:", form.errors)
+            print("FORMSET ERRORS:", formset.errors)
     else:
         form = ListingForm(instance=listing)
         formset = ImageFormSet(instance=listing)
