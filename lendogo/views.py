@@ -198,10 +198,8 @@ def edit_listing(request, pk):
 
     if request.method == 'POST':
         form = ListingForm(request.POST, instance=listing)
-        formset = ImageFormSet(request.POST, instance=listing)
-
-        # FORCE DJANGO TO BUILD deleted_objects
-        formset.is_valid() 
+        formset = ImageFormSet(request.POST, request.FILES, instance=listing)
+        formset.is_valid() # to get deleted_objects
 
         if form.is_valid():
             with transaction.atomic():
@@ -209,31 +207,26 @@ def edit_listing(request, pk):
                 listing.video = request.POST.get('video', '')
                 listing.save()
 
-                # 1. HANDLE DELETES - This will now exist
-                if hasattr(formset, 'deleted_objects'):
-                    for obj in formset.deleted_objects:
-                        obj.delete()
+                # 1. HANDLE DELETES FIRST
+                for obj in formset.deleted_objects:
+                    obj.delete()
 
-                # 2. UPDATE EXISTING IMAGES FROM CLOUDINARY
-                for key, value in request.POST.items():
-                    if key.startswith('form-') and key.endswith('-image') and value.startswith('http'):
-                        parts = key.split('-')
-                        index = int(parts[1])
-                        img_id = request.POST.get(f'form-{index}-id')
-                        if img_id and img_id.isdigit():
-                            ListingImage.objects.filter(id=int(img_id), listing=listing).update(image=value)
+                # 2. HANDLE REPLACE: DELETE OLD + CREATE NEW
+                for i in range(formset.total_form_count()):
+                    img_id = request.POST.get(f'form-{i}-id')
+                    new_url = request.POST.get(f'form-{i}-image')
+                    delete_flag = request.POST.get(f'form-{i}-DELETE')
+                    
+                    if img_id and new_url and new_url.startswith('http') and not delete_flag:
+                        # This is the fix: delete old row, create new row
+                        ListingImage.objects.filter(id=img_id).delete()
+                        ListingImage.objects.create(listing=listing, image=new_url)
 
                 # 3. ADD NEW IMAGES
                 new_images = request.POST.getlist('new_images')
-                if new_images:
-                    existing_count = listing.images.count()
-                    for order, url in enumerate(new_images):
-                        if url:
-                            ListingImage.objects.create(
-                                listing=listing,
-                                image=url,
-                                order=existing_count+order
-                            )
+                for url in new_images:
+                    if url:
+                        ListingImage.objects.create(listing=listing, image=url)
 
             messages.success(request, 'Listing updated successfully!')
             return redirect('listing_detail', pk=listing.pk)
@@ -246,10 +239,7 @@ def edit_listing(request, pk):
 
     categories = Category.objects.all()
     return render(request, 'edit_listing.html', {
-        'form': form,
-        'formset': formset,
-        'listing': listing,
-        'categories': categories
+        'form': form, 'formset': formset, 'listing': listing, 'categories': categories
     })
 
 @login_required
