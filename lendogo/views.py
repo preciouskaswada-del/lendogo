@@ -39,7 +39,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 User = get_user_model()
 
-# FIX: Use exclude instead of fields to avoid FieldError
+# FIX: Use exclude instead of fields to allow Cloudinary URLs
 ImageFormSet = inlineformset_factory(
     Listing,
     ListingImage,
@@ -199,7 +199,7 @@ def edit_listing(request, pk):
     if request.method == 'POST':
         form = ListingForm(request.POST, instance=listing)
         formset = ImageFormSet(request.POST, request.FILES, instance=listing)
-        formset.is_valid() # to get deleted_objects
+        formset.is_valid()
 
         if form.is_valid():
             with transaction.atomic():
@@ -207,7 +207,7 @@ def edit_listing(request, pk):
                 listing.video = request.POST.get('video', '')
                 listing.save()
 
-                # 1. HANDLE DELETES FIRST
+                # 1. HANDLE DELETES
                 for obj in formset.deleted_objects:
                     obj.delete()
 
@@ -218,7 +218,6 @@ def edit_listing(request, pk):
                     delete_flag = request.POST.get(f'form-{i}-DELETE')
                     
                     if img_id and new_url and new_url.startswith('http') and not delete_flag:
-                        # This is the fix: delete old row, create new row
                         ListingImage.objects.filter(id=img_id).delete()
                         ListingImage.objects.create(listing=listing, image=new_url)
 
