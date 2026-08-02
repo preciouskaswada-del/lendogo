@@ -48,7 +48,7 @@ ImageFormSet = inlineformset_factory(
     max_num=10,
     can_delete=True,
     can_delete_extra=False,
-    fields=('image',) # CHANGED: was exclude
+    fields=('image',)
 )
 
 def home(request):
@@ -191,37 +191,26 @@ def create_listing(request):
 
     categories = Category.objects.all()
     return render(request, 'create.html', {'form': form, 'formset': formset, 'categories': categories})
-    
+
 @login_required
 def edit_listing(request, pk):
     listing = get_object_or_404(Listing, pk=pk, seller=request.user)
 
     if request.method == 'POST':
         form = ListingForm(request.POST, instance=listing)
-        formset = ImageFormSet(request.POST, instance=listing)
+        formset = ImageFormSet(request.POST, request.FILES, instance=listing)
 
-        if form.is_valid():
+        if form.is_valid() and formset.is_valid():
             with transaction.atomic():
-                # 1. SAVE LISTING
-                listing = form.save()
+                # 1. SAVE LISTING + VIDEO
+                listing = form.save(commit=False)
                 listing.video = request.POST.get('video', '')
                 listing.save()
 
-                # 2. HANDLE DELETES MANUALLY - don't use formset.save()
-                for i in range(formset.total_form_count()):
-                    if request.POST.get(f'form-{i}-DELETE') == 'on':
-                        img_id = request.POST.get(f'form-{i}-id')
-                        if img_id:
-                            ListingImage.objects.filter(id=img_id, listing=listing).delete()
+                # 2. THIS HANDLES DELETE + REPLACE AUTOMATICALLY
+                formset.save()
 
-                # 3. HANDLE REPLACE - update existing image URL from Cloudinary
-                for i in range(formset.total_form_count()):
-                    img_id = request.POST.get(f'form-{i}-id')
-                    new_url = request.POST.get(f'form-{i}-image')
-                    if img_id and new_url and new_url.startswith('http'):
-                        ListingImage.objects.filter(id=img_id, listing=listing).update(image=new_url)
-
-                # 4. HANDLE ADD NEW - create from JS upload
+                # 3. HANDLE ADD NEW - create from JS upload
                 for url in request.POST.getlist('new_images'):
                     if url and url.startswith('http'):
                         ListingImage.objects.create(listing=listing, image=url)
@@ -230,6 +219,8 @@ def edit_listing(request, pk):
             return redirect('listing_detail', pk=listing.pk)
         else:
             messages.error(request, 'Please fix the errors below')
+            print("FORM ERRORS:", form.errors)
+            print("FORMSET ERRORS:", formset.errors)
     else:
         form = ListingForm(instance=listing)
         formset = ImageFormSet(instance=listing)
