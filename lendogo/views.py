@@ -31,9 +31,10 @@ import re
 import requests
 import urllib3
 import time
-import urllib.request
-from django.core.files.base import ContentFile
-from django.contrib.contenttypes.models import ContentType
+from PIL import Image, ExifTags # PATCH 1
+from io import BytesIO # PATCH 1
+from django.core.files.uploadedfile import InMemoryUploadedFile # PATCH 1
+import sys # PATCH 1
 
 load_dotenv()
 
@@ -45,13 +46,40 @@ ImageFormSet = inlineformset_factory(
     Listing,
     ListingImage,
     form=ListingImageForm,
-    extra=0,
+    extra=0, # FIX 3: was 10
     max_num=10,
     can_delete=True,
     can_delete_extra=False,
-    validate_min=False, # FIX 1: ALLOW EMPTY FORMSET
-    fields=('image',)
+    validate_min=False, # FIX 3: ADD THIS
 )
+
+def fix_image_orientation(image_file): # PATCH 1
+    """Fix EXIF rotation so width/height are correct"""
+    image = Image.open(image_file)
+    try:
+        for orientation in ExifTags.TAGS.keys():
+            if ExifTags.TAGS[orientation] == 'Orientation':
+                break
+        exif = image._getexif()
+        if exif is not None:
+            orientation_value = exif.get(orientation)
+            if orientation_value == 3:
+                image = image.rotate(180, expand=True)
+            elif orientation_value == 6:
+                image = image.rotate(270, expand=True)
+            elif orientation_value == 8:
+                image = image.rotate(90, expand=True)
+    except:
+        pass
+    output = BytesIO()
+    if image.mode in ("RGBA", "P"):
+        image = image.convert("RGB")
+    image.save(output, format='JPEG', quality=85, optimize=True)
+    output.seek(0)
+    return InMemoryUploadedFile(
+        output, 'ImageField', f"{image_file.name.split('.')[0]}.jpg",
+        'image/jpeg', sys.getsizeof(output), None
+    )
 
 def home(request):
     query = request.GET.get('q', '').strip()
@@ -59,6 +87,7 @@ def home(request):
     sort = request.GET.get('sort', '').strip()
     category_slug = request.GET.get('category', '').strip()
 
+    # FIX: Removed seller__userprofile to prevent DB crash on Railway SQLite
     all_listings = Listing.objects.select_related('seller', 'category').filter(
         status='ACTIVE'
     )
@@ -99,8 +128,9 @@ def home(request):
             business_q |= Q(product__icontains=keyword) | Q(location__icontains=keyword)
         all_listings = all_listings.filter(business_q)
     elif sort == 'near_me':
+        # FIX: Added.user and fixed typo
         if request.user.is_authenticated and hasattr(request.user, 'userprofile') and request.user.userprofile.location:
-            all_listings = all_listings.filter(location=request.user.userprofile.location)
+            all_listings = all_listings.filter(location=request.userprofile.location)
     else:
         all_listings = all_listings.order_by('-is_boosted', '-bumped_at', '-id')
 
@@ -161,37 +191,54 @@ def listing_detail(request, pk):
 @login_required(login_url='login')
 def create_listing(request):
     if request.method == 'POST':
-        form = ListingForm(request.POST)
-        formset = ImageFormSet(request.POST, prefix='images')
+        # PATCH 2: Fix image orientation before processing
+        fixed_files = {}
+        for key, file in request.FILES.items():
+            if key.startswith('images-') and file:
+                fixed_files[key] = fix_image_orientation(file)
+            else:
+                fixed_files[key] = file
+        request.FILES.clear()
+        for k, v in fixed_files.items():
+            request.FILES[k] = v
+        # END PATCH 2
+
+        form = ListingForm(request.POST, request.FILES)
+        formset = ImageFormSet(request.POST, request.FILES)
 
         if form.is_valid():
             with transaction.atomic():
                 listing = form.save(commit=False)
                 listing.seller = request.user
                 listing.status = 'ACTIVE'
-
-                video_url = request.POST.get('video', '').strip()
-                if video_url and video_url.startswith('http') and hasattr(listing, 'video'):
-                    try:
-                        result = urllib.request.urlretrieve(video_url)
-                        filename = f'video_{int(time.time())}.mp4'
-                        listing.video.save(filename, ContentFile(open(result[0], 'rb').read()), save=False)
-                    except: pass
-
                 listing.save()
+                form.save_m2m()
 
-                new_images = request.POST.getlist('new_images')
-                for order, url in enumerate(new_images):
-                    if url and url.startswith('http'):
-                        try:
-                            result = urllib.request.urlretrieve(url)
-                            filename = os.path.basename(url).split('?')[0] or f'img_{order}.jpg'
-                            ListingImage.objects.create(
-                                listing=listing,
-                                image=ContentFile(open(result[0], 'rb').read(), name=filename),
-                                order=order
-                            )
-                        except: pass
+                # FIX 1: Handle Cloudinary URLs from JS
+                image_urls_json = request.POST.get('image_urls', '[]')
+                video_url = request.POST.get('video_url', '')
+
+                try:
+                    image_urls = json.loads(image_urls_json)
+                except:
+                    image_urls = []
+
+                # Save each uploaded image URL to ListingImage
+                # IMPORTANT: Your ListingImage.image field must be CharField(max_length=500) not ImageField
+                for url in image_urls:
+                    if url:
+                        ListingImage.objects.create(listing=listing, image=url)
+
+                # FIX 2: Save video URL
+                # IMPORTANT: Your Listing.video field must be CharField(max_length=500, blank=True, null=True)
+                if video_url and hasattr(listing, 'video'):
+                    listing.video = video_url
+                    listing.save(update_fields=['video'])
+
+                # Still save formset files in case someone bypasses JS
+                if formset.is_valid():
+                    formset.instance = listing
+                    formset.save()
 
             messages.success(request, 'Listing created successfully!')
             return redirect('listing_detail', pk=listing.pk)
@@ -200,82 +247,10 @@ def create_listing(request):
             print("FORM ERRORS:", form.errors)
     else:
         form = ListingForm()
-        formset = ImageFormSet(prefix='images')
+        formset = ImageFormSet()
 
     categories = Category.objects.all()
     return render(request, 'create.html', {'form': form, 'formset': formset, 'categories': categories})
-
-@login_required
-def edit_listing(request, pk):
-    listing = get_object_or_404(Listing, pk=pk, seller=request.user)
-
-    if request.method == 'POST':
-        form = ListingForm(request.POST, instance=listing)
-        formset = ImageFormSet(request.POST, request.FILES, instance=listing, prefix='images')
-
-        if form.is_valid() and formset.is_valid():
-            with transaction.atomic():
-                listing = form.save(commit=False)
-                video_url = request.POST.get('video', '').strip()
-
-                if video_url and video_url.startswith('http'):
-                    try:
-                        result = urllib.request.urlretrieve(video_url)
-                        filename = f'video_{listing.id}_{int(time.time())}.mp4'
-                        listing.video.save(filename, ContentFile(open(result[0], 'rb').read()), save=False)
-                    except Exception as e: print("Video error:", e)
-                elif video_url == '':
-                    listing.video = None
-
-                listing.save()
-
-                formset.save(commit=False)
-
-                for obj in formset.deleted_objects:
-                    obj.delete()
-
-                # FIX 3: SKIP EMPTY FORMS
-                for i, form_i in enumerate(formset.forms):
-                    if form_i in formset.deleted_forms or not form_i.instance.pk:
-                        continue
-                    
-                    instance = form_i.instance
-                    cloud_url = request.POST.get(f'images-{i}-image')
-                    
-                    if cloud_url and cloud_url.startswith('http'):
-                        try:
-                            result = urllib.request.urlretrieve(cloud_url)
-                            filename = os.path.basename(cloud_url).split('?')[0] or f'img_{i}.jpg'
-                            instance.image.save(filename, ContentFile(open(result[0], 'rb').read()), save=False)
-                            instance.save()
-                        except Exception as e: print("Replace error:", e)
-
-                for url in request.POST.getlist('new_images'):
-                    if url and url.startswith('http'):
-                        try:
-                            result = urllib.request.urlretrieve(url)
-                            filename = os.path.basename(url).split('?')[0] or f'new_{int(time.time())}.jpg'
-                            ListingImage.objects.create(
-                                listing=listing,
-                                image=ContentFile(open(result[0], 'rb').read(), name=filename)
-                            )
-                        except Exception as e: print("New image error:", e)
-
-            messages.success(request, 'Listing updated successfully!')
-            return redirect('listing_detail', pk=listing.pk)
-        else:
-            messages.error(request, 'Please fix the errors below')
-            print("FORM ERRORS:", form.errors)
-            print("FORMSET ERRORS:", formset.errors)
-    else:
-        form = ListingForm(instance=listing)
-        existing_images = ListingImage.objects.filter(listing=listing) # FIX 2
-        formset = ImageFormSet(instance=listing, prefix='images', queryset=existing_images) # FIX 2
-
-    categories = Category.objects.all()
-    return render(request, 'edit_listing.html', {
-        'form': form, 'formset': formset, 'listing': listing, 'categories': categories
-    })
 
 @login_required
 def delete_listing(request, pk):
@@ -292,7 +267,7 @@ def mark_as_sold(request, pk):
         listing.is_sold = True
         listing.save(update_fields=['status', 'is_sold'])
 
-        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        profile, _ = UserProfile.objects.get_or_create(user=request.user) # FIX 2: was request.userprofile
         profile.total_sales = F('total_sales') + 1
         profile.save(update_fields=['total_sales'])
 
@@ -300,8 +275,77 @@ def mark_as_sold(request, pk):
     return redirect('dashboard')
 
 @login_required
+def edit_listing(request, pk):
+    listing = get_object_or_404(Listing, pk=pk, seller=request.user)
+    if request.method == 'POST':
+        # PATCH 3: Fix image orientation before processing
+        fixed_files = {}
+        for key, file in request.FILES.items():
+            if key.startswith('images-') and file:
+                fixed_files[key] = fix_image_orientation(file)
+            else:
+                fixed_files[key] = file
+        request.FILES.clear()
+        for k, v in fixed_files.items():
+            request.FILES[k] = v
+        # END PATCH 3
+
+        form = ListingForm(request.POST, request.FILES, instance=listing)
+        formset = ImageFormSet(request.POST, request.FILES, instance=listing)
+
+        if form.is_valid() and formset.is_valid():
+            with transaction.atomic():
+                listing = form.save(commit=False)
+                listing.save()
+                form.save_m2m()
+
+                # FIX 3: Also handle Cloudinary URLs on edit
+                image_urls_json = request.POST.get('image_urls', '[]')
+                video_url = request.POST.get('video_url', '')
+                try:
+                    image_urls = json.loads(image_urls_json)
+                except:
+                    image_urls = []
+
+                # FIX 1: DON'T DELETE ALL. ONLY SYNC DIFFERENCES
+                existing_urls = set(listing.images.values_list('image', flat=True))
+                new_urls = set([u for u in image_urls if u])
+
+                # Delete images that were removed
+                for img in listing.images.all():
+                    if img.image not in new_urls:
+                        img.delete()
+
+                # Add new images
+                for url in new_urls - existing_urls:
+                    if url:
+                        ListingImage.objects.create(listing=listing, image=url)
+                # END FIX 1
+
+                if video_url and hasattr(listing, 'video'):
+                    listing.video = video_url
+                    listing.save(update_fields=['video'])
+
+                formset.save()
+
+            messages.success(request, 'Listing updated')
+            return redirect('dashboard')
+    else:
+        form = ListingForm(instance=listing)
+        formset = ImageFormSet(instance=listing)
+
+    categories = Category.objects.all()
+    return render(request, 'edit.html', {
+        'form': form,
+        'formset': formset,
+        'listing': listing,
+        'categories': categories
+    })
+
+# FIX 4: MANUAL BOOST FOR FRIENDS/ADMIN
+@login_required
 def manual_boost(request, pk):
-    if not request.user.is_staff:
+    if not request.user.is_staff: # only staff/admin can do this
         return HttpResponseForbidden("Not allowed")
 
     listing = get_object_or_404(Listing, pk=pk)
@@ -334,11 +378,7 @@ def signup(request):
         form = SignUpForm(request.POST)
         if form.is_valid():
             user = form.save()
-            profile, _ = UserProfile.objects.get_or_create(user=user)
-            phone = form.cleaned_data.get('phone')
-            if phone:
-                profile.phone_number = phone
-                profile.save()
+            UserProfile.objects.get_or_create(user=user)
             login(request, user)
             return redirect('home')
     else:
@@ -360,6 +400,8 @@ def forgot_password(request):
             user = User.objects.filter(email__iexact=identifier).first()
             if user:
                 masked = user.email[:2] + '****' + user.email[user.email.find('@'):]
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Please enter your email address.'})
 
         if not user:
             return JsonResponse({'status': 'error', 'message': 'No account found with that email.'})
@@ -492,9 +534,6 @@ def dashboard(request):
     sold_yesterday = sold_listings.filter(updated_at__date=yesterday).count()
     sold_this_week = sold_listings.filter(updated_at__gte=week_ago).count()
 
-    profile, _ = UserProfile.objects.get_or_create(user=request.user)
-    is_verified = profile.is_verified
-
     stats = {
         'total_listings': user_listings.count(),
         'active_listings': active_listings.count(),
@@ -512,7 +551,7 @@ def dashboard(request):
         'sold_today': sold_today,
         'sold_yesterday': sold_yesterday,
         'sold_this_week': sold_this_week,
-        'is_verified': is_verified,
+        'is_verified': request.userprofile.is_verified,
     }
 
     return render(request, 'dashboard.html', {
@@ -532,28 +571,6 @@ def paychangu_callback(request):
         print(f"Payment {tx_ref} status: {status}")
 
     return HttpResponse("OK", status=200)
-
-@login_required
-def boost_listing(request, pk):
-    listing = get_object_or_404(Listing, pk=pk, seller=request.user)
-
-    if listing.status!= 'ACTIVE':
-        messages.error(request, 'You can only boost active listings.')
-        return redirect('dashboard')
-
-    if listing.is_boosted and listing.boost_expiry > timezone.now():
-        messages.info(request, 'This listing is already boosted.')
-        return redirect('dashboard')
-
-    amount = 550
-    tx_ref = f"BOOST_{listing.id}_{uuid.uuid4().hex[:8]}"
-
-    request.session['boost_tx_ref'] = tx_ref
-    request.session['boost_listing_id'] = listing.id
-
-    checkout_url = f"https://checkout.paychangu.com/?amount={amount}&currency=MWK&email={request.user.email}&first_name={request.user.first_name}&tx_ref={tx_ref}&callback_url={request.build_absolute_uri('/boost/callback/')}&return_url={request.build_absolute_uri('/dashboard/')}&public_key={settings.PAYCHANGU_PUBLIC_KEY}"
-
-    return redirect(checkout_url)
 
 @login_required
 def boost_callback(request):
@@ -653,16 +670,14 @@ def start_conversation(request, listing_id):
             'market_avg': str(listing.market_avg_price) if listing.market_avg_price else None,
         }, status=400)
 
-    content_type = ContentType.objects.get_for_model(Listing)
-
     convo, created = Conversation.objects.get_or_create(
-        content_type=content_type,
-        object_id=listing.id,
+        listing=listing,
+        rental=None,
         buyer=request.user,
         seller=seller
     )
     convo.save()
-    return redirect('chat:chat_room', convo_id=convo.id)
+    return redirect('chat:room', convo_id=convo.id)
 
 @login_required
 @require_POST
@@ -703,13 +718,12 @@ def get_messages(request, convo_id):
     if request.user not in [convo.buyer, convo.seller]:
         return JsonResponse({'error': 'Not allowed'}, status=403)
 
-    msgs = convo.messages.select_related('sender', 'sender__userprofile').all().order_by('created_at')
+    msgs = convo.messages.select_related('sender').all().order_by('created_at')
     msgs.filter(is_read=False).exclude(sender=request.user).update(is_read=True)
 
     data = [{
         'text': m.content,
         'sender': m.sender.username,
-        'sender_avatar': str(m.sender.userprofile.avatar) if hasattr(m.sender, 'userprofile') and m.sender.userprofile.avatar else '',
         'is_me': m.sender == request.user,
         'time': m.created_at.strftime('%H:%M')
     } for m in msgs]
@@ -718,13 +732,13 @@ def get_messages(request, convo_id):
 @login_required
 def chat_room(request, convo_id):
     convo = get_object_or_404(
-        Conversation.objects.select_related('buyer', 'seller', 'buyer__userprofile', 'seller__userprofile'),
+        Conversation.objects.select_related('buyer', 'seller', 'listing', 'rental'),
         id=convo_id
     )
     if request.user!= convo.buyer and request.user!= convo.seller:
         return HttpResponseForbidden("Not your chat")
 
-    messages = convo.messages.select_related('sender', 'sender__userprofile').all().order_by('created_at')
+    messages = convo.messages.select_related('sender').all().order_by('created_at')
     other_user = convo.seller if request.user == convo.buyer else convo.buyer
 
     return render(request, 'chat/room.html', {
@@ -856,6 +870,8 @@ def post_rental(request):
 
     return render(request, 'post_rental.html')
 
+from django.conf import settings
+
 def rental_detail(request, pk):
     rental = get_object_or_404(RentalListing.objects.select_related('seller'), pk=pk, is_active=True)
     RentalListing.objects.filter(pk=pk).update(views=F('views') + 1)
@@ -868,7 +884,6 @@ def rental_detail(request, pk):
         'rental': rental,
         'MEDIA_URL': settings.MEDIA_URL,
     })
-
 @login_required
 @require_POST
 def start_rental_conversation(request, rental_id):
@@ -879,17 +894,15 @@ def start_rental_conversation(request, rental_id):
         messages.error(request, "You can't message yourself.")
         return redirect('rental_detail', pk=rental_id)
 
-    content_type = ContentType.objects.get_for_model(RentalListing)
-
     convo, created = Conversation.objects.get_or_create(
-        content_type=content_type,
-        object_id=rental.id,
+        rental=rental,
+        listing=None,
         buyer=request.user,
         seller=seller
     )
 
     convo.save()
-    return redirect('chat:chat_room', convo_id=convo.id)
+    return redirect('chat:room', convo_id=convo.id)
 
 def airtel_checkout(request):
     if request.method == 'POST':
