@@ -200,8 +200,8 @@ input[name$="-DELETE"] { display: none!important; }
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-const CLOUD_NAME = "sbsdxiie"; // FIXED: This is your cloud name from screenshot
-const UPLOAD_PRESET = "lendogo3"; // This is your preset name
+const CLOUD_NAME = "sbsdxiie"; // YOUR CLOUD NAME
+const UPLOAD_PRESET = "lendogo3"; // YOUR PRESET
 let activeUploads = 0;
 let currentSlot = null;
 let currentAction = null;
@@ -288,27 +288,58 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
   e.target.value = '';
 });
 
-// FIX: ADD PHOTO TO EMPTY SLOT - THIS WAS MISSING
+// CLICK EMPTY SLOT TO ADD
 document.addEventListener('click', e => {
   if(e.target.closest('.slot-add-btn')){ 
     const slot = e.target.closest('.photo-slot');
     const input = slot.querySelector('.file-input');
-    input.dataset.slotType = 'new'; // mark this as "new slot"
+    input.dataset.mode = 'new'; // mark as new slot
     input.click(); 
   }
 });
 
-// REPLACE EXISTING PHOTO
+// CLICK ARROW TO REPLACE
+document.addEventListener('click', e => {
+  if(e.target.closest('.change-btn')){ 
+    currentSlot = e.target.closest('.photo-slot'); 
+    currentAction = 'change'; 
+    document.getElementById('modalTitle').textContent = 'Change Photo'; 
+    document.getElementById('modalText').textContent = 'Replace this photo?'; 
+    confirmModal.show(); 
+  }
+  if(e.target.closest('.delete-btn')){ 
+    currentSlot = e.target.closest('.photo-slot'); 
+    currentAction = 'delete'; 
+    document.getElementById('modalTitle').textContent = 'Delete Photo'; 
+    document.getElementById('modalText').textContent = 'Remove this photo?'; 
+    confirmModal.show(); 
+  }
+});
+
+document.getElementById('confirmActionBtn').onclick = () => {
+  if(currentAction === 'delete'){
+    currentSlot.querySelector('input[name$="-DELETE"]').checked = true;
+    currentSlot.classList.add('deleted');
+    currentSlot.querySelector('.photo-actions').innerHTML = '<span class="badge bg-secondary">Will Delete</span>';
+  }
+  if(currentAction === 'change'){ 
+    const input = currentSlot.querySelector('.file-input');
+    input.dataset.mode = 'replace'; // mark as replace
+    setTimeout(() => input.click(), 100); 
+  }
+  confirmModal.hide();
+}
+
+// FILE INPUT CHANGE - HANDLES BOTH NEW AND REPLACE
 document.addEventListener('change', async e => {
     if(e.target.classList.contains('file-input') && e.target.files[0]){
         const file = e.target.files[0];
         const slot = e.target.closest('.photo-slot');
-        const slotIndex = slot.dataset.index;
-        const slotId = 'slot_' + slotIndex + Date.now();
+        const mode = e.target.dataset.mode || 'replace';
+        const slotId = 'slot_' + Date.now();
         slot.setAttribute('data-progress-id', slotId);
         const localUrl = URL.createObjectURL(file);
         
-        // Show preview immediately
         let img = slot.querySelector('.photo-preview');
         if(!img){
           img = document.createElement('img');
@@ -320,24 +351,26 @@ document.addEventListener('change', async e => {
         updateProgressOverlay(slot, 0);
 
         const uploadPromise = uploadToCloudinary(file, 'image', slotId).then(cloudUrl => {
-          if(e.target.dataset.slotType === 'new'){
-            // CASE 1: WAS AN EMPTY SLOT - create new_images input
+          if(mode === 'new'){
+            // ADD TO EMPTY SLOT
             const hiddenInput = document.createElement('input');
             hiddenInput.type = 'hidden'; hiddenInput.name = 'new_images'; hiddenInput.value = cloudUrl;
             document.getElementById('newImageUrls').appendChild(hiddenInput);
-            delete e.target.dataset.slotType;
           } else {
-            // CASE 2: WAS EXISTING PHOTO - update formset input
-            const imageInput = slot.querySelector('input[name$="-image"]');
-            if(imageInput) {
-              imageInput.value = cloudUrl;
-              imageInput.dispatchEvent(new Event('change'));
+            // REPLACE EXISTING - FIX: create hidden input, don't touch file input
+            let urlInput = slot.querySelector('.cloud-url-input');
+            if(!urlInput){
+              urlInput = document.createElement('input');
+              urlInput.type = 'hidden';
+              urlInput.className = 'cloud-url-input';
+              urlInput.name = slot.querySelector('input[name$="-image"]').name; // same name as formset
+              slot.appendChild(urlInput);
             }
+            urlInput.value = cloudUrl;
             slot.querySelector('input[name$="-DELETE"]').checked = false;
           }
           
           img.src = cloudUrl;
-          // add action buttons if they don't exist
           if(!slot.querySelector('.photo-actions')){
             const actions = document.createElement('div');
             actions.className = 'photo-actions';
@@ -345,6 +378,7 @@ document.addEventListener('change', async e => {
             slot.appendChild(actions);
           }
           slot.querySelector('.uploading-overlay')?.remove();
+          delete e.target.dataset.mode;
         }).catch(err => {
           console.error(err);
           slot.querySelector('.uploading-overlay').innerHTML = `Failed: ${err.message}`;
@@ -383,20 +417,6 @@ videoFileInput.addEventListener('change', async e => {
   }
 });
 
-// DELETE / CHANGE MODALS
-document.addEventListener('click', e => {
-  if(e.target.closest('.change-btn')){ currentSlot = e.target.closest('.photo-slot'); currentAction = 'change'; document.getElementById('modalTitle').textContent = 'Change Photo'; document.getElementById('modalText').textContent = 'Replace this photo?'; confirmModal.show(); }
-  if(e.target.closest('.delete-btn')){ currentSlot = e.target.closest('.photo-slot'); currentAction = 'delete'; document.getElementById('modalTitle').textContent = 'Delete Photo'; document.getElementById('modalText').textContent = 'Remove this photo?'; confirmModal.show(); }
-});
-document.getElementById('confirmActionBtn').onclick = () => {
-  if(currentAction === 'delete'){
-    currentSlot.querySelector('input[name$="-DELETE"]').checked = true;
-    currentSlot.classList.add('deleted');
-    currentSlot.querySelector('.photo-actions').innerHTML = '<span class="badge bg-secondary">Will Delete</span>';
-  }
-  if(currentAction === 'change'){ setTimeout(() => currentSlot.querySelector('.file-input').click(), 100); }
-  confirmModal.hide();
-}
 document.addEventListener('click', e => { if(e.target.id === 'removeVideoBtn'){ videoConfirmModal.show(); } });
 document.getElementById('confirmVideoRemoveBtn').onclick = () => {
   document.getElementById('videoUrlInput').value = '';
