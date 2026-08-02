@@ -31,6 +31,8 @@ import re
 import requests
 import urllib3
 import time
+import urllib.request # ADDED: to download cloudinary URLs
+from django.core.files.base import ContentFile # ADDED: to save downloaded files
 from django.contrib.contenttypes.models import ContentType
 
 load_dotenv()
@@ -169,16 +171,26 @@ def create_listing(request):
                 listing.status = 'ACTIVE'
 
                 video_url = request.POST.get('video', '').strip()
-                if video_url and hasattr(listing, 'video'):
-                    listing.video = video_url
+                if video_url and video_url.startswith('http') and hasattr(listing, 'video'):
+                    # FIX: Download video and save as file
+                    result = urllib.request.urlretrieve(video_url)
+                    filename = f'video_{int(time.time())}.mp4'
+                    listing.video.save(filename, ContentFile(open(result[0], 'rb').read()), save=False)
 
                 listing.save()
                 form.save_m2m()
 
                 new_images = request.POST.getlist('new_images')
                 for order, url in enumerate(new_images):
-                    if url:
-                        ListingImage.objects.create(listing=listing, image=url, order=order)
+                    if url and url.startswith('http'):
+                        # FIX: Download image and save as file
+                        result = urllib.request.urlretrieve(url)
+                        filename = os.path.basename(url).split('?')[0]
+                        ListingImage.objects.create(
+                            listing=listing,
+                            image=ContentFile(open(result[0], 'rb').read(), name=filename),
+                            order=order
+                        )
 
             messages.success(request, 'Listing created successfully!')
             return redirect('listing_detail', pk=listing.pk)
@@ -204,16 +216,44 @@ def edit_listing(request, pk):
             with transaction.atomic():
                 # 1. SAVE LISTING + VIDEO
                 listing = form.save(commit=False)
-                listing.video = request.POST.get('video', '')
+                video_url = request.POST.get('video', '').strip()
+
+                if video_url and video_url.startswith('http'):
+                    # FIX: Download video URL and save as file
+                    result = urllib.request.urlretrieve(video_url)
+                    filename = f'video_{listing.id}_{int(time.time())}.mp4'
+                    listing.video.save(filename, ContentFile(open(result[0], 'rb').read()), save=False)
+                elif video_url == '': # user removed video
+                    listing.video = None
+
                 listing.save()
 
-                # 2. THIS HANDLES DELETE + REPLACE AUTOMATICALLY
-                formset.save()
+                # 2. HANDLE DELETE + REPLACE FROM FORMSET
+                images = formset.save(commit=False)
+                for img_obj in images:
+                    # Check if JS set a cloudinary URL in the hidden input
+                    cloud_url = request.POST.get(f'{img_obj._prefix}-image')
+                    if cloud_url and cloud_url.startswith('http'):
+                        result = urllib.request.urlretrieve(cloud_url)
+                        filename = os.path.basename(cloud_url).split('?')[0]
+                        img_obj.image.save(filename, ContentFile(open(result[0], 'rb').read()), save=False)
+                    img_obj.save()
 
-                # 3. HANDLE ADD NEW - create from JS upload
+                formset.save_m2m()
+
+                for obj in formset.deleted_objects:
+                    obj.delete()
+
+                # 3. HANDLE ADD NEW - from JS upload
                 for url in request.POST.getlist('new_images'):
                     if url and url.startswith('http'):
-                        ListingImage.objects.create(listing=listing, image=url)
+                        # FIX: Download URL and save as file
+                        result = urllib.request.urlretrieve(url)
+                        filename = os.path.basename(url).split('?')[0]
+                        ListingImage.objects.create(
+                            listing=listing,
+                            image=ContentFile(open(result[0], 'rb').read(), name=filename)
+                        )
 
             messages.success(request, 'Listing updated successfully!')
             return redirect('listing_detail', pk=listing.pk)
