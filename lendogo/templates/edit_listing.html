@@ -19,6 +19,10 @@
 .photo-slot.deleted { opacity: 0.3; pointer-events: none; }
 .photo-preview { width: 100%; height: 100%; object-fit: cover; }
 input[type="file"] { display: none!important; }
+/* HIDE DJANGO FORMSET HIDDEN FIELDS */
+input[name$="-image"] { display: none !important; }
+input[name$="-id"] { display: none !important; }
+input[name$="-DELETE"] { display: none !important; }
 .add-card { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 4px; cursor: pointer; color: #6b7280; font-weight: 500; font-size: 12px; width: 100%; height: 100%; }
 .add-card:hover { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
 .add-card i { font-size: 22px; }
@@ -61,6 +65,7 @@ input[type="file"] { display: none!important; }
           {% for img_form in formset %}
           <div class="photo-slot {% if img_form.instance.image %}filled{% endif %}" data-index="{{ forloop.counter0 }}">
             {{ img_form.id }}
+            {{ img_form.image }} {# <-- KEY FIX: This lets JS set the Cloudinary URL #}
             {{ img_form.DELETE }}
             <input type="file" accept="image/*" class="file-input">
 
@@ -87,7 +92,7 @@ input[type="file"] { display: none!important; }
             <input type="file" id="multiFileInput" accept="image/*" multiple>
           </div>
         </div>
-        <div id="newImageUrls"></div>
+        <div id="newImageUrls"></div> {# <-- Container for new_images hidden inputs #}
         <small class="text-muted mt-2 d-block">Tip: First photo = main photo.</small>
       </div>
 
@@ -268,6 +273,7 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
       document.getElementById('newImageUrls').appendChild(hiddenInput);
       slot.innerHTML = `<img src="${cloudUrl}" class="photo-preview"><div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger remove-new-btn"><i class="bi bi-trash"></i></button></div>`;
       slot.querySelector('.remove-new-btn').onclick = () => { slot.remove(); hiddenInput.remove(); }
+      slot.querySelector('.uploading-overlay')?.remove();
     }).catch(err => {
       slot.innerHTML = `<div class="add-card text-danger"><i class="bi bi-x-lg"></i><span>Failed</span></div>`;
     });
@@ -276,7 +282,7 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
   e.target.value = '';
 });
 
-// Single upload - REPLACE EXISTING PHOTO - KEY FIX HERE
+// Single upload - REPLACE EXISTING PHOTO
 document.addEventListener('change', async e => {
     if(e.target.classList.contains('file-input') && e.target.files[0]){
         const compressedFile = await compressImage(e.target.files[0]);
@@ -294,19 +300,14 @@ document.addEventListener('change', async e => {
           const idInput = slot.querySelector('input[name$="-id"]');
           const deleteInput = slot.querySelector('input[name$="-DELETE"]');
 
-          // KEY FIX: Create/update form-X-image input so backend saves it
-          let updateInput = document.querySelector(`input[name="form-${slotIndex}-image"]`);
-          if(!updateInput){
-            updateInput = document.createElement('input');
-            updateInput.type = 'hidden';
-            updateInput.name = `form-${slotIndex}-image`;
-            document.getElementById('newImageUrls').appendChild(updateInput);
-          }
-          updateInput.value = cloudUrl;
+          // KEY FIX: Update the form-X-image hidden input so backend saves it
+          let updateInput = slot.querySelector('input[name$="-image"]');
+          if(updateInput) updateInput.value = cloudUrl;
+          
           if(deleteInput) deleteInput.checked = false;
 
           slot.querySelector('.photo-preview').src = cloudUrl;
-          slot.querySelector('.uploading-overlay').remove();
+          slot.querySelector('.uploading-overlay')?.remove();
           if(!slot.querySelector('.photo-actions')) {
             slot.innerHTML += `<div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-btn"><i class="bi bi-trash"></i></button></div>`;
           }
@@ -336,6 +337,7 @@ videoFileInput.addEventListener('change', async e => {
     const uploadPromise = uploadToCloudinary(file, 'video', 'video1').then(cloudUrl => {
       document.getElementById('videoUrlInput').value = cloudUrl;
       document.getElementById('videoPreview').innerHTML = `<video src="${cloudUrl}" controls class="w-100 rounded" style="max-height:300px;"></video><div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button><button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn"><i class="bi bi-trash"></i> Remove</button></div>`;
+      videoSlot.querySelector('.uploading-overlay')?.remove();
     }).catch(err => {
       alert("Upload failed: " + err.message);
       document.getElementById('videoPreview').classList.add('d-none');
