@@ -200,8 +200,8 @@ input[name$="-DELETE"] { display: none!important; }
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-const CLOUD_NAME = "lendogo3"; // FIX 1: Must match your cloudinary account
-const UPLOAD_PRESET = "lendogo3";
+const CLOUD_NAME = "sbsdxiie"; // FIXED: This is your cloud name from screenshot
+const UPLOAD_PRESET = "lendogo3"; // This is your preset name
 let activeUploads = 0;
 let currentSlot = null;
 let currentAction = null;
@@ -259,7 +259,7 @@ async function uploadToCloudinary(file, type = 'image', slotId = 'default') {
   });
 }
 
-// ADD NEW PHOTOS
+// ADD NEW PHOTOS - BOTTOM BUTTON
 document.getElementById('addPhotoBtn').addEventListener('click', () => document.getElementById('multiFileInput').click());
 document.getElementById('multiFileInput').addEventListener('change', async e => {
   for(const file of Array.from(e.target.files)){
@@ -281,34 +281,69 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
       slot.querySelector('.uploading-overlay')?.remove();
     }).catch(err => {
       console.error(err);
-      slot.querySelector('.uploading-overlay').innerHTML = `Failed`;
+      slot.querySelector('.uploading-overlay').innerHTML = `Failed: ${err.message}`;
     });
     uploadPromises.push(uploadPromise);
   }
   e.target.value = '';
 });
 
-// REPLACE EXISTING PHOTO - FIX 2
+// FIX: ADD PHOTO TO EMPTY SLOT - THIS WAS MISSING
+document.addEventListener('click', e => {
+  if(e.target.closest('.slot-add-btn')){ 
+    const slot = e.target.closest('.photo-slot');
+    const input = slot.querySelector('.file-input');
+    input.dataset.slotType = 'new'; // mark this as "new slot"
+    input.click(); 
+  }
+});
+
+// REPLACE EXISTING PHOTO
 document.addEventListener('change', async e => {
     if(e.target.classList.contains('file-input') && e.target.files[0]){
         const file = e.target.files[0];
         const slot = e.target.closest('.photo-slot');
         const slotIndex = slot.dataset.index;
-        const slotId = 'slot_' + slotIndex;
+        const slotId = 'slot_' + slotIndex + Date.now();
         slot.setAttribute('data-progress-id', slotId);
         const localUrl = URL.createObjectURL(file);
-        slot.querySelector('.photo-preview').src = localUrl;
+        
+        // Show preview immediately
+        let img = slot.querySelector('.photo-preview');
+        if(!img){
+          img = document.createElement('img');
+          img.className = 'photo-preview';
+          slot.prepend(img);
+        }
+        img.src = localUrl;
         slot.classList.add('filled');
         updateProgressOverlay(slot, 0);
 
         const uploadPromise = uploadToCloudinary(file, 'image', slotId).then(cloudUrl => {
-          const imageInput = slot.querySelector('input[name$="-image"]');
-          if(imageInput) {
-            imageInput.value = cloudUrl;
-            imageInput.dispatchEvent(new Event('change')); // Tell Django it changed
+          if(e.target.dataset.slotType === 'new'){
+            // CASE 1: WAS AN EMPTY SLOT - create new_images input
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden'; hiddenInput.name = 'new_images'; hiddenInput.value = cloudUrl;
+            document.getElementById('newImageUrls').appendChild(hiddenInput);
+            delete e.target.dataset.slotType;
+          } else {
+            // CASE 2: WAS EXISTING PHOTO - update formset input
+            const imageInput = slot.querySelector('input[name$="-image"]');
+            if(imageInput) {
+              imageInput.value = cloudUrl;
+              imageInput.dispatchEvent(new Event('change'));
+            }
+            slot.querySelector('input[name$="-DELETE"]').checked = false;
           }
-          slot.querySelector('input[name$="-DELETE"]').checked = false;
-          slot.querySelector('.photo-preview').src = cloudUrl;
+          
+          img.src = cloudUrl;
+          // add action buttons if they don't exist
+          if(!slot.querySelector('.photo-actions')){
+            const actions = document.createElement('div');
+            actions.className = 'photo-actions';
+            actions.innerHTML = `<button type="button" class="btn btn-sm btn-light change-btn"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-btn"><i class="bi bi-trash"></i></button>`;
+            slot.appendChild(actions);
+          }
           slot.querySelector('.uploading-overlay')?.remove();
         }).catch(err => {
           console.error(err);
@@ -351,7 +386,6 @@ videoFileInput.addEventListener('change', async e => {
 // DELETE / CHANGE MODALS
 document.addEventListener('click', e => {
   if(e.target.closest('.change-btn')){ currentSlot = e.target.closest('.photo-slot'); currentAction = 'change'; document.getElementById('modalTitle').textContent = 'Change Photo'; document.getElementById('modalText').textContent = 'Replace this photo?'; confirmModal.show(); }
-  if(e.target.closest('.slot-add-btn')){ const input = e.target.closest('.photo-slot').querySelector('.file-input'); setTimeout(() => input.click(), 0); }
   if(e.target.closest('.delete-btn')){ currentSlot = e.target.closest('.photo-slot'); currentAction = 'delete'; document.getElementById('modalTitle').textContent = 'Delete Photo'; document.getElementById('modalText').textContent = 'Remove this photo?'; confirmModal.show(); }
 });
 document.getElementById('confirmActionBtn').onclick = () => {
