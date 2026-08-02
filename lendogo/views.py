@@ -31,8 +31,8 @@ import re
 import requests
 import urllib3
 import time
-import urllib.request # ADDED: to download cloudinary URLs
-from django.core.files.base import ContentFile # ADDED: to save downloaded files
+import urllib.request
+from django.core.files.base import ContentFile
 from django.contrib.contenttypes.models import ContentType
 
 load_dotenv()
@@ -41,7 +41,6 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 User = get_user_model()
 
-# FIX: Use fields instead of exclude so Cloudinary URLs can be saved
 ImageFormSet = inlineformset_factory(
     Listing,
     ListingImage,
@@ -162,7 +161,7 @@ def listing_detail(request, pk):
 def create_listing(request):
     if request.method == 'POST':
         form = ListingForm(request.POST)
-        formset = ImageFormSet(request.POST)
+        formset = ImageFormSet(request.POST, prefix='images')
 
         if form.is_valid():
             with transaction.atomic():
@@ -172,25 +171,27 @@ def create_listing(request):
 
                 video_url = request.POST.get('video', '').strip()
                 if video_url and video_url.startswith('http') and hasattr(listing, 'video'):
-                    # FIX: Download video and save as file
-                    result = urllib.request.urlretrieve(video_url)
-                    filename = f'video_{int(time.time())}.mp4'
-                    listing.video.save(filename, ContentFile(open(result[0], 'rb').read()), save=False)
+                    try:
+                        result = urllib.request.urlretrieve(video_url)
+                        filename = f'video_{int(time.time())}.mp4'
+                        listing.video.save(filename, ContentFile(open(result[0], 'rb').read()), save=False)
+                    except: pass
 
                 listing.save()
-                form.save_m2m()
 
+                # HANDLE NEW IMAGES FROM JS
                 new_images = request.POST.getlist('new_images')
                 for order, url in enumerate(new_images):
                     if url and url.startswith('http'):
-                        # FIX: Download image and save as file
-                        result = urllib.request.urlretrieve(url)
-                        filename = os.path.basename(url).split('?')[0]
-                        ListingImage.objects.create(
-                            listing=listing,
-                            image=ContentFile(open(result[0], 'rb').read(), name=filename),
-                            order=order
-                        )
+                        try:
+                            result = urllib.request.urlretrieve(url)
+                            filename = os.path.basename(url).split('?')[0] or f'img_{order}.jpg'
+                            ListingImage.objects.create(
+                                listing=listing,
+                                image=ContentFile(open(result[0], 'rb').read(), name=filename),
+                                order=order
+                            )
+                        except: pass
 
             messages.success(request, 'Listing created successfully!')
             return redirect('listing_detail', pk=listing.pk)
@@ -199,7 +200,7 @@ def create_listing(request):
             print("FORM ERRORS:", form.errors)
     else:
         form = ListingForm()
-        formset = ImageFormSet()
+        formset = ImageFormSet(prefix='images')
 
     categories = Category.objects.all()
     return render(request, 'create.html', {'form': form, 'formset': formset, 'categories': categories})
@@ -210,50 +211,58 @@ def edit_listing(request, pk):
 
     if request.method == 'POST':
         form = ListingForm(request.POST, instance=listing)
-        formset = ImageFormSet(request.POST, request.FILES, instance=listing)
+        formset = ImageFormSet(request.POST, request.FILES, instance=listing, prefix='images')
 
         if form.is_valid() and formset.is_valid():
             with transaction.atomic():
-                # 1. SAVE LISTING + VIDEO
+                # 1. SAVE LISTING + VIDEO FIRST
                 listing = form.save(commit=False)
                 video_url = request.POST.get('video', '').strip()
 
                 if video_url and video_url.startswith('http'):
-                    # FIX: Download video URL and save as file
-                    result = urllib.request.urlretrieve(video_url)
-                    filename = f'video_{listing.id}_{int(time.time())}.mp4'
-                    listing.video.save(filename, ContentFile(open(result[0], 'rb').read()), save=False)
-                elif video_url == '': # user removed video
+                    try:
+                        result = urllib.request.urlretrieve(video_url)
+                        filename = f'video_{listing.id}_{int(time.time())}.mp4'
+                        listing.video.save(filename, ContentFile(open(result[0], 'rb').read()), save=False)
+                    except: pass
+                elif video_url == '':
                     listing.video = None
 
-                listing.save()
+                listing.save() # SAVE HERE so it exists
 
-                # 2. HANDLE DELETE + REPLACE FROM FORMSET
-                images = formset.save(commit=False)
-                for img_obj in images:
-                    # Check if JS set a cloudinary URL in the hidden input
-                    cloud_url = request.POST.get(f'{img_obj._prefix}-image')
-                    if cloud_url and cloud_url.startswith('http'):
-                        result = urllib.request.urlretrieve(cloud_url)
-                        filename = os.path.basename(cloud_url).split('?')[0]
-                        img_obj.image.save(filename, ContentFile(open(result[0], 'rb').read()), save=False)
-                    img_obj.save()
-
-                formset.save_m2m()
-
+                # 2. HANDLE DELETE
                 for obj in formset.deleted_objects:
                     obj.delete()
 
-                # 3. HANDLE ADD NEW - from JS upload
+                # 3. HANDLE REPLACE - LOOP THROUGH FORMS NOT INSTANCES
+                for i, form_i in enumerate(formset.forms):
+                    if form_i.cleaned_data.get('DELETE'):
+                        continue
+                    
+                    instance = form_i.instance
+                    cloud_url = request.POST.get(f'images-{i}-image') # FIX: use index not _prefix
+                    
+                    if cloud_url and cloud_url.startswith('http'):
+                        try:
+                            result = urllib.request.urlretrieve(cloud_url)
+                            filename = os.path.basename(cloud_url).split('?')[0] or f'img_{i}.jpg'
+                            instance.image.save(filename, ContentFile(open(result[0], 'rb').read()), save=False)
+                        except: pass
+                    
+                    if instance.pk: # only save existing
+                        instance.save()
+
+                # 4. HANDLE ADD NEW - from JS upload
                 for url in request.POST.getlist('new_images'):
                     if url and url.startswith('http'):
-                        # FIX: Download URL and save as file
-                        result = urllib.request.urlretrieve(url)
-                        filename = os.path.basename(url).split('?')[0]
-                        ListingImage.objects.create(
-                            listing=listing,
-                            image=ContentFile(open(result[0], 'rb').read(), name=filename)
-                        )
+                        try:
+                            result = urllib.request.urlretrieve(url)
+                            filename = os.path.basename(url).split('?')[0] or f'new_{int(time.time())}.jpg'
+                            ListingImage.objects.create(
+                                listing=listing,
+                                image=ContentFile(open(result[0], 'rb').read(), name=filename)
+                            )
+                        except: pass
 
             messages.success(request, 'Listing updated successfully!')
             return redirect('listing_detail', pk=listing.pk)
@@ -263,7 +272,7 @@ def edit_listing(request, pk):
             print("FORMSET ERRORS:", formset.errors)
     else:
         form = ListingForm(instance=listing)
-        formset = ImageFormSet(instance=listing)
+        formset = ImageFormSet(instance=listing, prefix='images')
 
     categories = Category.objects.all()
     return render(request, 'edit_listing.html', {
