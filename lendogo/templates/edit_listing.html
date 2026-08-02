@@ -252,9 +252,8 @@ async function uploadToCloudinary(file, type = 'image', slotId = 'default') {
   });
 }
 
-// Multi upload - ADD NEW PHOTOS
+// ADD NEW
 document.getElementById('addPhotoBtn').addEventListener('click', () => document.getElementById('multiFileInput').click());
-
 document.getElementById('multiFileInput').addEventListener('change', async e => {
   for(const file of Array.from(e.target.files)){
     const compressedFile = await compressImage(file);
@@ -274,46 +273,48 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
       slot.innerHTML = `<img src="${cloudUrl}" class="photo-preview"><div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger remove-new-btn"><i class="bi bi-trash"></i></button></div>`;
       slot.querySelector('.remove-new-btn').onclick = () => { slot.remove(); hiddenInput.remove(); }
       slot.querySelector('.uploading-overlay')?.remove();
-    }).catch(err => {
-      slot.innerHTML = `<div class="add-card text-danger"><i class="bi bi-x-lg"></i><span>Failed</span></div>`;
+    }).catch(err => { 
+      console.error(err);
+      slot.querySelector('.uploading-overlay').innerHTML = `Failed`; 
     });
     uploadPromises.push(uploadPromise);
   }
   e.target.value = '';
 });
 
-// Single upload - REPLACE EXISTING PHOTO - FIX: Don't destroy the hidden inputs
+// REPLACE EXISTING - FIXED: Never set file input value
 document.addEventListener('change', async e => {
     if(e.target.classList.contains('file-input') && e.target.files[0]){
-        const compressedFile = await compressImage(e.target.files[0]);
+        const file = e.target.files[0];
+        const compressedFile = await compressImage(file);
         const slot = e.target.closest('.photo-slot');
         const slotIndex = slot.dataset.index;
         const slotId = 'slot_' + slotIndex;
         slot.setAttribute('data-progress-id', slotId);
         const localUrl = URL.createObjectURL(compressedFile);
-        slot.querySelector('.photo-preview').src = localUrl; // Only change src
+        slot.querySelector('.photo-preview').src = localUrl;
         slot.classList.add('filled');
         updateProgressOverlay(slot, 0);
 
         const uploadPromise = uploadToCloudinary(compressedFile, 'image', slotId).then(cloudUrl => {
           const imageInput = slot.querySelector('input[name$="-image"]');
-          imageInput.value = cloudUrl; // This is what formset.save() reads
+          if(imageInput) imageInput.value = cloudUrl; // This is OK, it's type=text hidden
           slot.querySelector('input[name$="-DELETE"]').checked = false;
           slot.querySelector('.photo-preview').src = cloudUrl;
           slot.querySelector('.uploading-overlay')?.remove();
-        }).catch(err => {
-          slot.querySelector('.uploading-overlay').innerHTML = `Failed`;
+          e.target.value = ''; // Reset file input so you can upload same file again
+        }).catch(err => { 
           console.error(err);
+          slot.querySelector('.uploading-overlay').innerHTML = `Failed`; 
         });
         uploadPromises.push(uploadPromise);
     }
 });
 
-// Video
+// VIDEO
 const videoFileInput = document.getElementById('videoFileInput');
 document.getElementById('videoUploadBtn')?.addEventListener('click', () => videoFileInput.click());
 document.addEventListener('click', e => { if(e.target.id === 'changeVideoBtn') videoFileInput.click(); });
-
 videoFileInput.addEventListener('change', async e => {
   if (e.target.files[0]) {
     const file = e.target.files[0];
@@ -329,7 +330,8 @@ videoFileInput.addEventListener('change', async e => {
       document.getElementById('videoUrlInput').value = cloudUrl;
       document.getElementById('videoPreview').innerHTML = `<video src="${cloudUrl}" controls class="w-100 rounded" style="max-height:300px;"></video><div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button><button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn"><i class="bi bi-trash"></i> Remove</button></div>`;
       videoSlot.querySelector('.uploading-overlay')?.remove();
-    }).catch(err => {
+      e.target.value = '';
+    }).catch(err => { 
       alert("Upload failed: " + err.message);
       document.getElementById('videoPreview').classList.add('d-none');
       document.getElementById('videoUploadArea')?.classList.remove('d-none');
@@ -338,32 +340,22 @@ videoFileInput.addEventListener('change', async e => {
   }
 });
 
-// DELETE MODAL FOR PHOTOS
+// DELETE
 document.addEventListener('click', e => {
   if(e.target.closest('.change-btn')){ currentSlot = e.target.closest('.photo-slot'); currentAction = 'change'; document.getElementById('modalTitle').textContent = 'Change Photo'; document.getElementById('modalText').textContent = 'Replace this photo?'; confirmModal.show(); }
   if(e.target.closest('.slot-add-btn')) e.target.closest('.photo-slot').querySelector('.file-input').click();
   if(e.target.closest('.delete-btn')){ currentSlot = e.target.closest('.photo-slot'); currentAction = 'delete'; document.getElementById('modalTitle').textContent = 'Delete Photo'; document.getElementById('modalText').textContent = 'Remove this photo?'; confirmModal.show(); }
 });
-
 document.getElementById('confirmActionBtn').onclick = () => {
   if(currentAction === 'delete'){
     currentSlot.querySelector('input[name$="-DELETE"]').checked = true;
     currentSlot.classList.add('deleted');
     currentSlot.querySelector('.photo-actions').innerHTML = '<span class="badge bg-secondary">Will Delete</span>';
   }
-  if(currentAction === 'change'){
-    currentSlot.querySelector('.file-input').click();
-  }
+  if(currentAction === 'change'){ currentSlot.querySelector('.file-input').click(); }
   confirmModal.hide();
 }
-
-// VIDEO DELETE MODAL
-document.addEventListener('click', e => {
-  if(e.target.id === 'removeVideoBtn'){
-    videoConfirmModal.show();
-  }
-});
-
+document.addEventListener('click', e => { if(e.target.id === 'removeVideoBtn'){ videoConfirmModal.show(); } });
 document.getElementById('confirmVideoRemoveBtn').onclick = () => {
   document.getElementById('videoUrlInput').value = '';
   document.getElementById('videoPreview').classList.add('d-none');
@@ -371,7 +363,7 @@ document.getElementById('confirmVideoRemoveBtn').onclick = () => {
   videoConfirmModal.hide();
 }
 
-// WAIT FOR ALL UPLOADS BEFORE SUBMIT
+// WAIT FOR UPLOADS
 document.getElementById('editForm').addEventListener('submit', async e => {
   if (activeUploads > 0) {
     e.preventDefault();
