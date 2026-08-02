@@ -23,7 +23,7 @@ input[type="file"] { display: none!important; }
 input[name$="-image"] { display: none !important; }
 input[name$="-id"] { display: none !important; }
 input[name$="-DELETE"] { display: none !important; }
-.add-card { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 4px; cursor: pointer; color: #6b7280; font-weight: 500; font-size: 12px; width: 100%; height: 100%; }
+.add-card { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 4px; cursor: pointer; color: #6b7280; font-weight: 500; font-size: 12px; width: 100%; height: 100%; border: 2px dashed #d1d5db; border-radius: 12px; }
 .add-card:hover { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
 .add-card i { font-size: 22px; }
 .photo-actions { position: absolute; top: 6px; right: 6px; display: flex; gap: 4px; background: rgba(0,0,0,0.6); padding: 3px; border-radius: 8px; z-index: 10; }
@@ -38,24 +38,54 @@ input[name$="-DELETE"] { display: none !important; }
 <div class="container py-4 form-wrapper">
   <a href="javascript:history.back()" class="btn btn-light mb-3"><i class="bi bi-arrow-left"></i> Back</a>
 
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
   <form method="POST" enctype="multipart/form-data" id="editForm">
     {% csrf_token %}
     <div class="form-card">
 
       <div class="form-section">
         <h3 class="section-title">Listing Details</h3>
-        <div class="mb-3"><label class="form-label fw-medium">Item Name</label>{{ form.product }}</div>
-        <div class="row g-3">
-          <div class="col-md-6"><label class="form-label fw-medium">Price (MWK)</label>{{ form.price }}</div>
-          <div class="col-md-6"><label class="form-label fw-medium">Phone/WhatsApp</label>{{ form.phone }}</div>
+        <div class="mb-3">
+          <label class="form-label fw-medium">Item Name</label>
+          {{ form.product }}
+          {% if form.product.errors %}<div class="text-danger small">{{ form.product.errors }}</div>{% endif %}
         </div>
-        <div class="mt-3"><label class="form-label fw-medium">Description</label>{{ form.description }}</div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-medium">Price (MWK)</label>
+            {{ form.price }}
+            {% if form.price.errors %}<div class="text-danger small">{{ form.price.errors }}</div>{% endif %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-medium">Phone/WhatsApp</label>
+            {{ form.phone }}
+            {% if form.phone.errors %}<div class="text-danger small">{{ form.phone.errors }}</div>{% endif %}
+          </div>
+        </div>
+        <div class="mt-3">
+          <label class="form-label fw-medium">Description</label>
+          {{ form.description }}
+          {% if form.description.errors %}<div class="text-danger small">{{ form.description.errors }}</div>{% endif %}
+        </div>
       </div>
 
       <div class="form-section">
         <h3 class="section-title">Location</h3>
-        <div class="mb-3"><label class="form-label fw-medium">Area / City</label>{{ form.location }}</div>
-        {{ form.latitude }}{{ form.longitude }}
+        <div class="mb-3">
+          <label class="form-label fw-medium">Area / City</label>
+          {{ form.location }}
+          {% if form.location.errors %}<div class="text-danger small">{{ form.location.errors }}</div>{% endif %}
+        </div>
+        {{ form.latitude }}
+        {{ form.longitude }}
       </div>
 
       <div class="form-section">
@@ -70,10 +100,10 @@ input[name$="-DELETE"] { display: none !important; }
             <input type="file" accept="image/*" class="file-input">
 
             {% if img_form.instance.image %}
-              <img src="{{ img_form.instance.image }}" class="photo-preview">
+              <img src="{{ img_form.instance.image }}" class="photo-preview" alt="Listing photo">
               <div class="photo-actions">
-                <button type="button" class="btn btn-sm btn-light change-btn"><i class="bi bi-arrow-repeat"></i></button>
-                <button type="button" class="btn btn-sm btn-danger delete-btn"><i class="bi bi-trash"></i></button>
+                <button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button>
+                <button type="button" class="btn btn-sm btn-danger delete-btn" title="Delete"><i class="bi bi-trash"></i></button>
               </div>
             {% else %}
               <div class="add-card slot-add-btn">
@@ -93,7 +123,7 @@ input[name$="-DELETE"] { display: none !important; }
           </div>
         </div>
         <div id="newImageUrls"></div>
-        <small class="text-muted mt-2 d-block">Tip: First photo = main photo.</small>
+        <small class="text-muted mt-2 d-block">Tip: First photo = main photo. Click trash to delete, arrows to replace.</small>
       </div>
 
       <div class="form-section">
@@ -113,7 +143,7 @@ input[name$="-DELETE"] { display: none !important; }
           {% else %}
           <div id="videoUploadArea">
             <i class="bi bi-camera-video fs-1 text-muted d-block mb-2"></i>
-            <p class="text-muted mb-3">Add a short video</p>
+            <p class="text-muted mb-3">Add a short video to showcase your item</p>
             <button type="button" class="btn btn-sm btn-outline-primary" id="videoUploadBtn"><i class="bi bi-upload"></i> Upload Video</button>
           </div>
           <div id="videoPreview" class="d-none"></div>
@@ -179,7 +209,7 @@ const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal')
 const videoConfirmModal = new bootstrap.Modal(document.getElementById('videoConfirmModal'));
 let uploadPromises = [];
 
-document.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(el => el.classList.add('form-control'));
+document.querySelectorAll('input[type="text"], input[type="number"], textarea, select').forEach(el => el.classList.add('form-control'));
 
 function setUploading(change){
   activeUploads += change;
@@ -252,7 +282,7 @@ async function uploadToCloudinary(file, type = 'image', slotId = 'default') {
   });
 }
 
-// ADD NEW
+// ADD NEW PHOTOS
 document.getElementById('addPhotoBtn').addEventListener('click', () => document.getElementById('multiFileInput').click());
 document.getElementById('multiFileInput').addEventListener('change', async e => {
   for(const file of Array.from(e.target.files)){
@@ -282,7 +312,7 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
   e.target.value = '';
 });
 
-// REPLACE EXISTING - FIXED: Never set file input value
+// REPLACE EXISTING PHOTO
 document.addEventListener('change', async e => {
     if(e.target.classList.contains('file-input') && e.target.files[0]){
         const file = e.target.files[0];
@@ -298,11 +328,11 @@ document.addEventListener('change', async e => {
 
         const uploadPromise = uploadToCloudinary(compressedFile, 'image', slotId).then(cloudUrl => {
           const imageInput = slot.querySelector('input[name$="-image"]');
-          if(imageInput) imageInput.value = cloudUrl; // This is OK, it's type=text hidden
+          if(imageInput) imageInput.value = cloudUrl;
           slot.querySelector('input[name$="-DELETE"]').checked = false;
           slot.querySelector('.photo-preview').src = cloudUrl;
           slot.querySelector('.uploading-overlay')?.remove();
-          e.target.value = ''; // Reset file input so you can upload same file again
+          setTimeout(() => { e.target.value = ''; }, 100);
         }).catch(err => { 
           console.error(err);
           slot.querySelector('.uploading-overlay').innerHTML = `Failed`; 
@@ -311,7 +341,7 @@ document.addEventListener('change', async e => {
     }
 });
 
-// VIDEO
+// VIDEO UPLOAD
 const videoFileInput = document.getElementById('videoFileInput');
 document.getElementById('videoUploadBtn')?.addEventListener('click', () => videoFileInput.click());
 document.addEventListener('click', e => { if(e.target.id === 'changeVideoBtn') videoFileInput.click(); });
@@ -330,7 +360,7 @@ videoFileInput.addEventListener('change', async e => {
       document.getElementById('videoUrlInput').value = cloudUrl;
       document.getElementById('videoPreview').innerHTML = `<video src="${cloudUrl}" controls class="w-100 rounded" style="max-height:300px;"></video><div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button><button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn"><i class="bi bi-trash"></i> Remove</button></div>`;
       videoSlot.querySelector('.uploading-overlay')?.remove();
-      e.target.value = '';
+      setTimeout(() => { e.target.value = ''; }, 100);
     }).catch(err => { 
       alert("Upload failed: " + err.message);
       document.getElementById('videoPreview').classList.add('d-none');
@@ -340,10 +370,10 @@ videoFileInput.addEventListener('change', async e => {
   }
 });
 
-// DELETE
+// DELETE / CHANGE MODALS
 document.addEventListener('click', e => {
   if(e.target.closest('.change-btn')){ currentSlot = e.target.closest('.photo-slot'); currentAction = 'change'; document.getElementById('modalTitle').textContent = 'Change Photo'; document.getElementById('modalText').textContent = 'Replace this photo?'; confirmModal.show(); }
-  if(e.target.closest('.slot-add-btn')) e.target.closest('.photo-slot').querySelector('.file-input').click();
+  if(e.target.closest('.slot-add-btn')){ const input = e.target.closest('.photo-slot').querySelector('.file-input'); setTimeout(() => input.click(), 0); }
   if(e.target.closest('.delete-btn')){ currentSlot = e.target.closest('.photo-slot'); currentAction = 'delete'; document.getElementById('modalTitle').textContent = 'Delete Photo'; document.getElementById('modalText').textContent = 'Remove this photo?'; confirmModal.show(); }
 });
 document.getElementById('confirmActionBtn').onclick = () => {
@@ -352,7 +382,7 @@ document.getElementById('confirmActionBtn').onclick = () => {
     currentSlot.classList.add('deleted');
     currentSlot.querySelector('.photo-actions').innerHTML = '<span class="badge bg-secondary">Will Delete</span>';
   }
-  if(currentAction === 'change'){ currentSlot.querySelector('.file-input').click(); }
+  if(currentAction === 'change'){ setTimeout(() => currentSlot.querySelector('.file-input').click(), 0); }
   confirmModal.hide();
 }
 document.addEventListener('click', e => { if(e.target.id === 'removeVideoBtn'){ videoConfirmModal.show(); } });
@@ -363,7 +393,7 @@ document.getElementById('confirmVideoRemoveBtn').onclick = () => {
   videoConfirmModal.hide();
 }
 
-// WAIT FOR UPLOADS
+// WAIT FOR ALL UPLOADS BEFORE SUBMIT
 document.getElementById('editForm').addEventListener('submit', async e => {
   if (activeUploads > 0) {
     e.preventDefault();
