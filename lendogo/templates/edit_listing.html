@@ -93,25 +93,20 @@ input[name$="-DELETE"] { display: none!important; }
         {{ formset.management_form }}
         <div class="photo-grid" id="photoGrid">
           {% for img_form in formset %}
-          <div class="photo-slot {% if img_form.instance.image %}filled{% endif %}" data-index="{{ forloop.counter0 }}">
+          {% if img_form.instance.pk and img_form.instance.image %} {# ONLY SHOW FORMS WITH REAL IMAGES #}
+          <div class="photo-slot filled" data-index="{{ forloop.counter0 }}">
             {{ img_form.id }}
             {{ img_form.image }}
             {{ img_form.DELETE }}
             <input type="file" accept="image/*" class="file-input">
 
-            {% if img_form.instance.image %}
-              <img src="{{ img_form.instance.image }}" class="photo-preview" alt="Listing photo">
-              <div class="photo-actions">
-                <button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button>
-                <button type="button" class="btn btn-sm btn-danger delete-btn" title="Delete"><i class="bi bi-trash"></i></button>
-              </div>
-            {% else %}
-              <div class="add-card slot-add-btn">
-                <i class="bi bi-plus-lg"></i>
-                <span>Add Photo</span>
-              </div>
-            {% endif %}
+            <img src="{{ img_form.instance.image.url }}" class="photo-preview" alt="Listing photo"> {# FIX:.url #}
+            <div class="photo-actions">
+              <button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button>
+              <button type="button" class="btn btn-sm btn-danger delete-btn" title="Delete"><i class="bi bi-trash"></i></button>
+            </div>
           </div>
+          {% endif %}
           {% endfor %}
 
           <div class="photo-slot" id="addPhotoBtn">
@@ -293,7 +288,7 @@ document.addEventListener('click', e => {
   if(e.target.closest('.slot-add-btn')){ 
     const slot = e.target.closest('.photo-slot');
     const input = slot.querySelector('.file-input');
-    input.dataset.mode = 'new'; // mark as new slot
+    input.dataset.mode = 'new';
     input.click(); 
   }
 });
@@ -324,7 +319,7 @@ document.getElementById('confirmActionBtn').onclick = () => {
   }
   if(currentAction === 'change'){ 
     const input = currentSlot.querySelector('.file-input');
-    input.dataset.mode = 'replace'; // mark as replace
+    input.dataset.mode = 'replace';
     setTimeout(() => input.click(), 100); 
   }
   confirmModal.hide();
@@ -352,18 +347,16 @@ document.addEventListener('change', async e => {
 
         const uploadPromise = uploadToCloudinary(file, 'image', slotId).then(cloudUrl => {
           if(mode === 'new'){
-            // ADD TO EMPTY SLOT
             const hiddenInput = document.createElement('input');
             hiddenInput.type = 'hidden'; hiddenInput.name = 'new_images'; hiddenInput.value = cloudUrl;
             document.getElementById('newImageUrls').appendChild(hiddenInput);
           } else {
-            // REPLACE EXISTING - FIX: create hidden input, don't touch file input
             let urlInput = slot.querySelector('.cloud-url-input');
             if(!urlInput){
               urlInput = document.createElement('input');
               urlInput.type = 'hidden';
               urlInput.className = 'cloud-url-input';
-              urlInput.name = slot.querySelector('input[name$="-image"]').name; // same name as formset
+              urlInput.name = slot.querySelector('input[name$="-image"]').name;
               slot.appendChild(urlInput);
             }
             urlInput.value = cloudUrl;
