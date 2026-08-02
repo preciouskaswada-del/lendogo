@@ -49,6 +49,7 @@ ImageFormSet = inlineformset_factory(
     max_num=10,
     can_delete=True,
     can_delete_extra=False,
+    validate_min=False, # FIX 1: ALLOW EMPTY FORMSET
     fields=('image',)
 )
 
@@ -179,7 +180,6 @@ def create_listing(request):
 
                 listing.save()
 
-                # HANDLE NEW IMAGES FROM JS
                 new_images = request.POST.getlist('new_images')
                 for order, url in enumerate(new_images):
                     if url and url.startswith('http'):
@@ -215,7 +215,6 @@ def edit_listing(request, pk):
 
         if form.is_valid() and formset.is_valid():
             with transaction.atomic():
-                # 1. SAVE LISTING + VIDEO FIRST
                 listing = form.save(commit=False)
                 video_url = request.POST.get('video', '').strip()
 
@@ -230,30 +229,27 @@ def edit_listing(request, pk):
 
                 listing.save()
 
-                # 2. SAVE FORMSET FIRST - THIS CREATES deleted_objects
-                instances = formset.save(commit=False)
+                formset.save(commit=False)
 
-                # 3. HANDLE DELETE
                 for obj in formset.deleted_objects:
                     obj.delete()
 
-                # 4. HANDLE REPLACE - LOOP THROUGH FORMS
+                # FIX 3: SKIP EMPTY FORMS
                 for i, form_i in enumerate(formset.forms):
-                    if form_i in formset.deleted_forms: # skip deleted ones
+                    if form_i in formset.deleted_forms or not form_i.instance.pk:
                         continue
                     
                     instance = form_i.instance
                     cloud_url = request.POST.get(f'images-{i}-image')
                     
-                    if cloud_url and cloud_url.startswith('http') and instance.pk:
+                    if cloud_url and cloud_url.startswith('http'):
                         try:
                             result = urllib.request.urlretrieve(cloud_url)
                             filename = os.path.basename(cloud_url).split('?')[0] or f'img_{i}.jpg'
                             instance.image.save(filename, ContentFile(open(result[0], 'rb').read()), save=False)
-                            instance.save() # save after replacing
+                            instance.save()
                         except Exception as e: print("Replace error:", e)
 
-                # 5. HANDLE ADD NEW - from JS upload
                 for url in request.POST.getlist('new_images'):
                     if url and url.startswith('http'):
                         try:
@@ -273,7 +269,8 @@ def edit_listing(request, pk):
             print("FORMSET ERRORS:", formset.errors)
     else:
         form = ListingForm(instance=listing)
-        formset = ImageFormSet(instance=listing, prefix='images')
+        existing_images = ListingImage.objects.filter(listing=listing) # FIX 2
+        formset = ImageFormSet(instance=listing, prefix='images', queryset=existing_images) # FIX 2
 
     categories = Category.objects.all()
     return render(request, 'edit_listing.html', {
