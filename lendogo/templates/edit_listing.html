@@ -282,7 +282,7 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
   e.target.value = '';
 });
 
-// Single upload - REPLACE EXISTING PHOTO - FIXED: Don't destroy inputs
+// Single upload - REPLACE EXISTING PHOTO - FIX: Don't destroy the hidden inputs
 document.addEventListener('change', async e => {
     if(e.target.classList.contains('file-input') && e.target.files[0]){
         const compressedFile = await compressImage(e.target.files[0]);
@@ -291,21 +291,19 @@ document.addEventListener('change', async e => {
         const slotId = 'slot_' + slotIndex;
         slot.setAttribute('data-progress-id', slotId);
         const localUrl = URL.createObjectURL(compressedFile);
-        slot.querySelector('.photo-preview').src = localUrl;
+        slot.querySelector('.photo-preview').src = localUrl; // Only change src
         slot.classList.add('filled');
         updateProgressOverlay(slot, 0);
 
         const uploadPromise = uploadToCloudinary(compressedFile, 'image', slotId).then(cloudUrl => {
-          const deleteInput = slot.querySelector('input[name$="-DELETE"]');
-          const imageInput = slot.querySelector('input[name$="-image"]'); // This exists now
-
-          imageInput.value = cloudUrl; // Set the hidden input for Django
-          if(deleteInput) deleteInput.checked = false;
-
+          const imageInput = slot.querySelector('input[name$="-image"]');
+          imageInput.value = cloudUrl; // This is what formset.save() reads
+          slot.querySelector('input[name$="-DELETE"]').checked = false;
           slot.querySelector('.photo-preview').src = cloudUrl;
           slot.querySelector('.uploading-overlay')?.remove();
         }).catch(err => {
           slot.querySelector('.uploading-overlay').innerHTML = `Failed`;
+          console.error(err);
         });
         uploadPromises.push(uploadPromise);
     }
@@ -340,7 +338,7 @@ videoFileInput.addEventListener('change', async e => {
   }
 });
 
-// DELETE MODAL FOR PHOTOS - FIXED: Don't remove slot
+// DELETE MODAL FOR PHOTOS
 document.addEventListener('click', e => {
   if(e.target.closest('.change-btn')){ currentSlot = e.target.closest('.photo-slot'); currentAction = 'change'; document.getElementById('modalTitle').textContent = 'Change Photo'; document.getElementById('modalText').textContent = 'Replace this photo?'; confirmModal.show(); }
   if(e.target.closest('.slot-add-btn')) e.target.closest('.photo-slot').querySelector('.file-input').click();
@@ -350,7 +348,7 @@ document.addEventListener('click', e => {
 document.getElementById('confirmActionBtn').onclick = () => {
   if(currentAction === 'delete'){
     currentSlot.querySelector('input[name$="-DELETE"]').checked = true;
-    currentSlot.classList.add('deleted'); // Just gray it out, don't remove
+    currentSlot.classList.add('deleted');
     currentSlot.querySelector('.photo-actions').innerHTML = '<span class="badge bg-secondary">Will Delete</span>';
   }
   if(currentAction === 'change'){
