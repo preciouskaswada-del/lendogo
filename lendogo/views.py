@@ -224,35 +224,36 @@ def edit_listing(request, pk):
                         result = urllib.request.urlretrieve(video_url)
                         filename = f'video_{listing.id}_{int(time.time())}.mp4'
                         listing.video.save(filename, ContentFile(open(result[0], 'rb').read()), save=False)
-                    except: pass
+                    except Exception as e: print("Video error:", e)
                 elif video_url == '':
                     listing.video = None
 
-                listing.save() # SAVE HERE so it exists
+                listing.save()
 
-                # 2. HANDLE DELETE
+                # 2. SAVE FORMSET FIRST - THIS CREATES deleted_objects
+                instances = formset.save(commit=False)
+
+                # 3. HANDLE DELETE
                 for obj in formset.deleted_objects:
                     obj.delete()
 
-                # 3. HANDLE REPLACE - LOOP THROUGH FORMS NOT INSTANCES
+                # 4. HANDLE REPLACE - LOOP THROUGH FORMS
                 for i, form_i in enumerate(formset.forms):
-                    if form_i.cleaned_data.get('DELETE'):
+                    if form_i in formset.deleted_forms: # skip deleted ones
                         continue
                     
                     instance = form_i.instance
-                    cloud_url = request.POST.get(f'images-{i}-image') # FIX: use index not _prefix
+                    cloud_url = request.POST.get(f'images-{i}-image')
                     
-                    if cloud_url and cloud_url.startswith('http'):
+                    if cloud_url and cloud_url.startswith('http') and instance.pk:
                         try:
                             result = urllib.request.urlretrieve(cloud_url)
                             filename = os.path.basename(cloud_url).split('?')[0] or f'img_{i}.jpg'
                             instance.image.save(filename, ContentFile(open(result[0], 'rb').read()), save=False)
-                        except: pass
-                    
-                    if instance.pk: # only save existing
-                        instance.save()
+                            instance.save() # save after replacing
+                        except Exception as e: print("Replace error:", e)
 
-                # 4. HANDLE ADD NEW - from JS upload
+                # 5. HANDLE ADD NEW - from JS upload
                 for url in request.POST.getlist('new_images'):
                     if url and url.startswith('http'):
                         try:
@@ -262,7 +263,7 @@ def edit_listing(request, pk):
                                 listing=listing,
                                 image=ContentFile(open(result[0], 'rb').read(), name=filename)
                             )
-                        except: pass
+                        except Exception as e: print("New image error:", e)
 
             messages.success(request, 'Listing updated successfully!')
             return redirect('listing_detail', pk=listing.pk)
