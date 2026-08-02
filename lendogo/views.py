@@ -559,6 +559,28 @@ def dashboard(request):
         'stats': stats,
         'now': now
     })
+    
+@login_required
+def boost_listing(request, pk):
+    listing = get_object_or_404(Listing, pk=pk, seller=request.user)
+
+    if listing.status != 'ACTIVE':
+        messages.error(request, 'You can only boost active listings.')
+        return redirect('dashboard')
+
+    if listing.is_boosted and listing.boost_expiry > timezone.now():
+        messages.info(request, 'This listing is already boosted.')
+        return redirect('dashboard')
+
+    amount = 550
+    tx_ref = f"BOOST_{listing.id}_{uuid.uuid4().hex[:8]}"
+
+    request.session['boost_tx_ref'] = tx_ref
+    request.session['boost_listing_id'] = listing.id
+
+    checkout_url = f"https://checkout.paychangu.com/?amount={amount}&currency=MWK&email={request.user.email}&first_name={request.user.first_name}&tx_ref={tx_ref}&callback_url={request.build_absolute_uri('/boost/callback/')}&return_url={request.build_absolute_uri('/dashboard/')}&public_key={settings.PAYCHANGU_PUBLIC_KEY}"
+
+    return redirect(checkout_url)
 
 @csrf_exempt
 def paychangu_callback(request):
