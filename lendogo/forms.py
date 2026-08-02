@@ -11,7 +11,7 @@ from.models import Listing, ListingImage, RentalListing
 
 User = get_user_model()
 
-MAX_PRICE = Decimal('999.99')
+MAX_PRICE = Decimal('1000000000.00') # CHANGED: Now 1 Billion MWK
 MAX_VIDEO_SIZE = 50 * 1024 * 1024
 MAX_IMAGE_SIZE = 10 * 1024 * 1024
 ALLOWED_VIDEO_TYPES = {'video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska'}
@@ -306,7 +306,7 @@ class RentalListingForm(forms.ModelForm):
             if deposit < 0:
                 raise ValidationError("Deposit cannot be negative")
             if deposit > MAX_PRICE:
-                raise ValidationError("Deposit too large")
+                raise ValidationError(f"Deposit cannot exceed {MAX_PRICE:,.0f} MWK")
             return deposit.quantize(Decimal('0.01'))
         except InvalidOperation:
             raise ValidationError("Invalid deposit amount")
