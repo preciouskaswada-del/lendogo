@@ -130,7 +130,7 @@ def home(request):
     elif sort == 'near_me':
         # FIX: Added.user and fixed typo
         if request.user.is_authenticated and hasattr(request.user, 'userprofile') and request.user.userprofile.location:
-            all_listings = all_listings.filter(location=request.userprofile.location)
+            all_listings = all_listings.filter(location=request.user.userprofile.location)
     else:
         all_listings = all_listings.order_by('-is_boosted', '-bumped_at', '-id')
 
@@ -551,7 +551,7 @@ def dashboard(request):
         'sold_today': sold_today,
         'sold_yesterday': sold_yesterday,
         'sold_this_week': sold_this_week,
-        'is_verified': request.userprofile.is_verified,
+        'is_verified': profile.is_verified if profile else False,
     }
 
     return render(request, 'dashboard.html', {
