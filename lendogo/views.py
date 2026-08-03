@@ -1,13 +1,13 @@
 import os
 from dotenv import load_dotenv
 
-from django.forms import inlineformset_factory
-from.forms import ListingForm, ListingImageForm, SignUpForm
+from django.forms import inlineformset_factory, modelformset_factory
+from .forms import ListingForm, ListingImageForm, SignUpForm
 from django.contrib.auth.forms import AuthenticationForm
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, authenticate, get_user_model
 from django.contrib.auth.decorators import login_required
-from.models import Listing, ListingImage, RentalListing, ListingView, WhatsAppClick, UserProfile, Category
+from .models import Listing, ListingImage, RentalListing, ListingView, WhatsAppClick, UserProfile, Category
 from django.db.models import Q, Count, Sum, F
 from urllib.parse import urlencode
 from django.contrib import messages
@@ -35,7 +35,6 @@ from PIL import Image, ExifTags # PATCH 1
 from io import BytesIO # PATCH 1
 from django.core.files.uploadedfile import InMemoryUploadedFile # PATCH 1
 import sys # PATCH 1
-
 load_dotenv()
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
