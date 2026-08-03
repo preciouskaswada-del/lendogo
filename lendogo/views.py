@@ -273,10 +273,10 @@ def mark_as_sold(request, pk):
 
     messages.success(request, f'{listing.product} marked as sold! This helps improve market prices for everyone.')
     return redirect('dashboard')
-
 @login_required
 def edit_listing(request, pk):
     listing = get_object_or_404(Listing, pk=pk, seller=request.user)
+    
     if request.method == 'POST':
         # PATCH 3: Fix image orientation before processing
         fixed_files = {}
@@ -288,7 +288,6 @@ def edit_listing(request, pk):
         request.FILES.clear()
         for k, v in fixed_files.items():
             request.FILES[k] = v
-        # END PATCH 3
 
         form = ListingForm(request.POST, request.FILES, instance=listing)
         formset = ImageFormSet(request.POST, request.FILES, instance=listing)
@@ -299,37 +298,39 @@ def edit_listing(request, pk):
                 listing.save()
                 form.save_m2m()
 
-                # FIX 3: Also handle Cloudinary URLs on edit
-                image_urls_json = request.POST.get('image_urls', '[]')
-                video_url = request.POST.get('video_url', '')
-                try:
-                    image_urls = json.loads(image_urls_json)
-                except:
-                    image_urls = []
+                # 1. SAVE FORMSET FIRST - handles deletes
+                formset.save()
 
-                # FIX 1: DON'T DELETE ALL. ONLY SYNC DIFFERENCES
-                existing_urls = set(listing.images.values_list('image', flat=True))
-                new_urls = set([u for u in image_urls if u])
+                # 2. HANDLE NEW CLOUDINARY UPLOADS FROM JS
+                new_images = request.POST.getlist('new_images')
+                for img_url in new_images:
+                    if img_url:
+                        ListingPhoto.objects.create(
+                            listing=listing,
+                            image=img_url
+                        )
 
-                # Delete images that were removed
-                for img in listing.images.all():
-                    if img.image not in new_urls:
-                        img.delete()
+                # 3. HANDLE REPLACED PHOTOS
+                for img_form in formset.forms:
+                    if img_form.instance.pk:
+                        cloud_url = request.POST.get(img_form.prefix + '-image')
+                        if cloud_url and cloud_url.startswith('https://'):
+                            photo = img_form.instance
+                            photo.image = cloud_url
+                            photo.save()
 
-                # Add new images
-                for url in new_urls - existing_urls:
-                    if url:
-                        ListingImage.objects.create(listing=listing, image=url)
-                # END FIX 1
-
-                if video_url and hasattr(listing, 'video'):
+                # 4. HANDLE VIDEO
+                video_url = request.POST.get('video', '')
+                if hasattr(listing, 'video'):
                     listing.video = video_url
                     listing.save(update_fields=['video'])
 
-                formset.save()
-
-            messages.success(request, 'Listing updated')
+            messages.success(request, 'Listing updated successfully')
             return redirect('dashboard')
+        
+        else:
+            messages.error(request, 'Please fix the errors below')
+
     else:
         form = ListingForm(instance=listing)
         formset = ImageFormSet(instance=listing)
@@ -341,7 +342,6 @@ def edit_listing(request, pk):
         'listing': listing,
         'categories': categories
     })
-
 # FIX 4: MANUAL BOOST FOR FRIENDS/ADMIN
 @login_required
 def manual_boost(request, pk):
