@@ -49,6 +49,15 @@ input[name$="-DELETE"] { display: none!important; }
 
   <form method="POST" enctype="multipart/form-data" id="editForm">
     {% csrf_token %}
+    
+    {% if form.errors or formset.errors %}
+    <div class="alert alert-danger mb-3">
+      <strong>Please fix these errors:</strong>
+      {{ form.errors }}
+      {{ formset.errors }}
+    </div>
+    {% endif %}
+
     <div class="form-card">
 
       <div class="form-section">
@@ -75,6 +84,14 @@ input[name$="-DELETE"] { display: none!important; }
           {{ form.description }}
           {% if form.description.errors %}<div class="text-danger small">{{ form.description.errors }}</div>{% endif %}
         </div>
+
+        <!-- ADDED CATEGORY FIELD -->
+        <div class="mt-3">
+          <label class="form-label fw-medium">Category</label>
+          {{ form.category }}
+          {% if form.category.errors %}<div class="text-danger small">{{ form.category.errors }}</div>{% endif %}
+        </div>
+
       </div>
 
       <div class="form-section">
@@ -100,7 +117,8 @@ input[name$="-DELETE"] { display: none!important; }
             {{ img_form.DELETE }}
             <input type="file" accept="image/*" class="file-input">
 
-            <img src="{{ img_form.instance.image.url }}" class="photo-preview" alt="Listing photo"> {# FIX:.url #}
+            <!-- FIXED: removed.url because we use URLField for Cloudinary -->
+            <img src="{{ img_form.instance.image }}" class="photo-preview" alt="Listing photo">
             <div class="photo-actions">
               <button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button>
               <button type="button" class="btn btn-sm btn-danger delete-btn" title="Delete"><i class="bi bi-trash"></i></button>
@@ -281,16 +299,6 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
     uploadPromises.push(uploadPromise);
   }
   e.target.value = '';
-});
-
-// CLICK EMPTY SLOT TO ADD
-document.addEventListener('click', e => {
-  if(e.target.closest('.slot-add-btn')){ 
-    const slot = e.target.closest('.photo-slot');
-    const input = slot.querySelector('.file-input');
-    input.dataset.mode = 'new';
-    input.click(); 
-  }
 });
 
 // CLICK ARROW TO REPLACE
