@@ -534,6 +534,9 @@ def dashboard(request):
     sold_yesterday = sold_listings.filter(updated_at__date=yesterday).count()
     sold_this_week = sold_listings.filter(updated_at__gte=week_ago).count()
 
+    # ADD THIS LINE HERE 👇 This creates/fetches the profile
+    profile, created = UserProfile.objects.get_or_create(user=request.user)
+
     stats = {
         'total_listings': user_listings.count(),
         'active_listings': active_listings.count(),
