@@ -278,6 +278,14 @@ def mark_as_sold(request, pk):
 def edit_listing(request, pk):
     listing = get_object_or_404(Listing, pk=pk, seller=request.user)
     
+    # FIX: extra=0 so we don't get 4 empty forms = no 'id required' error
+    ImageFormSet = modelformset_factory(
+        ListingImage, 
+        fields=['image'], 
+        extra=0,
+        can_delete=True
+    )
+    
     if request.method == 'POST':
         # PATCH 3: Fix image orientation before processing
         fixed_files = {}
@@ -291,13 +299,12 @@ def edit_listing(request, pk):
             request.FILES[k] = v
 
         form = ListingForm(request.POST, request.FILES, instance=listing)
-        formset = ImageFormSet(request.POST, request.FILES, instance=listing)
+        # FIX: Use queryset= not instance= for modelformset
+        formset = ImageFormSet(request.POST, request.FILES, queryset=listing.images.all())
 
         if form.is_valid() and formset.is_valid():
             with transaction.atomic():
-                listing = form.save(commit=False)
-                listing.save()
-                form.save_m2m()
+                listing = form.save()
 
                 # 1. SAVE FORMSET FIRST - handles deletes
                 formset.save()
@@ -332,11 +339,14 @@ def edit_listing(request, pk):
             return redirect('dashboard')
         
         else:
+            print("FORM ERRORS:", form.errors)
+            print("FORMSET ERRORS:", formset.errors)
             messages.error(request, 'Please fix the errors below')
 
     else:
         form = ListingForm(instance=listing)
-        formset = ImageFormSet(instance=listing)
+        # FIX: Use queryset= here too
+        formset = ImageFormSet(queryset=listing.images.all())
 
     categories = Category.objects.all()
     return render(request, 'edit.html', {
