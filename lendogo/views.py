@@ -273,6 +273,7 @@ def mark_as_sold(request, pk):
 
     messages.success(request, f'{listing.product} marked as sold! This helps improve market prices for everyone.')
     return redirect('dashboard')
+
 @login_required
 def edit_listing(request, pk):
     listing = get_object_or_404(Listing, pk=pk, seller=request.user)
@@ -303,11 +304,13 @@ def edit_listing(request, pk):
 
                 # 2. HANDLE NEW CLOUDINARY UPLOADS FROM JS
                 new_images = request.POST.getlist('new_images')
-                for img_url in new_images:
+                max_order = listing.images.aggregate(models.Max('order'))['order__max'] or 0
+                for i, img_url in enumerate(new_images):
                     if img_url:
-                        ListingPhoto.objects.create(
+                        ListingImage.objects.create(
                             listing=listing,
-                            image=img_url
+                            image=img_url,
+                            order=max_order + i + 1
                         )
 
                 # 3. HANDLE REPLACED PHOTOS
@@ -342,6 +345,7 @@ def edit_listing(request, pk):
         'listing': listing,
         'categories': categories
     })
+
 # FIX 4: MANUAL BOOST FOR FRIENDS/ADMIN
 @login_required
 def manual_boost(request, pk):
