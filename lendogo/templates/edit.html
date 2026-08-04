@@ -107,16 +107,15 @@ input[name$="-id"] { position: absolute; left: -9999px; }
 
         <div class="photo-grid" id="photoGrid">
           {% for img_form in formset %}
-          {% if img_form.instance.pk and img_form.instance.image %}
+          {# KEY FIX: Only render if there is a real image with a URL #}
+          {% if img_form.instance.pk and img_form.instance.image and img_form.instance.image.url %}
           <div class="photo-slot filled {% if img_form.DELETE.value %}deleted{% endif %}" data-index="{{ forloop.counter0 }}">
             {{ img_form.id }}
             {{ img_form.image }}
             {{ img_form.DELETE }}
             <input type="file" accept="image/*" class="file-input">
 
-            {% if img_form.instance.image %}
-              <img src="{{ img_form.instance.image.url }}" class="photo-preview" alt="Listing photo" onerror="this.src='https://placehold.co/400x400/e5e7eb/6b7280?text=No+Image'">
-            {% endif %}
+            <img src="{{ img_form.instance.image.url }}" class="photo-preview" alt="Listing photo">
 
             {% if img_form.DELETE.value %}
               <div class="photo-actions">
