@@ -31,6 +31,7 @@ input[name$="-id"] { position: absolute; left: -9999px; }
 .sticky-footer { position: sticky; bottom: 0; background: white; border-top: 1px solid #e5e7eb; padding: 16px 24px; margin: 0 -24px -24px; border-radius: 0 0 16px 16px; z-index: 10; }
 .btn-primary { background: #2563eb; border: none; }
 .btn-primary:disabled,.btn-primary.disabled { background: #93c5fd; cursor: not-allowed; pointer-events: none; }
+.d-none { display: none!important; }
 </style>
 {% endblock %}
 
@@ -100,35 +101,31 @@ input[name$="-id"] { position: absolute; left: -9999px; }
         <h3 class="section-title">Photos <span class="text-muted fw-normal fs-6">Up to 10</span></h3>
         
         {{ formset.management_form }}
-        <input type="hidden" name="form-TOTAL_FORMS" value="{{ formset.total_form_count }}">
-        <input type="hidden" name="form-INITIAL_FORMS" value="{{ formset.initial_form_count }}">
-        <input type="hidden" name="form-MIN_NUM_FORMS" value="0">
-        <input type="hidden" name="form-MAX_NUM_FORMS" value="1000">
 
         <div class="photo-grid" id="photoGrid">
           {% for img_form in formset %}
-          {# KEY FIX: Only render if there is a real image with a URL #}
-          {% if img_form.instance.pk and img_form.instance.image and img_form.instance.image.url %}
-          <div class="photo-slot filled {% if img_form.DELETE.value %}deleted{% endif %}" data-index="{{ forloop.counter0 }}">
+          {# Always render the form, but hide if no image using d-none #}
+          <div class="photo-slot {% if img_form.instance.pk and img_form.instance.image and img_form.instance.image.url %}filled{% else %}d-none{% endif %} {% if img_form.DELETE.value %}deleted{% endif %}" data-index="{{ forloop.counter0 }}">
             {{ img_form.id }}
             {{ img_form.image }}
             {{ img_form.DELETE }}
             <input type="file" accept="image/*" class="file-input">
 
-            <img src="{{ img_form.instance.image.url }}" class="photo-preview" alt="Listing photo">
+            {% if img_form.instance.pk and img_form.instance.image and img_form.instance.image.url %}
+              <img src="{{ img_form.instance.image.url }}" class="photo-preview" alt="Listing photo">
 
-            {% if img_form.DELETE.value %}
-              <div class="photo-actions">
-                <span class="badge bg-secondary">Will Delete</span>
-              </div>
-            {% else %}
-              <div class="photo-actions">
-                <button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button>
-                <button type="button" class="btn btn-sm btn-danger delete-btn" title="Delete"><i class="bi bi-trash"></i></button>
-              </div>
+              {% if img_form.DELETE.value %}
+                <div class="photo-actions">
+                  <span class="badge bg-secondary">Will Delete</span>
+                </div>
+              {% else %}
+                <div class="photo-actions">
+                  <button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button>
+                  <button type="button" class="btn btn-sm btn-danger delete-btn" title="Delete"><i class="bi bi-trash"></i></button>
+                </div>
+              {% endif %}
             {% endif %}
           </div>
-          {% endif %}
           {% endfor %}
 
           <div class="photo-slot" id="addPhotoBtn">
@@ -345,7 +342,7 @@ document.addEventListener('change', async e => {
           slot.prepend(img);
         }
         img.src = localUrl;
-        slot.classList.remove('deleted');
+        slot.classList.remove('deleted', 'd-none');
         slot.classList.add('filled');
         updateProgressOverlay(slot, 0);
         const uploadPromise = uploadToCloudinary(file, 'image', slotId).then(cloudUrl => {
