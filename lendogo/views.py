@@ -9,6 +9,7 @@ from django.contrib.auth import login, logout, authenticate, get_user_model
 from django.contrib.auth.decorators import login_required
 from .models import Listing, ListingImage, RentalListing, ListingView, WhatsAppClick, UserProfile, Category
 from django.db.models import Q, Count, Sum, F
+from django.db import models, transaction
 from urllib.parse import urlencode
 from django.contrib import messages
 from django.core.mail import send_mail
@@ -24,7 +25,6 @@ import json
 from django.views.decorators.http import require_POST, require_GET
 from django.core.files.storage import default_storage
 from decimal import Decimal, InvalidOperation
-from django.db import transaction
 from payments.airtel import initiate_airtel_payment
 import uuid
 import re
