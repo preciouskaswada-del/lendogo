@@ -298,8 +298,8 @@ def edit_listing(request, pk):
             request.FILES[k] = v
 
         form = ListingForm(request.POST, request.FILES, instance=listing)
-        # FIX: Use queryset= not instance= for modelformset
-        formset = ImageFormSet(request.POST, request.FILES, queryset=listing.images.all())
+        # FIX: Add prefix='form' to match template management_form
+        formset = ImageFormSet(request.POST, request.FILES, queryset=listing.images.all(), prefix='form')
 
         if form.is_valid() and formset.is_valid():
             with transaction.atomic():
@@ -344,8 +344,8 @@ def edit_listing(request, pk):
 
     else:
         form = ListingForm(instance=listing)
-        # FIX: Use queryset= here too
-        formset = ImageFormSet(queryset=listing.images.all())
+        # FIX: Add prefix='form' here too
+        formset = ImageFormSet(queryset=listing.images.all(), prefix='form')
 
     categories = Category.objects.all()
     return render(request, 'edit.html', {
