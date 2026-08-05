@@ -277,11 +277,12 @@ def mark_as_sold(request, pk):
 def edit_listing(request, pk):
     listing = get_object_or_404(Listing, pk=pk, seller=request.user)
     
-    # FIX: extra=0 so we don't get 4 empty forms = no 'id required' error
+    # KEY FIX: extra=0 so Django doesn't create empty forms
     ImageFormSet = modelformset_factory(
         ListingImage, 
         fields=['image'], 
         extra=0,
+        max_num=10,
         can_delete=True
     )
     
@@ -298,7 +299,7 @@ def edit_listing(request, pk):
             request.FILES[k] = v
 
         form = ListingForm(request.POST, request.FILES, instance=listing)
-        # FIX: Add prefix='form' to match template management_form
+        # KEY FIX: Add prefix='form' to match template
         formset = ImageFormSet(request.POST, request.FILES, queryset=listing.images.all(), prefix='form')
 
         if form.is_valid() and formset.is_valid():
@@ -344,7 +345,7 @@ def edit_listing(request, pk):
 
     else:
         form = ListingForm(instance=listing)
-        # FIX: Add prefix='form' here too
+        # KEY FIX: Add prefix='form' here too
         formset = ImageFormSet(queryset=listing.images.all(), prefix='form')
 
     categories = Category.objects.all()
