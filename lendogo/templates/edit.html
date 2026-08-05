@@ -30,9 +30,9 @@ input[name$="-id"] { position: absolute; left: -9999px; }
 .uploading-overlay { position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.75); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 18px; z-index: 5; border-radius: 12px; flex-direction: column; }
 .sticky-footer { position: sticky; bottom: 0; background: white; border-top: 1px solid #e5e7eb; padding: 16px 24px; margin: 0 -24px -24px; border-radius: 0 0 16px 16px; z-index: 10; }
 .btn-primary { background: #2563eb; border: none; }
-.btn-primary:disabled,.btn-primary.disabled { background: #93c5fd; cursor: not-allowed; pointer-events: none; }
+.btn-primary:disabled,.btn-primary.disabled { background: #93c5fd; cursor: not-allowed; }
 .d-none { display: none!important; }
-#savingOverlay { pointer-events: auto; }
+#savingOverlay { pointer-events: none; } /* So it doesn't block */
 </style>
 {% endblock %}
 
@@ -175,16 +175,18 @@ input[name$="-id"] { position: absolute; left: -9999px; }
   </form>
 </div>
 
-<!-- FULL SCREEN SAVING LOADER -->
+<!-- FULL SCREEN SPINNER LOADER -->
 <div id="savingOverlay" class="d-none" style="
   position: fixed; top: 0; left: 0; right: 0; bottom: 0; 
-  background: rgba(0,0,0,0.8); z-index: 9999; 
+  background: rgba(0,0,0,0.85); z-index: 9999; 
   display: flex; align-items: center; justify-content: center; 
   flex-direction: column; color: white;
 ">
-  <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
-  <h4 class="mt-3" id="savingTitle">Saving Changes...</h4>
-  <p class="text-center px-4" id="savingTip">Finishing uploads and updating your listing</p>
+  <div class="spinner-border text-primary mb-3" style="width: 4rem; height: 4rem;" role="status">
+    <span class="visually-hidden">Loading...</span>
+  </div>
+  <h4 id="savingTitle">Saving Changes...</h4>
+  <p class="text-center px-4" id="savingTip">Finishing uploads</p>
 </div>
 
 
@@ -235,9 +237,9 @@ let uploadPromises = [];
 
 document.querySelectorAll('input[type="text"], input[type="number"], textarea, select').forEach(el => el.classList.add('form-control'));
 
-// FIX: Button is never disabled by uploads
 function setUploading(change){
   activeUploads += change;
+  if(activeUploads < 0) activeUploads = 0;
   const btn = document.getElementById('postBtn');
   btn.innerHTML = activeUploads > 0? '<span class="spinner-border spinner-border-sm"></span> Uploading...' : '<i class="bi bi-check-lg"></i> Save Changes';
 }
@@ -291,11 +293,11 @@ async function uploadToCloudinary(file, type = 'image', slotId = 'default') {
     };
     xhr.onload = () => {
       const data = JSON.parse(xhr.responseText);
-      setUploading(-1); // Always decrease counter
+      setUploading(-1);
       if (data.secure_url) resolve(data.secure_url);
       else reject(new Error(data.error?.message || 'Upload failed'));
     };
-    xhr.onerror = () => { setUploading(-1); reject(new Error('Network error')); }; // Always decrease
+    xhr.onerror = () => { setUploading(-1); reject(new Error('Network error')); };
     xhr.send(formData);
   });
 }
@@ -322,7 +324,7 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
       slot.querySelector('.uploading-overlay')?.remove();
     }).catch(err => {
       console.error(err);
-      setUploading(-1); // Safety
+      setUploading(-1);
       slot.querySelector('.uploading-overlay').innerHTML = `Failed`;
     });
     uploadPromises.push(uploadPromise);
@@ -448,34 +450,48 @@ document.getElementById('confirmVideoRemoveBtn').onclick = () => {
   videoConfirmModal.hide();
 }
 
-// FINAL: Submit with loader
-const tips = ["Optimizing your photos...", "Updating your listing...", "Almost done!"];
+// FIX 1 + 2: SPINNER + FORCE REDIRECT
+const tips = ["Compressing media...", "Uploading to Cloud...", "Updating listing...", "Almost done!"];
 let tipInterval;
 
 document.getElementById('editForm').addEventListener('submit', async e => {
   e.preventDefault();
+  const form = e.target;
   const btn = document.getElementById('postBtn');
   const overlay = document.getElementById('savingOverlay');
   
   btn.disabled = true;
-  overlay.classList.remove('d-none');
+  overlay.classList.remove('d-none'); // SHOW BIG SPINNER
 
   let i = 0;
   tipInterval = setInterval(() => {
     document.getElementById('savingTip').innerText = tips[i++ % tips.length];
-  }, 1500);
+  }, 1200);
 
   try{
+    // Wait for uploads with 15s timeout
     if(uploadPromises.length > 0 && activeUploads > 0){
-      await Promise.all(uploadPromises);
+      await Promise.race([
+        Promise.all(uploadPromises),
+        new Promise(r => setTimeout(r, 15000))
+      ]);
     }
+    
     clearInterval(tipInterval);
-    e.target.submit(); // This should redirect now
+    document.getElementById('savingTitle').innerText = "Finalizing...";
+    
+    // KEY FIX: requestSubmit forces the browser to submit
+    setTimeout(() => {
+      form.requestSubmit(); 
+    }, 300);
+    
   } catch(err){
     clearInterval(tipInterval);
     overlay.classList.add('d-none');
     btn.disabled = false;
-    alert('Error: ' + err.message);
+    console.error(err);
+    alert('Slow network. Submitting now...');
+    form.requestSubmit();
   }
 });
 </script>
