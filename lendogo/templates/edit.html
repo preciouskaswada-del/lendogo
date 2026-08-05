@@ -32,7 +32,7 @@ input[name$="-id"] { position: absolute; left: -9999px; }
 .btn-primary { background: #2563eb; border: none; }
 .btn-primary:disabled,.btn-primary.disabled { background: #93c5fd; cursor: not-allowed; }
 .d-none { display: none!important; }
-#savingOverlay { pointer-events: none; } /* So it doesn't block */
+#savingOverlay { pointer-events: auto; } /* CHANGED: was none */
 </style>
 {% endblock %}
 
@@ -450,7 +450,7 @@ document.getElementById('confirmVideoRemoveBtn').onclick = () => {
   videoConfirmModal.hide();
 }
 
-// FIX 1 + 2: SPINNER + FORCE REDIRECT
+// FINAL WORKING SUBMIT
 const tips = ["Compressing media...", "Uploading to Cloud...", "Updating listing...", "Almost done!"];
 let tipInterval;
 
@@ -459,39 +459,45 @@ document.getElementById('editForm').addEventListener('submit', async e => {
   const form = e.target;
   const btn = document.getElementById('postBtn');
   const overlay = document.getElementById('savingOverlay');
-  
+
   btn.disabled = true;
-  overlay.classList.remove('d-none'); // SHOW BIG SPINNER
+  overlay.classList.remove('d-none'); // SHOW SPINNER
+  
+  await new Promise(r => setTimeout(r, 100)); // Force paint
 
   let i = 0;
   tipInterval = setInterval(() => {
     document.getElementById('savingTip').innerText = tips[i++ % tips.length];
   }, 1200);
 
+  let startTime = Date.now();
+
   try{
-    // Wait for uploads with 15s timeout
-    if(uploadPromises.length > 0 && activeUploads > 0){
-      await Promise.race([
-        Promise.all(uploadPromises),
-        new Promise(r => setTimeout(r, 15000))
-      ]);
+    if(uploadPromises.length > 0){
+      await Promise.race([Promise.all(uploadPromises), new Promise(r => setTimeout(r, 15000))]);
     }
-    
+
+    // Ensure spinner shows at least 800ms
+    let elapsed = Date.now() - startTime;
+    if(elapsed < 800) await new Promise(r => setTimeout(r, 800 - elapsed));
+
     clearInterval(tipInterval);
     document.getElementById('savingTitle').innerText = "Finalizing...";
-    
-    // KEY FIX: requestSubmit forces the browser to submit
-    setTimeout(() => {
-      form.requestSubmit(); 
-    }, 300);
-    
+    await new Promise(r => setTimeout(r, 300));
+
+    // BULLETPROOF SUBMIT: create real button and click it
+    const fakeBtn = document.createElement('button');
+    fakeBtn.type = 'submit';
+    fakeBtn.style.display = 'none';
+    form.appendChild(fakeBtn);
+    fakeBtn.click();
+    fakeBtn.remove();
+
   } catch(err){
     clearInterval(tipInterval);
     overlay.classList.add('d-none');
     btn.disabled = false;
     console.error(err);
-    alert('Slow network. Submitting now...');
-    form.requestSubmit();
   }
 });
 </script>
