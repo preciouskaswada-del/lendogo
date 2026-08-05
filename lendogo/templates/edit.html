@@ -27,7 +27,7 @@ input[name$="-id"] { position: absolute; left: -9999px; }
 .add-card:hover { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
 .add-card i { font-size: 22px; }
 .photo-actions { position: absolute; top: 6px; right: 6px; display: flex; gap: 4px; background: rgba(0,0,0,0.6); padding: 3px; border-radius: 8px; z-index: 10; }
-.uploading-overlay { position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.75); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 18px; z-index: 5; border-radius: 12px; flex-direction: column; }
+.uploading-overlay { position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.75); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; z-index: 5; border-radius: 12px; flex-direction: column; }
 .sticky-footer { position: sticky; bottom: 0; background: white; border-top: 1px solid #e5e7eb; padding: 16px 24px; margin: 0 -24px -24px; border-radius: 0 0 16px 16px; z-index: 10; }
 .btn-primary { background: #2563eb; border: none; }
 .btn-primary:disabled,.btn-primary.disabled { background: #93c5fd; cursor: not-allowed; }
@@ -211,18 +211,35 @@ async function uploadToCloudinary(file, type = 'image') {
 .catch(() => null);
 }
 
-// PHOTO UPLOAD
+// PHOTO UPLOAD WITH PREVIEW
 document.getElementById('addPhotoBtn').addEventListener('click', () => document.getElementById('multiFileInput').click());
+
 document.getElementById('multiFileInput').addEventListener('change', async e => {
   if(!e.target.files[0]) return;
   const file = e.target.files[0];
-  compressImage(file).then(c => uploadToCloudinary(c, 'image')).then(cloudUrl => {
+
+  // 1. SHOW PREVIEW INSTANTLY
+  const localUrl = URL.createObjectURL(file);
+  const slot = document.createElement('div');
+  slot.className = 'photo-slot filled';
+  slot.innerHTML = `<img src="${localUrl}" class="photo-preview"><div class="uploading-overlay">Uploading...<div class="spinner-border spinner-border-sm mt-2"></div></div>`;
+  document.getElementById('photoGrid').insertBefore(slot, document.getElementById('addPhotoBtn'));
+
+  // 2. UPLOAD IN BACKGROUND
+  const job = compressImage(file).then(c => uploadToCloudinary(c, 'image')).then(cloudUrl => {
+      slot.querySelector('.uploading-overlay')?.remove();
       if(cloudUrl) {
+        slot.querySelector('img').src = cloudUrl; // replace with cloud url
         const hiddenInput = document.createElement('input');
         hiddenInput.type = 'hidden'; hiddenInput.name = 'new_images'; hiddenInput.value = cloudUrl;
         document.getElementById('newImageUrls').appendChild(hiddenInput);
+      } else {
+        slot.remove();
+        alert("Upload failed. Try a smaller photo.");
       }
+      URL.revokeObjectURL(localUrl);
   });
+  uploadPromises.push(job);
   e.target.value = '';
 });
 
@@ -233,8 +250,15 @@ document.addEventListener('click', e => { if(e.target.id === 'changeVideoBtn') v
 videoFileInput.addEventListener('change', async e => {
   if (e.target.files[0]) {
     const file = e.target.files[0];
+    document.getElementById('videoUploadArea')?.classList.add('d-none');
+    document.getElementById('videoPreview').classList.remove('d-none');
+    document.getElementById('videoPreview').innerHTML = `<div class="spinner-border"></div><p>Uploading...</p>`;
+
     uploadToCloudinary(file, 'video').then(cloudUrl => {
-      if(cloudUrl) document.getElementById('videoUrlInput').value = cloudUrl;
+      if(cloudUrl) {
+        document.getElementById('videoUrlInput').value = cloudUrl;
+        document.getElementById('videoPreview').innerHTML = `<video src="${cloudUrl}" controls class="w-100 rounded" style="max-height:300px;"></video><div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button><button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn"><i class="bi bi-trash"></i> Remove</button></div>`;
+      }
     });
     e.target.value = '';
   }
@@ -247,7 +271,7 @@ document.addEventListener('click', e => { if(e.target.id === 'removeVideoBtn'){
   document.getElementById('videoUploadArea')?.classList.remove('d-none');
 }});
 
-// KEY FIX: SUBMIT NORMALLY AFTER 3S
+// SUBMIT
 document.getElementById('editForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   const form = this;
@@ -256,13 +280,11 @@ document.getElementById('editForm').addEventListener('submit', async function(e)
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
 
-  // Wait 3 seconds max for uploads, then submit anyway
   await Promise.race([
       Promise.all(uploadPromises),
       new Promise(r => setTimeout(r, 3000))
   ]);
 
-  // Submit normally so Django redirect('dashboard') works
   form.submit();
 });
 </script>
