@@ -32,6 +32,7 @@ input[name$="-id"] { position: absolute; left: -9999px; }
 .btn-primary { background: #2563eb; border: none; }
 .btn-primary:disabled,.btn-primary.disabled { background: #93c5fd; cursor: not-allowed; pointer-events: none; }
 .d-none { display: none!important; }
+#savingOverlay { pointer-events: auto; }
 </style>
 {% endblock %}
 
@@ -234,7 +235,7 @@ let uploadPromises = [];
 
 document.querySelectorAll('input[type="text"], input[type="number"], textarea, select').forEach(el => el.classList.add('form-control'));
 
-// CHANGED: Don't disable button while uploading
+// FIX: Button is never disabled by uploads
 function setUploading(change){
   activeUploads += change;
   const btn = document.getElementById('postBtn');
@@ -289,12 +290,12 @@ async function uploadToCloudinary(file, type = 'image', slotId = 'default') {
         }
     };
     xhr.onload = () => {
-      setUploading(-1);
       const data = JSON.parse(xhr.responseText);
+      setUploading(-1); // Always decrease counter
       if (data.secure_url) resolve(data.secure_url);
       else reject(new Error(data.error?.message || 'Upload failed'));
     };
-    xhr.onerror = () => { setUploading(-1); reject(new Error('Network error')); };
+    xhr.onerror = () => { setUploading(-1); reject(new Error('Network error')); }; // Always decrease
     xhr.send(formData);
   });
 }
@@ -321,6 +322,7 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
       slot.querySelector('.uploading-overlay')?.remove();
     }).catch(err => {
       console.error(err);
+      setUploading(-1); // Safety
       slot.querySelector('.uploading-overlay').innerHTML = `Failed`;
     });
     uploadPromises.push(uploadPromise);
@@ -402,6 +404,7 @@ document.addEventListener('change', async e => {
           delete e.target.dataset.mode;
         }).catch(err => {
           console.error(err);
+          setUploading(-1);
           slot.querySelector('.uploading-overlay').innerHTML = `Failed`;
         });
         uploadPromises.push(uploadPromise);
@@ -427,6 +430,7 @@ videoFileInput.addEventListener('change', async e => {
       document.getElementById('videoPreview').innerHTML = `<video src="${cloudUrl}" controls class="w-100 rounded" style="max-height:300px;"></video><div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button><button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn"><i class="bi bi-trash"></i> Remove</button></div>`;
       videoSlot.querySelector('.uploading-overlay')?.remove();
     }).catch(err => {
+      setUploading(-1);
       alert("Upload failed");
       document.getElementById('videoPreview').classList.add('d-none');
       document.getElementById('videoUploadArea')?.classList.remove('d-none');
@@ -444,34 +448,34 @@ document.getElementById('confirmVideoRemoveBtn').onclick = () => {
   videoConfirmModal.hide();
 }
 
-// FINAL FIX: Full screen loader + wait for uploads then submit
+// FINAL: Submit with loader
 const tips = ["Optimizing your photos...", "Updating your listing...", "Almost done!"];
 let tipInterval;
 
 document.getElementById('editForm').addEventListener('submit', async e => {
-  e.preventDefault(); // Always prevent
+  e.preventDefault();
   const btn = document.getElementById('postBtn');
   const overlay = document.getElementById('savingOverlay');
   
   btn.disabled = true;
-  overlay.classList.remove('d-none'); // SHOW LOADER
+  overlay.classList.remove('d-none');
 
-  // Rotate tips so user doesn't get bored
   let i = 0;
   tipInterval = setInterval(() => {
     document.getElementById('savingTip').innerText = tips[i++ % tips.length];
   }, 1500);
 
   try{
-    if(uploadPromises.length > 0){
+    if(uploadPromises.length > 0 && activeUploads > 0){
       await Promise.all(uploadPromises);
     }
-    e.target.submit(); // Submit instantly after uploads
+    clearInterval(tipInterval);
+    e.target.submit(); // This should redirect now
   } catch(err){
     clearInterval(tipInterval);
     overlay.classList.add('d-none');
     btn.disabled = false;
-    alert('Something went wrong. Please try again.');
+    alert('Error: ' + err.message);
   }
 });
 </script>
