@@ -11,7 +11,7 @@ from.models import Listing, ListingImage, RentalListing
 
 User = get_user_model()
 
-MAX_PRICE = Decimal('1000000000.00') # CHANGED: Now 1 Billion MWK
+MAX_PRICE = Decimal('1000000.00') # CHANGED: Now 1 Billion MWK
 MAX_VIDEO_SIZE = 50 * 1024 * 1024
 MAX_IMAGE_SIZE = 10 * 1024 * 1024
 ALLOWED_VIDEO_TYPES = {'video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska'}
@@ -165,9 +165,9 @@ class ListingImageForm(forms.ModelForm):
             })
         }
 
-    def __init__(self, *args, **kwargs): # <-- ADDED THIS
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['image'].required = False # <-- ADDED THIS: KEY FIX
+        self.fields['image'].required = False # KEY FIX: allows empty hidden fields
 
     def clean_image(self):
         image = self.cleaned_data.get('image')
@@ -372,4 +372,5 @@ ImageFormSet = inlineformset_factory(
     max_num=10,
     can_delete=True,
     can_delete_extra=False,
-    fields=('image',)
+    fields=('image',) 
+) 
