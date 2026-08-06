@@ -54,7 +54,7 @@ input[name$="-id"] { position: absolute; left: -9999px; }
     {% endfor %}
   {% endif %}
 
-  <form method="POST" enctype="multipart/form-data" id="editForm">
+  <form method="POST" enctype="multipart/form-data" id="editForm" novalidate> <!-- ADDED novalidate -->
     {% csrf_token %}
 
     {% if form.errors or formset.errors %}
@@ -184,11 +184,12 @@ let uploadPromises = [];
 
 document.querySelectorAll('input[type="text"], input[type="number"], textarea, select').forEach(el => el.classList.add('form-control'));
 
-// KEY FIX: REMOVE REQUIRED FROM HIDDEN DJANGO FORMSET INPUTS
+// NUCLEAR FIX: REMOVE REQUIRED FROM ALL FORMSET INPUTS + FORM
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('input[name$="-image"]').forEach(input => {
         input.removeAttribute('required');
     });
+    document.getElementById('editForm').setAttribute('novalidate', 'novalidate');
 });
 
 function compressImage(file, maxWidth = 600, quality = 0.4){
@@ -219,7 +220,7 @@ async function uploadToCloudinary(file, type = 'image') {
   formData.append('upload_preset', UPLOAD_PRESET);
   formData.append('folder', 'lendogo');
   try {
-    const res = await fetch(url, { method: 'POST', body: formData, signal: AbortSignal.timeout(20000) }); // 20s timeout for 30MB video
+    const res = await fetch(url, { method: 'POST', body: formData, signal: AbortSignal.timeout(20000) });
     const data = await res.json();
     return data.secure_url || null;
   } catch {
@@ -227,7 +228,7 @@ async function uploadToCloudinary(file, type = 'image') {
   }
 }
 
-// PHOTO UPLOAD
+// PHOTO UPLOAD - NOW FILLS FORMSET INPUTS
 document.getElementById('addPhotoBtn').addEventListener('click', () => document.getElementById('multiFileInput').click());
 document.getElementById('multiFileInput').addEventListener('change', async e => {
   if(!e.target.files[0]) return;
@@ -242,9 +243,16 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
       slot.querySelector('.uploading-overlay')?.remove();
       if(cloudUrl) {
         slot.querySelector('img').src = cloudUrl;
-        const hiddenInput = document.createElement('input');
-        hiddenInput.type = 'hidden'; hiddenInput.name = 'new_images'; hiddenInput.value = cloudUrl;
-        document.getElementById('newImageUrls').appendChild(hiddenInput);
+        
+        // KEY: Find first empty formset image input and fill it
+        let filled = false;
+        document.querySelectorAll('input[name$="-image"]').forEach(input => {
+            if(!input.value &&!filled){
+                input.value = cloudUrl;
+                filled = true;
+            }
+        });
+
       } else {
         slot.querySelector('.uploading-overlay').innerHTML = 'Failed<br><small>Will skip</small>';
       }
@@ -263,8 +271,7 @@ videoFileInput.addEventListener('change', async e => {
   if (e.target.files[0]) {
     const file = e.target.files[0];
     
-    // 30MB LIMIT
-    if(file.size > 30000000){ // 30 * 1024 * 1024
+    if(file.size > 30000000){
         alert("Video too big. Max 30MB allowed. Please record a shorter video.");
         e.target.value = '';
         return;
