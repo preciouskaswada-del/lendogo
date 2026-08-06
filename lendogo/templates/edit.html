@@ -1,165 +1,324 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static humanize %}
 
 {% block title %}Edit Listing - Lendogo{% endblock %}
 
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<style>
+.form-wrapper { max-width: 900px; margin: 0 auto; }
+.form-card { background: white; border-radius: 16px; border: 1px solid #e5e7eb; }
+.form-section { border-bottom: 1px solid #f3f4f6; padding: 24px; }
+.section-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
+.photo-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+@media (max-width: 992px) {.photo-grid { grid-template-columns: repeat(3, 1fr); }}
+@media (max-width: 768px) {.photo-grid { grid-template-columns: repeat(2, 1fr); }}
+.photo-slot { aspect-ratio: 1; border-radius: 12px; border: 2px dashed #d1d5db; background: #f9fafb; position: relative; overflow: hidden; }
+.photo-slot.filled { border: 2px solid #e5e7eb; }
+.photo-slot.deleted { opacity: 0.3; pointer-events: none; }
+.photo-preview { width: 100%; height: 100%; object-fit: cover; }
+
+/* KEY FIX FOR CHROME BUG */
+input[type="file"] { display: none!important; }
+input[name$="-image"] { 
+    position: absolute;
+    left: -9999px;
+    opacity: 0;
+}
+input[name$="-DELETE"] { display: none!important; }
+input[name$="-id"] { position: absolute; left: -9999px; }
+
+.add-card { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 4px; cursor: pointer; color: #6b7280; font-weight: 500; font-size: 12px; width: 100%; height: 100%; border: 2px dashed #d1d5db; border-radius: 12px; }
+.add-card:hover { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
+.add-card i { font-size: 22px; }
+.photo-actions { position: absolute; top: 6px; right: 6px; display: flex; gap: 4px; background: rgba(0,0,0,0.6); padding: 3px; border-radius: 8px; z-index: 10; }
+.uploading-overlay { position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.75); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; z-index: 5; border-radius: 12px; flex-direction: column; }
+.sticky-footer { position: sticky; bottom: 0; background: white; border-top: 1px solid #e5e7eb; padding: 16px 24px; margin: 0 -24px -24px; border-radius: 0 0 16px 16px; z-index: 10; }
+.btn-primary { background: #2563eb; border: none; }
+.btn-primary:disabled,.btn-primary.disabled { background: #93c5fd; cursor: not-allowed; }
+.d-none { display: none!important; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container py-4">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card shadow-sm">
-                <div class="card-header">
-                    <h4>Edit: {{ listing.product }}</h4>
-                </div>
-                <div class="card-body">
-                    <form method="POST" enctype="multipart/form-data" id="editForm">
-                        {% csrf_token %}
-                        {{ formset.management_form }}
+<div class="container py-4 form-wrapper">
+  <a href="javascript:history.back()" class="btn btn-light mb-3"><i class="bi bi-arrow-left"></i> Back</a>
 
-                        <div class="mb-3">
-                            <label class="form-label">Product Name</label>
-                            {{ form.product }}
-                        </div>
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
 
-                        <div class="mb-3">
-                            <label class="form-label">Description</label>
-                            {{ form.description }}
-                        </div>
+  <form method="POST" enctype="multipart/form-data" id="editForm" novalidate> <!-- ADDED novalidate -->
+    {% csrf_token %}
 
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Price MWK</label>
-                                {{ form.price }}
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Location</label>
-                                {{ form.location }}
-                            </div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Category</label>
-                            {{ form.category }}
-                        </div>
-
-                        <hr>
-                        <h5>Photos</h5>
-                        <p class="text-muted small">Tip: Opens camera directly to avoid memory issues</p>
-
-                        <div id="image-preview" class="d-flex flex-wrap gap-2 mb-3">
-                            {% for img_form in formset %}
-                                <div class="position-relative" style="width: 120px; height: 120px;">
-                                    {% if img_form.instance.image %}
-                                        <img src="{{ img_form.instance.image }}" class="rounded border" style="width: 100%; height: 100%; object-fit: cover;">
-                                    {% endif %}
-                                    {{ img_form.id }}
-                                    <input type="hidden" name="{{ img_form.prefix }}-image" value="{{ img_form.instance.image }}">
-                                    {% if img_form.DELETE %} {{ img_form.DELETE }} {% endif %}
-                                </div>
-                            {% endfor %}
-                        </div>
-
-                        <button type="button" class="btn btn-outline-secondary mb-3 add-photo-btn">
-                            <i class="bi bi-plus"></i> Add Photo
-                        </button>
-
-                        <hr>
-                        <h5>Video <span class="text-muted small">Optional, Max 30MB</span></h5>
-                        <div class="mb-3 p-3 border rounded text-center">
-                            <i class="bi bi-camera-video fs-1"></i>
-                            <p>Add a short video to showcase your item</p>
-                            <input type="text" name="video" value="{{ listing.video|default:'' }}" class="d-none" id="videoInput">
-                            <button type="button" class="btn btn-outline-primary btn-sm upload-video-btn">
-                                <i class="bi bi-upload"></i> Upload Video
-                            </button>
-                        </div>
-
-                        <div class="d-flex justify-content-end gap-2 mt-4">
-                            <a href="{% url 'dashboard' %}" class="btn btn-secondary">Cancel</a>
-                            <button type="submit" class="btn btn-primary" id="saveBtn">
-                                Save Changes
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
+    {% if form.errors or formset.errors %}
+    <div class="alert alert-danger mb-3">
+      <strong>Please fix these errors:</strong>
+      {{ form.errors }}
+      {{ formset.errors }}
     </div>
+    {% endif %}
+
+    <div class="form-card">
+
+      <div class="form-section">
+        <h3 class="section-title">Listing Details</h3>
+        <div class="mb-3">
+          <label class="form-label fw-medium">Item Name</label>
+          {{ form.product }}
+        </div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-medium">Price (MWK)</label>
+            {{ form.price }}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-medium">Phone/WhatsApp</label>
+            {{ form.phone }}
+          </div>
+        </div>
+        <div class="mt-3">
+          <label class="form-label fw-medium">Description</label>
+          {{ form.description }}
+        </div>
+        <div class="mt-3">
+          <label class="form-label fw-medium">Category</label>
+          {{ form.category }}
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3 class="section-title">Location</h3>
+        <div class="mb-3">
+          <label class="form-label fw-medium">Area / City</label>
+          {{ form.location }}
+        </div>
+        {{ form.latitude }}
+        {{ form.longitude }}
+      </div>
+
+      <div class="form-section">
+        <h3 class="section-title">Photos <span class="text-muted fw-normal fs-6">Max 1 at a time</span></h3>
+
+        {{ formset.management_form }}
+
+        <div class="photo-grid" id="photoGrid">
+          {% for img_form in formset %}
+          <div class="photo-slot {% if img_form.instance.pk and img_form.instance.image and img_form.instance.image.url %}filled{% else %}d-none{% endif %} {% if img_form.DELETE.value %}deleted{% endif %}" data-index="{{ forloop.counter0 }}">
+            {{ img_form.id }}
+            {{ img_form.image }}
+            {{ img_form.DELETE }}
+            <input type="file" accept="image/*" class="file-input">
+
+            {% if img_form.instance.pk and img_form.instance.image and img_form.instance.image.url %}
+              <img src="{{ img_form.instance.image.url }}" class="photo-preview" alt="Listing photo" loading="lazy">
+              <div class="photo-actions">
+                <button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button>
+                <button type="button" class="btn btn-sm btn-danger delete-btn" title="Delete"><i class="bi bi-trash"></i></button>
+              </div>
+            {% endif %}
+          </div>
+          {% endfor %}
+
+          <div class="photo-slot" id="addPhotoBtn">
+            <div class="add-card">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add Photo</span>
+            </div>
+            <input type="file" id="multiFileInput" accept="image/*" capture="environment">
+          </div>
+        </div>
+        <div id="newImageUrls"></div>
+        <small class="text-muted mt-2 d-block">Tip: Opens camera directly to avoid memory issues</small>
+      </div>
+
+      <div class="form-section">
+        <h3 class="section-title">Video <span class="text-muted fw-normal fs-6">Optional, Max 30MB</span></h3>
+        <input type="hidden" name="video" id="videoUrlInput" value="{{ form.instance.video|default:'' }}">
+        <input type="file" name="video_upload" accept="video/*" id="videoFileInput">
+        <div class="border rounded-3 p-4 text-center bg-light" id="videoBox">
+          {% if form.instance.video %}
+          <div id="videoPreview">
+            <video src="{{ form.instance.video }}" controls class="w-100 rounded" style="max-height:300px;"></video>
+            <div class="mt-2">
+                <button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button>
+                <button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn"><i class="bi bi-trash"></i> Remove</button>
+            </div>
+          </div>
+          {% else %}
+          <div id="videoUploadArea">
+            <i class="bi bi-camera-video fs-1 text-muted d-block mb-2"></i>
+            <p class="text-muted mb-3">Add a short video to showcase your item<br><small>Max 30MB</small></p>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="videoUploadBtn"><i class="bi bi-upload"></i> Upload Video</button>
+          </div>
+          <div id="videoPreview" class="d-none"></div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sticky-footer">
+        <div class="d-flex gap-2 justify-content-end">
+          <a href="javascript:history.back()" class="btn btn-outline-secondary">Cancel</a>
+          <button type="submit" id="postBtn" class="btn btn-primary px-4"><i class="bi bi-check-lg"></i> Save Changes</button>
+        </div>
+      </div>
+
+    </div>
+  </form>
 </div>
 
-<script src="https://upload.widget.cloudinary.com/global/all.js" type="text/javascript"></script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+const CLOUD_NAME = "sbsdxiie";
+const UPLOAD_PRESET = "lendogo3";
+let uploadPromises = [];
+
+document.querySelectorAll('input[type="text"], input[type="number"], textarea, select').forEach(el => el.classList.add('form-control'));
+
+// NUCLEAR FIX: REMOVE REQUIRED FROM ALL FORMSET INPUTS + FORM
 document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('editForm');
-    const saveBtn = document.getElementById('saveBtn');
-    let imageCount = {{ formset.total_form_count }};
-
-    // CLOUDINARY IMAGE UPLOAD
-    const imageWidget = cloudinary.createUploadWidget({
-        cloudName: 'YOUR_CLOUD_NAME', // <-- REPLACE THIS
-        uploadPreset: 'YOUR_UPLOAD_PRESET', // <-- REPLACE THIS
-        maxFiles: 10,
-        sources: ['local', 'camera'],
-        multiple: true,
-        cropping: true,
-        folder: 'lendogo_listings'
-    }, (error, result) => {
-        if (!error && result && result.event === "success") {
-            const preview = document.getElementById('image-preview');
-            const url = result.info.secure_url;
-            
-            // Add preview
-            preview.innerHTML += `
-                <div class="position-relative" style="width: 120px; height: 120px;">
-                    <img src="${url}" class="rounded border" style="width: 100%; height: 100%; object-fit: cover;">
-                </div>
-            `;
-
-            // Add hidden input so Django receives it
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = `form-${imageCount}-image`;
-            input.value = url;
-            form.appendChild(input);
-            imageCount++;
-        }
+    document.querySelectorAll('input[name$="-image"]').forEach(input => {
+        input.removeAttribute('required');
     });
+    document.getElementById('editForm').setAttribute('novalidate', 'novalidate');
+});
 
-    document.querySelector('.add-photo-btn').addEventListener('click', function() {
-        imageWidget.open();
-    }, false);
-
-    // CLOUDINARY VIDEO UPLOAD
-    const videoWidget = cloudinary.createUploadWidget({
-        cloudName: 'YOUR_CLOUD_NAME', // <-- REPLACE THIS
-        uploadPreset: 'YOUR_UPLOAD_PRESET', // <-- REPLACE THIS
-        resourceType: 'video',
-        maxFileSize: 30000000,
-        folder: 'lendogo_videos'
-    }, (error, result) => {
-        if (!error && result && result.event === "success") {
-            document.getElementById('videoInput').value = result.info.secure_url;
-            alert('Video uploaded!');
-        }
+function compressImage(file, maxWidth = 600, quality = 0.4){
+    if(file.size < 300000) return Promise.resolve(file);
+    return new Promise((resolve) => {
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        img.src = objectUrl;
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width; let height = img.height;
+            if(width > maxWidth){ height *= maxWidth / width; width = maxWidth; }
+            canvas.width = width; canvas.height = height;
+            canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+            canvas.toBlob((blob) => {
+                URL.revokeObjectURL(objectUrl);
+                resolve(new File([blob], 'img.jpg', {type: 'image/jpeg'}));
+            }, 'image/jpeg', quality);
+        };
+        img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(file); };
     });
+}
 
-    document.querySelector('.upload-video-btn').addEventListener('click', function() {
-        videoWidget.open();
-    }, false);
+async function uploadToCloudinary(file, type = 'image') {
+  const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${type}/upload`;
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', UPLOAD_PRESET);
+  formData.append('folder', 'lendogo');
+  try {
+    const res = await fetch(url, { method: 'POST', body: formData, signal: AbortSignal.timeout(20000) });
+    const data = await res.json();
+    return data.secure_url || null;
+  } catch {
+    return null;
+  }
+}
 
+// PHOTO UPLOAD - NOW FILLS FORMSET INPUTS
+document.getElementById('addPhotoBtn').addEventListener('click', () => document.getElementById('multiFileInput').click());
+document.getElementById('multiFileInput').addEventListener('change', async e => {
+  if(!e.target.files[0]) return;
+  const file = e.target.files[0];
+  const localUrl = URL.createObjectURL(file);
+  const slot = document.createElement('div');
+  slot.className = 'photo-slot filled';
+  slot.innerHTML = `<img src="${localUrl}" class="photo-preview"><div class="uploading-overlay">Uploading...<div class="spinner-border spinner-border-sm mt-2"></div></div>`;
+  document.getElementById('photoGrid').insertBefore(slot, document.getElementById('addPhotoBtn'));
 
-    // KEY FIX: SUBMIT HANDLER WITH TRY/CATCH
-    form.addEventListener('submit', function(e) {
-        try {
-            if (saveBtn) {
-                saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Saving...';
-                saveBtn.disabled = true;
+  const job = compressImage(file).then(c => uploadToCloudinary(c, 'image')).then(cloudUrl => {
+      slot.querySelector('.uploading-overlay')?.remove();
+      if(cloudUrl) {
+        slot.querySelector('img').src = cloudUrl;
+        
+        // KEY: Find first empty formset image input and fill it
+        let filled = false;
+        document.querySelectorAll('input[name$="-image"]').forEach(input => {
+            if(!input.value &&!filled){
+                input.value = cloudUrl;
+                filled = true;
             }
-        } catch(err) {
-            console.log("Button update failed but form will still submit", err);
-        }
-        // Form will submit normally
+        });
+
+      } else {
+        slot.querySelector('.uploading-overlay').innerHTML = 'Failed<br><small>Will skip</small>';
+      }
+      URL.revokeObjectURL(localUrl);
+  });
+  uploadPromises.push(job);
+  e.target.value = '';
+});
+
+// VIDEO UPLOAD - 30MB LIMIT
+const videoFileInput = document.getElementById('videoFileInput');
+document.getElementById('videoUploadBtn')?.addEventListener('click', () => videoFileInput.click());
+document.addEventListener('click', e => { if(e.target.id === 'changeVideoBtn') videoFileInput.click(); });
+
+videoFileInput.addEventListener('change', async e => {
+  if (e.target.files[0]) {
+    const file = e.target.files[0];
+    
+    if(file.size > 30000000){
+        alert("Video too big. Max 30MB allowed. Please record a shorter video.");
+        e.target.value = '';
+        return;
+    }
+
+    document.getElementById('videoUploadArea')?.classList.add('d-none');
+    document.getElementById('videoPreview').classList.remove('d-none');
+    document.getElementById('videoPreview').innerHTML = `<div class="spinner-border"></div><p>Uploading Video... <small>This may take up to 20s</small></p>`;
+
+    const job = uploadToCloudinary(file, 'video').then(cloudUrl => {
+      if(cloudUrl) {
+        document.getElementById('videoUrlInput').value = cloudUrl;
+        document.getElementById('videoPreview').innerHTML = `<video src="${cloudUrl}" controls class="w-100 rounded" style="max-height:300px;"></video><div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button><button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn"><i class="bi bi-trash"></i> Remove</button></div>`;
+      } else {
+        document.getElementById('videoPreview').innerHTML = `<p class="text-warning">Video upload failed. You can still save without video.</p><button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn">Try Again</button>`;
+        document.getElementById('videoUploadArea')?.classList.remove('d-none');
+      }
     });
+    uploadPromises.push(job);
+    e.target.value = '';
+  }
+});
+
+// DELETE VIDEO
+document.addEventListener('click', e => { 
+    if(e.target.id === 'removeVideoBtn'){
+      document.getElementById('videoUrlInput').value = '';
+      document.getElementById('videoPreview').classList.add('d-none');
+      document.getElementById('videoUploadArea')?.classList.remove('d-none');
+    }
+});
+
+// SUBMIT - FORCE SUBMIT AFTER 2 SECONDS
+document.getElementById('editForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const form = this;
+  const btn = document.getElementById('postBtn');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+
+  await Promise.race([
+      Promise.all(uploadPromises),
+      new Promise(r => setTimeout(r, 2000))
+  ]);
+
+  form.submit();
 });
 </script>
 {% endblock %}
