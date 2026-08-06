@@ -11,7 +11,7 @@ from.models import Listing, ListingImage, RentalListing
 
 User = get_user_model()
 
-MAX_PRICE = Decimal('1000000.00') # CHANGED: Now 1 Billion MWK
+MAX_PRICE = Decimal('1000000.00') # 1 Billion MWK
 MAX_VIDEO_SIZE = 50 * 1024 * 1024
 MAX_IMAGE_SIZE = 10 * 1024 * 1024
 ALLOWED_VIDEO_TYPES = {'video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska'}
@@ -59,9 +59,8 @@ class ListingForm(forms.ModelForm):
             }),
             'latitude': forms.HiddenInput(),
             'longitude': forms.HiddenInput(),
-            'video': forms.FileInput(attrs={
-                'class': 'w-full p-2 border rounded',
-                'accept': 'video/mp4,video/quicktime,video/x-msvideo'
+            'video': forms.URLInput(attrs={ # FIX 1: Changed from FileInput to URLInput
+                'class': 'd-none' # Hidden, JS fills Cloudinary URL
             })
         }
 
@@ -107,14 +106,15 @@ class ListingForm(forms.ModelForm):
             raise ValidationError("Description too short. Min 10 characters helps buyers.")
         return desc
 
-    def clean_video(self):
+    def clean_video(self): # FIX 2: Accept URL string from Cloudinary
         video = self.cleaned_data.get('video')
         if not video:
-            return video
-
+            return None
         if isinstance(video, str):
+            if not video.startswith('https://'):
+                raise ValidationError("Invalid video URL")
             return video
-
+        # Fallback for direct upload
         if isinstance(video, UploadedFile):
             if video.size > MAX_VIDEO_SIZE:
                 raise ValidationError(f"Video is {video.size / 1024 / 1024:.1f}MB. Max: 50MB")
@@ -156,40 +156,17 @@ class ListingForm(forms.ModelForm):
         return lng
 
 class ListingImageForm(forms.ModelForm):
+    image = forms.CharField(required=False, widget=forms.HiddenInput()) # FIX 3: CharField so we can put URL
+    
     class Meta:
         model = ListingImage
         fields = ['image']
-        widgets = {
-            'image': forms.URLInput(attrs={ # CHANGED: URLInput so we can put cloudinary url
-                'class': 'd-none'
-            })
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['image'].required = False # KEY FIX: allows empty hidden fields
 
     def clean_image(self):
         image = self.cleaned_data.get('image')
-        if not image:
-            return image
-
-        if isinstance(image, str):
-            return image
-
-        if isinstance(image, UploadedFile):
-            if image.size > MAX_IMAGE_SIZE:
-                raise ValidationError(f"Image is {image.size / 1024 / 1024:.1f}MB. Max: 10MB")
-            try:
-                file_head = image.read(2048)
-                image.seek(0)
-                mime = magic.from_buffer(file_head, mime=True)
-                if mime not in ALLOWED_IMAGE_TYPES:
-                    raise ValidationError("Only JPG, PNG, WebP images allowed")
-            except Exception:
-                raise ValidationError("Cannot verify image. File may be corrupted.")
-            image.name = re.sub(r'[^a-zA-Z0-9._-]', '', image.name)[:100]
-        return image
+        if not image: # FIX 4: Return None not '' so Django skips empty forms
+            return None
+        return image # Cloudinary URL string
 
 class SignUpForm(UserCreationForm):
     email = forms.EmailField(
@@ -363,7 +340,7 @@ class RentalListingForm(forms.ModelForm):
             image.name = re.sub(r'[^a-zA-Z0-9._-]', '', image.name)[:100]
         return image
 
-# FIX: CHANGED FROM exclude TO fields SO CLOUDINARY URLS SAVE
+# FIX 5: Tell formset to ignore empty forms
 ImageFormSet = inlineformset_factory(
     Listing,
     ListingImage,
@@ -373,4 +350,7 @@ ImageFormSet = inlineformset_factory(
     can_delete=True,
     can_delete_extra=False,
     fields=('image',) 
-) 
+)
+
+# KEY: This makes empty image fields = None instead of ''
+ImageFormSet.form.base_fields['image'].empty_values = [None, '', [], (), {}]
