@@ -160,11 +160,14 @@ class ListingImageForm(forms.ModelForm):
         model = ListingImage
         fields = ['image']
         widgets = {
-            'image': forms.FileInput(attrs={
-                'class': 'img-swap w-full p-2 border rounded',
-                'accept': 'image/jpeg,image/png,image/webp'
+            'image': forms.URLInput(attrs={ # CHANGED: URLInput so we can put cloudinary url
+                'class': 'd-none'
             })
         }
+
+    def __init__(self, *args, **kwargs): # <-- ADDED THIS
+        super().__init__(*args, **kwargs)
+        self.fields['image'].required = False # <-- ADDED THIS: KEY FIX
 
     def clean_image(self):
         image = self.cleaned_data.get('image')
@@ -370,4 +373,3 @@ ImageFormSet = inlineformset_factory(
     can_delete=True,
     can_delete_extra=False,
     fields=('image',)
-)
