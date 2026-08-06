@@ -277,7 +277,6 @@ def mark_as_sold(request, pk):
 def edit_listing(request, pk):
     listing = get_object_or_404(Listing, pk=pk, seller=request.user)
     
-    # KEY FIX: extra=0 so Django doesn't create empty forms
     ImageFormSet = modelformset_factory(
         ListingImage, 
         fields=['image'], 
@@ -301,6 +300,11 @@ def edit_listing(request, pk):
         form = ListingForm(request.POST, request.FILES, instance=listing)
         formset = ImageFormSet(request.POST, request.FILES, queryset=listing.images.all(), prefix='form')
 
+        # NUCLEAR FIX: Allow empty forms before validation
+        for f in formset.forms:
+            f.empty_permitted = True
+            f.fields['image'].required = False
+
         if form.is_valid() and formset.is_valid():
             with transaction.atomic():
                 listing = form.save()
@@ -308,7 +312,7 @@ def edit_listing(request, pk):
                 # 1. SAVE FORMSET - but only ones with image
                 instances = formset.save(commit=False)
                 for obj in instances:
-                    if obj.image: # KEY FIX: SKIP EMPTY ONES
+                    if obj.image: # SKIP EMPTY ONES
                         obj.listing = listing
                         obj.save()
                 
@@ -317,7 +321,6 @@ def edit_listing(request, pk):
                     obj.delete()
 
                 # 2. HANDLE NEW CLOUDINARY UPLOADS FROM JS
-                # KEY FIX: Now we read from form-0-image instead of new_images
                 new_image_urls = []
                 for key, value in request.POST.items():
                     if key.startswith('form-') and key.endswith('-image') and value.startswith('https://'):
@@ -325,7 +328,6 @@ def edit_listing(request, pk):
                 
                 max_order = listing.images.aggregate(models.Max('order'))['order__max'] or 0
                 for i, img_url in enumerate(new_image_urls):
-                    # Don't duplicate if already exists
                     if not listing.images.filter(image=img_url).exists():
                         ListingImage.objects.create(
                             listing=listing,
@@ -339,7 +341,7 @@ def edit_listing(request, pk):
                         cloud_url = request.POST.get(img_form.prefix + '-image')
                         if cloud_url and cloud_url.startswith('https://'):
                             photo = img_form.instance
-                            if photo.image!= cloud_url: # only update if changed
+                            if photo.image!= cloud_url:
                                 photo.image = cloud_url
                                 photo.save()
 
@@ -360,6 +362,10 @@ def edit_listing(request, pk):
     else:
         form = ListingForm(instance=listing)
         formset = ImageFormSet(queryset=listing.images.all(), prefix='form')
+        # Also set it for GET so template doesn't break
+        for f in formset.forms:
+            f.empty_permitted = True
+            f.fields['image'].required = False
 
     categories = Category.objects.all()
     return render(request, 'edit.html', {
