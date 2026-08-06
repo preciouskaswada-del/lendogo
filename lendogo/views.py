@@ -1,13 +1,13 @@
 import os
 from dotenv import load_dotenv
 
-from django.forms import inlineformset_factory, modelformset_factory
-from .forms import ListingForm, ListingImageForm, SignUpForm
+from django.forms import inlineformset_factory, modelformset_factory, ModelForm, URLInput
+from.forms import ListingForm, ListingImageForm, SignUpForm
 from django.contrib.auth.forms import AuthenticationForm
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, authenticate, get_user_model
 from django.contrib.auth.decorators import login_required
-from .models import Listing, ListingImage, RentalListing, ListingView, WhatsAppClick, UserProfile, Category
+from.models import Listing, ListingImage, RentalListing, ListingView, WhatsAppClick, UserProfile, Category
 from django.db.models import Q, Count, Sum, F
 from django.db import models, transaction
 from urllib.parse import urlencode
@@ -40,6 +40,16 @@ load_dotenv()
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 User = get_user_model()
+
+# KEY FIX: Custom form to make image not required
+class EditListingImageForm(ModelForm):
+    class Meta:
+        model = ListingImage
+        fields = ['image']
+        widgets = {'image': URLInput(attrs={'class': 'd-none'})}
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['image'].required = False
 
 ImageFormSet = inlineformset_factory(
     Listing,
@@ -128,7 +138,7 @@ def home(request):
         all_listings = all_listings.filter(business_q)
     elif sort == 'near_me':
         # FIX: Added.user and fixed typo
-        if request.user.is_authenticated and hasattr(request.user, 'userprofile') and request.user.userprofile.location:
+        if request.user.is_authenticated and hasattr(request.user, 'userprofile') and request.userprofile.location:
             all_listings = all_listings.filter(location=request.user.userprofile.location)
     else:
         all_listings = all_listings.order_by('-is_boosted', '-bumped_at', '-id')
@@ -276,15 +286,16 @@ def mark_as_sold(request, pk):
 @login_required
 def edit_listing(request, pk):
     listing = get_object_or_404(Listing, pk=pk, seller=request.user)
-    
-    ImageFormSet = modelformset_factory(
-        ListingImage, 
-        fields=['image'], 
+
+    # KEY FIX: Use custom form so empty images don't validate
+    EditImageFormSet = modelformset_factory(
+        ListingImage,
+        form=EditListingImageForm,
         extra=0,
         max_num=10,
         can_delete=True
     )
-    
+
     if request.method == 'POST':
         # PATCH 3: Fix image orientation before processing
         fixed_files = {}
@@ -298,12 +309,7 @@ def edit_listing(request, pk):
             request.FILES[k] = v
 
         form = ListingForm(request.POST, request.FILES, instance=listing)
-        formset = ImageFormSet(request.POST, request.FILES, queryset=listing.images.all(), prefix='form')
-
-        # NUCLEAR FIX: Allow empty forms before validation
-        for f in formset.forms:
-            f.empty_permitted = True
-            f.fields['image'].required = False
+        formset = EditImageFormSet(request.POST, request.FILES, queryset=listing.images.all(), prefix='form')
 
         if form.is_valid() and formset.is_valid():
             with transaction.atomic():
@@ -315,7 +321,7 @@ def edit_listing(request, pk):
                     if obj.image: # SKIP EMPTY ONES
                         obj.listing = listing
                         obj.save()
-                
+
                 # Delete marked ones
                 for obj in formset.deleted_objects:
                     obj.delete()
@@ -325,7 +331,7 @@ def edit_listing(request, pk):
                 for key, value in request.POST.items():
                     if key.startswith('form-') and key.endswith('-image') and value.startswith('https://'):
                         new_image_urls.append(value)
-                
+
                 max_order = listing.images.aggregate(models.Max('order'))['order__max'] or 0
                 for i, img_url in enumerate(new_image_urls):
                     if not listing.images.filter(image=img_url).exists():
@@ -353,7 +359,7 @@ def edit_listing(request, pk):
 
             messages.success(request, 'Listing updated successfully')
             return redirect('dashboard')
-        
+
         else:
             print("FORM ERRORS:", form.errors)
             print("FORMSET ERRORS:", formset.errors)
@@ -361,11 +367,7 @@ def edit_listing(request, pk):
 
     else:
         form = ListingForm(instance=listing)
-        formset = ImageFormSet(queryset=listing.images.all(), prefix='form')
-        # Also set it for GET so template doesn't break
-        for f in formset.forms:
-            f.empty_permitted = True
-            f.fields['image'].required = False
+        formset = EditImageFormSet(queryset=listing.images.all(), prefix='form')
 
     categories = Category.objects.all()
     return render(request, 'edit.html', {
@@ -595,12 +597,12 @@ def dashboard(request):
         'stats': stats,
         'now': now
     })
-    
+
 @login_required
 def boost_listing(request, pk):
     listing = get_object_or_404(Listing, pk=pk, seller=request.user)
 
-    if listing.status != 'ACTIVE':
+    if listing.status!= 'ACTIVE':
         messages.error(request, 'You can only boost active listings.')
         return redirect('dashboard')
 
