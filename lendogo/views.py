@@ -299,21 +299,34 @@ def edit_listing(request, pk):
             request.FILES[k] = v
 
         form = ListingForm(request.POST, request.FILES, instance=listing)
-        # KEY FIX: Add prefix='form' to match template
         formset = ImageFormSet(request.POST, request.FILES, queryset=listing.images.all(), prefix='form')
 
         if form.is_valid() and formset.is_valid():
             with transaction.atomic():
                 listing = form.save()
 
-                # 1. SAVE FORMSET FIRST - handles deletes
-                formset.save()
+                # 1. SAVE FORMSET - but only ones with image
+                instances = formset.save(commit=False)
+                for obj in instances:
+                    if obj.image: # KEY FIX: SKIP EMPTY ONES
+                        obj.listing = listing
+                        obj.save()
+                
+                # Delete marked ones
+                for obj in formset.deleted_objects:
+                    obj.delete()
 
                 # 2. HANDLE NEW CLOUDINARY UPLOADS FROM JS
-                new_images = request.POST.getlist('new_images')
+                # KEY FIX: Now we read from form-0-image instead of new_images
+                new_image_urls = []
+                for key, value in request.POST.items():
+                    if key.startswith('form-') and key.endswith('-image') and value.startswith('https://'):
+                        new_image_urls.append(value)
+                
                 max_order = listing.images.aggregate(models.Max('order'))['order__max'] or 0
-                for i, img_url in enumerate(new_images):
-                    if img_url:
+                for i, img_url in enumerate(new_image_urls):
+                    # Don't duplicate if already exists
+                    if not listing.images.filter(image=img_url).exists():
                         ListingImage.objects.create(
                             listing=listing,
                             image=img_url,
@@ -326,8 +339,9 @@ def edit_listing(request, pk):
                         cloud_url = request.POST.get(img_form.prefix + '-image')
                         if cloud_url and cloud_url.startswith('https://'):
                             photo = img_form.instance
-                            photo.image = cloud_url
-                            photo.save()
+                            if photo.image!= cloud_url: # only update if changed
+                                photo.image = cloud_url
+                                photo.save()
 
                 # 4. HANDLE VIDEO
                 video_url = request.POST.get('video', '')
@@ -345,7 +359,6 @@ def edit_listing(request, pk):
 
     else:
         form = ListingForm(instance=listing)
-        # KEY FIX: Add prefix='form' here too
         formset = ImageFormSet(queryset=listing.images.all(), prefix='form')
 
     categories = Category.objects.all()
