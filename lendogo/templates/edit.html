@@ -139,7 +139,7 @@ input[name$="-id"] { position: absolute; left: -9999px; }
       </div>
 
       <div class="form-section">
-        <h3 class="section-title">Video <span class="text-muted fw-normal fs-6">Optional</span></h3>
+        <h3 class="section-title">Video <span class="text-muted fw-normal fs-6">Optional, Max 30MB</span></h3>
         <input type="hidden" name="video" id="videoUrlInput" value="{{ form.instance.video|default:'' }}">
         <input type="file" name="video_upload" accept="video/*" id="videoFileInput">
         <div class="border rounded-3 p-4 text-center bg-light" id="videoBox">
@@ -154,7 +154,7 @@ input[name$="-id"] { position: absolute; left: -9999px; }
           {% else %}
           <div id="videoUploadArea">
             <i class="bi bi-camera-video fs-1 text-muted d-block mb-2"></i>
-            <p class="text-muted mb-3">Add a short video to showcase your item</p>
+            <p class="text-muted mb-3">Add a short video to showcase your item<br><small>Max 30MB</small></p>
             <button type="button" class="btn btn-sm btn-outline-primary" id="videoUploadBtn"><i class="bi bi-upload"></i> Upload Video</button>
           </div>
           <div id="videoPreview" class="d-none"></div>
@@ -219,7 +219,7 @@ async function uploadToCloudinary(file, type = 'image') {
   formData.append('upload_preset', UPLOAD_PRESET);
   formData.append('folder', 'lendogo');
   try {
-    const res = await fetch(url, { method: 'POST', body: formData, signal: AbortSignal.timeout(10000) });
+    const res = await fetch(url, { method: 'POST', body: formData, signal: AbortSignal.timeout(20000) }); // 20s timeout for 30MB video
     const data = await res.json();
     return data.secure_url || null;
   } catch {
@@ -254,23 +254,33 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
   e.target.value = '';
 });
 
-// VIDEO UPLOAD
+// VIDEO UPLOAD - 30MB LIMIT
 const videoFileInput = document.getElementById('videoFileInput');
 document.getElementById('videoUploadBtn')?.addEventListener('click', () => videoFileInput.click());
 document.addEventListener('click', e => { if(e.target.id === 'changeVideoBtn') videoFileInput.click(); });
+
 videoFileInput.addEventListener('change', async e => {
   if (e.target.files[0]) {
     const file = e.target.files[0];
+    
+    // 30MB LIMIT
+    if(file.size > 30000000){ // 30 * 1024 * 1024
+        alert("Video too big. Max 30MB allowed. Please record a shorter video.");
+        e.target.value = '';
+        return;
+    }
+
     document.getElementById('videoUploadArea')?.classList.add('d-none');
     document.getElementById('videoPreview').classList.remove('d-none');
-    document.getElementById('videoPreview').innerHTML = `<div class="spinner-border"></div><p>Uploading Video...</p>`;
+    document.getElementById('videoPreview').innerHTML = `<div class="spinner-border"></div><p>Uploading Video... <small>This may take up to 20s</small></p>`;
 
     const job = uploadToCloudinary(file, 'video').then(cloudUrl => {
       if(cloudUrl) {
         document.getElementById('videoUrlInput').value = cloudUrl;
         document.getElementById('videoPreview').innerHTML = `<video src="${cloudUrl}" controls class="w-100 rounded" style="max-height:300px;"></video><div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button><button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn"><i class="bi bi-trash"></i> Remove</button></div>`;
       } else {
-        document.getElementById('videoPreview').innerHTML = `<p class="text-danger">Video upload failed. Will skip.</p>`;
+        document.getElementById('videoPreview').innerHTML = `<p class="text-warning">Video upload failed. You can still save without video.</p><button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn">Try Again</button>`;
+        document.getElementById('videoUploadArea')?.classList.remove('d-none');
       }
     });
     uploadPromises.push(job);
@@ -279,11 +289,13 @@ videoFileInput.addEventListener('change', async e => {
 });
 
 // DELETE VIDEO
-document.addEventListener('click', e => { if(e.target.id === 'removeVideoBtn'){
-  document.getElementById('videoUrlInput').value = '';
-  document.getElementById('videoPreview').classList.add('d-none');
-  document.getElementById('videoUploadArea')?.classList.remove('d-none');
-}});
+document.addEventListener('click', e => { 
+    if(e.target.id === 'removeVideoBtn'){
+      document.getElementById('videoUrlInput').value = '';
+      document.getElementById('videoPreview').classList.add('d-none');
+      document.getElementById('videoUploadArea')?.classList.remove('d-none');
+    }
+});
 
 // SUBMIT - FORCE SUBMIT AFTER 2 SECONDS
 document.getElementById('editForm').addEventListener('submit', async function(e) {
