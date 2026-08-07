@@ -282,10 +282,10 @@ def mark_as_sold(request, pk):
 
     messages.success(request, f'{listing.product} marked as sold! This helps improve market prices for everyone.')
     return redirect('dashboard')
-
 @login_required
 def edit_listing(request, pk):
     listing = get_object_or_404(Listing, pk=pk, seller=request.user)
+    existing_images = listing.images.all() # GET DB IMAGES
 
     if request.method == 'POST':
         # PATCH: Fix image orientation before processing
@@ -300,19 +300,20 @@ def edit_listing(request, pk):
             request.FILES[k] = v
 
         form = ListingForm(request.POST, request.FILES, instance=listing)
-        formset = ImageFormSet(request.POST, request.FILES, instance=listing)
+        # KEY FIX: Pass queryset so formset creates forms for existing images
+        formset = ImageFormSet(request.POST, request.FILES, instance=listing, queryset=existing_images)
 
         if form.is_valid():
             with transaction.atomic():
                 listing = form.save()
 
-                # 1. HANDLE DELETES - Check the DELETE hidden input manually
+                # 1. HANDLE DELETES
                 for img_form in formset:
                     if img_form.instance.pk:
                         delete_key = img_form.prefix + '-DELETE'
                         if request.POST.get(delete_key) == 'on':
                             img_form.instance.delete()
-                            continue # skip to next
+                            continue
 
                 # 2. SAVE/UPDATE IMAGES WITH URL
                 for img_form in formset:
@@ -320,15 +321,20 @@ def edit_listing(request, pk):
                     if image_url and image_url.startswith('https://'):
                         if img_form.instance.pk:
                             # Update existing
-                            if str(img_form.instance.image)!= image_url:
-                                img_form.instance.image = image_url
-                                img_form.instance.save()
+                            img_form.instance.image = image_url
+                            img_form.instance.save()
                         else:
                             # Create new
-                            if not listing.images.filter(image=image_url).exists():
-                                ListingImage.objects.create(listing=listing, image=image_url)
+                            ListingImage.objects.create(listing=listing, image=image_url)
 
-                # 3. HANDLE VIDEO
+                # 3. HANDLE NEW UPLOADS FROM JS THAT DON'T HAVE A FORM
+                # JS fills extra inputs. Catch them here
+                for key, value in request.POST.items():
+                    if key.startswith('listingimage_set-') and key.endswith('-image') and value.startswith('https://'):
+                        if not listing.images.filter(image=value).exists():
+                            ListingImage.objects.create(listing=listing, image=value)
+
+                # 4. HANDLE VIDEO
                 video_url = request.POST.get('video', '')
                 listing.video = video_url if video_url else None
                 listing.save(update_fields=['video'])
@@ -342,14 +348,16 @@ def edit_listing(request, pk):
 
     else:
         form = ListingForm(instance=listing)
-        formset = ImageFormSet(instance=listing)
+        # KEY FIX: Pass queryset here too so GET shows existing photos
+        formset = ImageFormSet(instance=listing, queryset=existing_images)
 
     categories = Category.objects.all()
     return render(request, 'edit.html', {
         'form': form,
         'formset': formset,
         'listing': listing,
-        'categories': categories
+        'categories': categories,
+        'existing_images': existing_images # Pass to template as backup
     })
 # FIX 4: MANUAL BOOST FOR FRIENDS/ADMIN
 @login_required
