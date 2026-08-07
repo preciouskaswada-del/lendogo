@@ -117,7 +117,7 @@ input[name$="-id"] { position: absolute; left: -9999px; }
             <input type="file" accept="image/*" class="file-input">
 
             {% if img_form.instance.pk and img_form.instance.image %}
-              <img src="{{ img_form.instance.image }}" class="photo-preview" alt="Listing photo" loading="lazy">
+              <img src="{{ img_form.instance.image }}?w=400&h=400&c_fill" class="photo-preview" alt="Listing photo" loading="lazy">
               <div class="photo-actions">
                 <button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button>
                 <button type="button" class="btn btn-sm btn-danger delete-btn" title="Delete"><i class="bi bi-trash"></i></button>
@@ -128,7 +128,7 @@ input[name$="-id"] { position: absolute; left: -9999px; }
           {# LOOP 2: BACKUP - SHOW DB PHOTOS IF FORMSET IS EMPTY #}
           {% for img in existing_images %}
           <div class="photo-slot filled">
-            <img src="{{ img.image }}" class="photo-preview" alt="Listing photo" loading="lazy">
+            <img src="{{ img.image }}?w=400&h=400&c_fill" class="photo-preview" alt="Listing photo" loading="lazy">
             <div class="photo-actions">
               <button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button>
               <button type="button" class="btn btn-sm btn-danger delete-btn" title="Delete"><i class="bi bi-trash"></i></button>
@@ -205,7 +205,8 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('editForm').setAttribute('novalidate', 'novalidate');
 });
 
-function compressImage(file, maxWidth = 600, quality = 0.4){
+// FIX 1: Compress less to save RAM
+function compressImage(file, maxWidth = 400, quality = 0.3){
     if(file.size < 300000) return Promise.resolve(file);
     return new Promise((resolve) => {
         const img = new Image();
@@ -265,9 +266,10 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
 async function handleFileUpload(file, targetSlot){
   const localUrl = URL.createObjectURL(file);
   if(!targetSlot){
+    // FIX 2: Add loading="lazy" to new images
     targetSlot = document.createElement('div');
     targetSlot.className = 'photo-slot filled';
-    targetSlot.innerHTML = `<img src="${localUrl}" class="photo-preview"><div class="uploading-overlay">Uploading...<div class="spinner-border spinner-border-sm mt-2"></div></div><div class="photo-actions"><button type="button" class="btn btn-sm btn-danger delete-new-btn" title="Delete"><i class="bi bi-trash"></i></button></div>`;
+    targetSlot.innerHTML = `<img src="${localUrl}" class="photo-preview" loading="lazy"><div class="uploading-overlay">Uploading...<div class="spinner-border spinner-border-sm mt-2"></div></div><div class="photo-actions"><button type="button" class="btn btn-sm btn-danger delete-new-btn" title="Delete"><i class="bi bi-trash"></i></button></div>`;
     document.getElementById('photoGrid').insertBefore(targetSlot, document.getElementById('addPhotoBtn'));
   } else {
     targetSlot.querySelector('img').src = localUrl;
@@ -277,14 +279,16 @@ async function handleFileUpload(file, targetSlot){
   const job = compressImage(file).then(c => uploadToCloudinary(c, 'image')).then(cloudUrl => {
       targetSlot.querySelector('.uploading-overlay')?.remove();
       if(cloudUrl) {
-        targetSlot.querySelector('img').src = cloudUrl;
+        // FIX 3: Use small thumb + revoke URL immediately
+        targetSlot.querySelector('img').src = cloudUrl + '?w=400&h=400&c_fill';
         const input = targetSlot.querySelector('input[name$="-image"]');
         if(input) input.value = cloudUrl;
+        URL.revokeObjectURL(localUrl);
       } else {
         targetSlot.remove();
         alert('Upload failed. Please try again.');
+        URL.revokeObjectURL(localUrl);
       }
-      URL.revokeObjectURL(localUrl);
   });
   uploadPromises.push(job);
 }
