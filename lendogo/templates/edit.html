@@ -242,7 +242,9 @@ async function handleFileUpload(file, targetSlot){
 
   targetSlot.querySelector('.uploading-overlay')?.remove();
   if(cloudUrl) {
-    targetSlot.querySelector('img').src = cloudUrl + '?w=200&h=200&c_fill';
+    const img = targetSlot.querySelector('img'); // <-- ONLY LINE CHANGED
+    img.src = ''; // <-- ONLY LINE ADDED: force refresh for Chrome
+    img.src = cloudUrl + '?w=200&h=200&c_fill';
     targetSlot.querySelector('input[name$="-image"]').value = cloudUrl;
   } else {
     targetSlot.remove();
