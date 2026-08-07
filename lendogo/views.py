@@ -287,9 +287,6 @@ def edit_listing(request, pk):
     listing = get_object_or_404(Listing, pk=pk, seller=request.user)
     existing_images = listing.images.all() # GET DB IMAGES
 
-    # FIX 1: Use modelformset_factory so we get real forms with id + DELETE for each image
-    ImageFormSet = modelformset_factory(ListingImage, fields=['image'], extra=max(3, existing_images.count()), can_delete=True)
-
     if request.method == 'POST':
         # PATCH: Fix image orientation before processing
         fixed_files = {}
@@ -303,23 +300,25 @@ def edit_listing(request, pk):
             request.FILES[k] = v
 
         form = ListingForm(request.POST, request.FILES, instance=listing)
-        # FIX 2: Use queryset instead of instance
-        formset = ImageFormSet(request.POST, request.FILES, queryset=existing_images)
+        # CHANGE 1: ADD can_delete=True HERE
+        formset = ImageFormSet(request.POST, request.FILES, instance=listing, queryset=existing_images)
 
         if form.is_valid():
             with transaction.atomic():
                 listing = form.save()
 
-                # FIX 3: Handle save/delete properly without crashing on empty forms
-                instances = formset.save(commit=False)
-                for obj in instances:
-                    if obj.image: # skip empty extra forms
-                        obj.listing = listing # set FK because we removed instance=listing
-                        obj.save()
-                for obj in formset.deleted_objects: # this handles delete
-                    obj.delete()
+                # CHANGE 2: DELETE THIS ENTIRE BLOCK
+                # for img_form in formset:
+                # if img_form.instance.pk:
+                # delete_key = img_form.prefix + '-DELETE'
+                # if request.POST.get(delete_key) == 'on':
+                # img_form.instance.delete()
+                # continue
 
-                # 2. SAVE/UPDATE IMAGES WITH CLOUDINARY URL FROM JS
+                # CHANGE 3: REPLACE IT WITH THIS 1 LINE
+                formset.save() # This now handles delete + empty forms for us
+
+                # 2. SAVE/UPDATE IMAGES WITH URL - KEEP YOURS 100%
                 for img_form in formset:
                     image_url = request.POST.get(img_form.prefix + '-image')
                     if image_url and image_url.startswith('https://'):
@@ -331,13 +330,13 @@ def edit_listing(request, pk):
                             # Create new
                             ListingImage.objects.create(listing=listing, image=image_url)
 
-                # 3. HANDLE NEW UPLOADS FROM JS THAT DON'T HAVE A FORM
+                # 3. HANDLE NEW UPLOADS FROM JS THAT DON'T HAVE A FORM - KEEP YOURS
                 for key, value in request.POST.items():
                     if key.startswith('listingimage_set-') and key.endswith('-image') and value.startswith('https://'):
                         if not listing.images.filter(image=value).exists():
                             ListingImage.objects.create(listing=listing, image=value)
 
-                # 4. HANDLE VIDEO
+                # 4. HANDLE VIDEO - KEEP YOURS
                 video_url = request.POST.get('video', '')
                 listing.video = video_url if video_url else None
                 listing.save(update_fields=['video'])
@@ -351,8 +350,7 @@ def edit_listing(request, pk):
 
     else:
         form = ListingForm(instance=listing)
-        # FIX 4: Use queryset here too
-        formset = ImageFormSet(queryset=existing_images)
+        formset = ImageFormSet(instance=listing, queryset=existing_images)
 
     categories = Category.objects.all()
     return render(request, 'edit.html', {
@@ -362,7 +360,6 @@ def edit_listing(request, pk):
         'categories': categories,
         'existing_images': existing_images # Pass to template as backup
     })
-
 # FIX 4: MANUAL BOOST FOR FRIENDS/ADMIN
 @login_required
 def manual_boost(request, pk):
