@@ -21,7 +21,7 @@
 
 /* KEY FIX FOR CHROME BUG */
 input[type="file"] { display: none!important; }
-input[name$="-image"] { 
+input[name$="-image"] {
     position: absolute;
     left: -9999px;
     opacity: 0;
@@ -54,14 +54,14 @@ input[name$="-id"] { position: absolute; left: -9999px; }
     {% endfor %}
   {% endif %}
 
-  <form method="POST" enctype="multipart/form-data" id="editForm" novalidate> <!-- ADDED novalidate -->
+  <form method="POST" enctype="multipart/form-data" id="editForm" novalidate>
     {% csrf_token %}
 
-    {% if form.errors or formset.errors %}
+    {# FIX: Only show main form errors. Hide formset.errors so users don't see "Enter valid URL" #}
+    {% if form.errors %}
     <div class="alert alert-danger mb-3">
       <strong>Please fix these errors:</strong>
       {{ form.errors }}
-      {{ formset.errors }}
     </div>
     {% endif %}
 
@@ -228,7 +228,7 @@ async function uploadToCloudinary(file, type = 'image') {
   }
 }
 
-// PHOTO UPLOAD - NOW FILLS FORMSET INPUTS
+// PHOTO UPLOAD - FILLS FORMSET INPUTS
 document.getElementById('addPhotoBtn').addEventListener('click', () => document.getElementById('multiFileInput').click());
 document.getElementById('multiFileInput').addEventListener('change', async e => {
   if(!e.target.files[0]) return;
@@ -236,14 +236,14 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
   const localUrl = URL.createObjectURL(file);
   const slot = document.createElement('div');
   slot.className = 'photo-slot filled';
-  slot.innerHTML = `<img src="${localUrl}" class="photo-preview"><div class="uploading-overlay">Uploading...<div class="spinner-border spinner-border-sm mt-2"></div></div>`;
+  slot.innerHTML = `<img src="${localUrl}" class="photo-preview"><div class="uploading-overlay">Uploading...<div class="spinner-border spinner-border-sm mt-2"></div></div><div class="photo-actions"><button type="button" class="btn btn-sm btn-danger delete-new-btn" title="Delete"><i class="bi bi-trash"></i></button></div>`;
   document.getElementById('photoGrid').insertBefore(slot, document.getElementById('addPhotoBtn'));
 
   const job = compressImage(file).then(c => uploadToCloudinary(c, 'image')).then(cloudUrl => {
       slot.querySelector('.uploading-overlay')?.remove();
       if(cloudUrl) {
         slot.querySelector('img').src = cloudUrl;
-        
+
         // KEY: Find first empty formset image input and fill it
         let filled = false;
         document.querySelectorAll('input[name$="-image"]').forEach(input => {
@@ -254,12 +254,29 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
         });
 
       } else {
-        slot.querySelector('.uploading-overlay').innerHTML = 'Failed<br><small>Will skip</small>';
+        slot.remove(); // Remove failed upload
+        alert('Upload failed. Please try again.');
       }
       URL.revokeObjectURL(localUrl);
   });
   uploadPromises.push(job);
   e.target.value = '';
+});
+
+// DELETE EXISTING PHOTO
+document.addEventListener('click', function(e) {
+    if(e.target.closest('.delete-btn')){
+        const slot = e.target.closest('.photo-slot');
+        const deleteInput = slot.querySelector('input[name$="-DELETE"]');
+        if(deleteInput){
+            deleteInput.value = 'on'; // Tell Django to delete
+            slot.classList.add('deleted');
+        }
+    }
+    // DELETE NEW UPLOADED PHOTO
+    if(e.target.closest('.delete-new-btn')){
+        e.target.closest('.photo-slot').remove();
+    }
 });
 
 // VIDEO UPLOAD - 30MB LIMIT
@@ -270,7 +287,7 @@ document.addEventListener('click', e => { if(e.target.id === 'changeVideoBtn') v
 videoFileInput.addEventListener('change', async e => {
   if (e.target.files[0]) {
     const file = e.target.files[0];
-    
+
     if(file.size > 30000000){
         alert("Video too big. Max 30MB allowed. Please record a shorter video.");
         e.target.value = '';
@@ -296,7 +313,7 @@ videoFileInput.addEventListener('change', async e => {
 });
 
 // DELETE VIDEO
-document.addEventListener('click', e => { 
+document.addEventListener('click', e => {
     if(e.target.id === 'removeVideoBtn'){
       document.getElementById('videoUrlInput').value = '';
       document.getElementById('videoPreview').classList.add('d-none');
