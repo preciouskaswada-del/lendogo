@@ -22,7 +22,7 @@
 /* KEY FIX FOR CHROME BUG */
 input[type="file"] { display: none!important; }
 input[name$="-image"] { position: absolute; left: -9999px; opacity: 0; }
-input[name$="-DELETE"] { position: absolute; left: -9999px; opacity: 0; } /* CHANGED: was display:none */
+input[name$="-DELETE"] { position: absolute; left: -9999px; opacity: 0; }
 input[name$="-id"] { position: absolute; left: -9999px; }
 
 .add-card { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 4px; cursor: pointer; color: #6b7280; font-weight: 500; font-size: 12px; width: 100%; height: 100%; border: 2px dashed #d1d5db; border-radius: 12px; }
@@ -89,7 +89,7 @@ input[name$="-id"] { position: absolute; left: -9999px; }
             {{ img_form.DELETE }}
             <input type="file" accept="image/*" class="file-input">
             {% if img_form.instance.pk and img_form.instance.image %}
-              <img src="{{ img_form.instance.image }}?w=200&h=200&c_fill" class="photo-preview" alt="Listing photo" loading="lazy">
+              <img src="{{ img_form.instance.image }}?w=200&h=200&c_fill" class="photo-preview" alt="Listing photo" loading="lazy" decoding="async"> <!-- ADDED decoding -->
               <div class="photo-actions">
                 <button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button>
                 <button type="button" class="btn btn-sm btn-danger delete-btn" title="Delete"><i class="bi bi-trash"></i></button>
@@ -112,7 +112,7 @@ input[name$="-id"] { position: absolute; left: -9999px; }
         <div class="border rounded-3 p-4 text-center bg-light" id="videoBox">
           {% if form.instance.video %}
           <div id="videoPreview">
-            <video src="{{ form.instance.video }}" controls class="w-100 rounded" style="max-height:300px;"></video>
+            <video src="{{ form.instance.video }}" controls class="w-100 rounded" style="max-height:300px;" preload="metadata" loading="lazy"></video> <!-- FIX: lazy load video -->
             <div class="mt-2">
                 <button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button>
                 <button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn"><i class="bi bi-trash"></i> Remove</button>
@@ -210,7 +210,7 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
   e.target.value = '';
 });
 
-// FULL FUNCTION - YOURS
+// FIX 1: ADD CHANGE BUTTON TO NEW PHOTOS + FIX PREVIEW
 async function handleFileUpload(file, targetSlot){
   const localUrl = URL.createObjectURL(file);
   let isNew = false;
@@ -221,12 +221,15 @@ async function handleFileUpload(file, targetSlot){
     let newIndex = parseInt(totalForms.value);
     targetSlot = document.createElement('div');
     targetSlot.className = 'photo-slot filled';
-    targetSlot.innerHTML = `<img src="${localUrl}" class="photo-preview" loading="lazy"><div class="uploading-overlay">Uploading...<div class="spinner-border spinner-border-sm mt-2"></div></div><div class="photo-actions"><button type="button" class="btn btn-sm btn-danger delete-new-btn" title="Delete"><i class="bi bi-trash"></i></button></div><input type="hidden" name="listingimage_set-${newIndex}-image"><input type="checkbox" name="listingimage_set-${newIndex}-DELETE" style="position:absolute;left:-9999px;opacity:0">`; // FIXED: checkbox not hidden
+    // ADDED: change-btn so new photos can be replaced. This fixes "adding where none"
+    targetSlot.innerHTML = `<img src="${localUrl}" class="photo-preview" loading="lazy" decoding="async"><div class="uploading-overlay">Uploading...<div class="spinner-border spinner-border-sm mt-2"></div></div><div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-new-btn" title="Delete"><i class="bi bi-trash"></i></button></div><input type="file" accept="image/*" class="file-input"><input type="hidden" name="listingimage_set-${newIndex}-image"><input type="checkbox" name="listingimage_set-${newIndex}-DELETE" style="position:absolute;left:-9999px;opacity:0">`;
     document.getElementById('photoGrid').insertBefore(targetSlot, document.getElementById('addPhotoBtn'));
     totalForms.value = newIndex + 1;
   } else {
     targetSlot.querySelector('img').src = localUrl;
-    targetSlot.innerHTML += `<div class="uploading-overlay">Uploading...<div class="spinner-border spinner-border-sm mt-2"></div></div>`;
+    if(!targetSlot.querySelector('.uploading-overlay')){
+        targetSlot.innerHTML += `<div class="uploading-overlay">Uploading...<div class="spinner-border spinner-border-sm mt-2"></div></div>`;
+    }
   }
 
   const job = compressImage(file).then(c => uploadToCloudinary(c, 'image')).then(cloudUrl => {
@@ -234,7 +237,7 @@ async function handleFileUpload(file, targetSlot){
       if(cloudUrl) {
         targetSlot.querySelector('img').src = cloudUrl + '?w=200&h=200&c_fill';
         targetSlot.querySelector('input[name$="-image"]').value = cloudUrl;
-        URL.revokeObjectURL(localUrl);
+        URL.revokeObjectURL(localUrl); // FIX 2: LOW MEMORY - free memory
       } else {
         targetSlot.remove();
         alert('Upload failed. Please try again.');
@@ -248,7 +251,7 @@ async function handleFileUpload(file, targetSlot){
 document.addEventListener('click', function(e) {
     if(e.target.closest('.delete-btn')){
         const slot = e.target.closest('.photo-slot');
-        const deleteInput = slot.querySelector('input[name$="-DELETE"]'); // FIXED: removed [type="checkbox"]
+        const deleteInput = slot.querySelector('input[name$="-DELETE"]');
         if(deleteInput){
             deleteInput.checked = true;
             slot.classList.add('deleted');
@@ -273,7 +276,7 @@ videoFileInput.addEventListener('change', async e => {
     const job = uploadToCloudinary(file, 'video').then(cloudUrl => {
       if(cloudUrl) {
         document.getElementById('videoUrlInput').value = cloudUrl;
-        document.getElementById('videoPreview').innerHTML = `<video src="${cloudUrl}" controls class="w-100 rounded" style="max-height:300px;"></video><div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button><button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn"><i class="bi bi-trash"></i> Remove</button></div>`;
+        document.getElementById('videoPreview').innerHTML = `<video src="${cloudUrl}" controls class="w-100 rounded" style="max-height:300px;" preload="metadata" loading="lazy"></video><div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button><button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn"><i class="bi bi-trash"></i> Remove</button></div>`;
       }
     });
     uploadPromises.push(job);
