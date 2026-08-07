@@ -89,7 +89,7 @@ input[name$="-id"] { position: absolute; left: -9999px; }
             {{ img_form.DELETE }}
             <input type="file" accept="image/*" class="file-input">
             {% if img_form.instance.pk and img_form.instance.image %}
-              <img src="{{ img_form.instance.image }}?w=200&h=200&c_fill" class="photo-preview" alt="Listing photo" loading="lazy" decoding="async"> <!-- ADDED decoding -->
+              <img src="{{ img_form.instance.image }}?w=200&h=200&c_fill" class="photo-preview" alt="Listing photo" loading="lazy" decoding="async">
               <div class="photo-actions">
                 <button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button>
                 <button type="button" class="btn btn-sm btn-danger delete-btn" title="Delete"><i class="bi bi-trash"></i></button>
@@ -112,7 +112,7 @@ input[name$="-id"] { position: absolute; left: -9999px; }
         <div class="border rounded-3 p-4 text-center bg-light" id="videoBox">
           {% if form.instance.video %}
           <div id="videoPreview">
-            <video src="{{ form.instance.video }}" controls class="w-100 rounded" style="max-height:300px;" preload="metadata" loading="lazy"></video> <!-- FIX: lazy load video -->
+            <video src="{{ form.instance.video }}" controls class="w-100 rounded" style="max-height:300px;" preload="metadata" loading="lazy"></video>
             <div class="mt-2">
                 <button type="button" class="btn btn-sm btn-outline-primary" id="changeVideoBtn"><i class="bi bi-arrow-repeat"></i> Change</button>
                 <button type="button" class="btn btn-sm btn-outline-danger" id="removeVideoBtn"><i class="bi bi-trash"></i> Remove</button>
@@ -155,8 +155,9 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-function compressImage(file, maxWidth = 400, quality = 0.3){
-    if(file.size < 300000) return Promise.resolve(file);
+// FIX 1: LESS AGGRESSIVE COMPRESSION TO SAVE RAM
+function compressImage(file, maxWidth = 300, quality = 0.25){ // CHANGED: 400->300, 0.3->0.25
+    if(file.size < 200000) return Promise.resolve(file); // CHANGED: 300000->200000
     return new Promise((resolve) => {
         const img = new Image();
         const objectUrl = URL.createObjectURL(file);
@@ -210,7 +211,7 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
   e.target.value = '';
 });
 
-// FIX 1: ADD CHANGE BUTTON TO NEW PHOTOS + FIX PREVIEW
+// FIX 2: ADD CHANGE BUTTON TO NEW PHOTOS + FREE MEMORY FAST
 async function handleFileUpload(file, targetSlot){
   const localUrl = URL.createObjectURL(file);
   let isNew = false;
@@ -221,33 +222,35 @@ async function handleFileUpload(file, targetSlot){
     let newIndex = parseInt(totalForms.value);
     targetSlot = document.createElement('div');
     targetSlot.className = 'photo-slot filled';
-    // ADDED: change-btn so new photos can be replaced. This fixes "adding where none"
+    // FIX: Added change-btn here so new photos can be replaced too
     targetSlot.innerHTML = `<img src="${localUrl}" class="photo-preview" loading="lazy" decoding="async"><div class="uploading-overlay">Uploading...<div class="spinner-border spinner-border-sm mt-2"></div></div><div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-new-btn" title="Delete"><i class="bi bi-trash"></i></button></div><input type="file" accept="image/*" class="file-input"><input type="hidden" name="listingimage_set-${newIndex}-image"><input type="checkbox" name="listingimage_set-${newIndex}-DELETE" style="position:absolute;left:-9999px;opacity:0">`;
     document.getElementById('photoGrid').insertBefore(targetSlot, document.getElementById('addPhotoBtn'));
     totalForms.value = newIndex + 1;
   } else {
-    targetSlot.querySelector('img').src = localUrl;
+    const img = targetSlot.querySelector('img');
+    img.src = localUrl;
     if(!targetSlot.querySelector('.uploading-overlay')){
         targetSlot.innerHTML += `<div class="uploading-overlay">Uploading...<div class="spinner-border spinner-border-sm mt-2"></div></div>`;
     }
   }
 
-  const job = compressImage(file).then(c => uploadToCloudinary(c, 'image')).then(cloudUrl => {
-      targetSlot.querySelector('.uploading-overlay')?.remove();
-      if(cloudUrl) {
-        targetSlot.querySelector('img').src = cloudUrl + '?w=200&h=200&c_fill';
-        targetSlot.querySelector('input[name$="-image"]').value = cloudUrl;
-        URL.revokeObjectURL(localUrl); // FIX 2: LOW MEMORY - free memory
-      } else {
-        targetSlot.remove();
-        alert('Upload failed. Please try again.');
-        URL.revokeObjectURL(localUrl);
-      }
-  });
-  uploadPromises.push(job);
+  // FIX: Compress first, then upload, then free memory immediately
+  const compressed = await compressImage(file);
+  URL.revokeObjectURL(localUrl); // KEY: Free memory right after compress
+
+  const cloudUrl = await uploadToCloudinary(compressed, 'image');
+
+  targetSlot.querySelector('.uploading-overlay')?.remove();
+  if(cloudUrl) {
+    targetSlot.querySelector('img').src = cloudUrl + '?w=200&h=200&c_fill';
+    targetSlot.querySelector('input[name$="-image"]').value = cloudUrl;
+  } else {
+    targetSlot.remove();
+    alert('Upload failed. Please try again.');
+  }
 }
 
-// FULL DELETE FUNCTION - YOURS
+// FULL DELETE FUNCTION - YOURS UNCHANGED
 document.addEventListener('click', function(e) {
     if(e.target.closest('.delete-btn')){
         const slot = e.target.closest('.photo-slot');
@@ -285,7 +288,7 @@ videoFileInput.addEventListener('change', async e => {
 });
 document.addEventListener('click', e => { if(e.target.id === 'removeVideoBtn'){ document.getElementById('videoUrlInput').value = ''; document.getElementById('videoPreview').classList.add('d-none'); document.getElementById('videoUploadArea')?.classList.remove('d-none'); }});
 
-// FULL SUBMIT FUNCTION - YOURS
+// FULL SUBMIT FUNCTION - YOURS UNCHANGED
 document.getElementById('editForm').addEventListener('submit', function(e) {
   e.preventDefault();
   const btn = document.getElementById('postBtn');
