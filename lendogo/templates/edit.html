@@ -117,7 +117,7 @@ input[name$="-id"] { position: absolute; left: -9999px; }
             <input type="file" accept="image/*" class="file-input">
 
             {% if img_form.instance.pk and img_form.instance.image %}
-              <img src="{{ img_form.instance.image.url }}" class="photo-preview" alt="Listing photo" loading="lazy">
+              <img src="{{ img_form.instance.image }}" class="photo-preview" alt="Listing photo" loading="lazy">
               <div class="photo-actions">
                 <button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button>
                 <button type="button" class="btn btn-sm btn-danger delete-btn" title="Delete"><i class="bi bi-trash"></i></button>
@@ -128,13 +128,13 @@ input[name$="-id"] { position: absolute; left: -9999px; }
           {# LOOP 2: BACKUP - SHOW DB PHOTOS IF FORMSET IS EMPTY #}
           {% for img in existing_images %}
           <div class="photo-slot filled">
-            <img src="{{ img.image.url }}" class="photo-preview" alt="Listing photo" loading="lazy">
+            <img src="{{ img.image }}" class="photo-preview" alt="Listing photo" loading="lazy">
             <div class="photo-actions">
               <button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button>
               <button type="button" class="btn btn-sm btn-danger delete-btn" title="Delete"><i class="bi bi-trash"></i></button>
             </div>
             <input type="hidden" name="listingimage_set-{{ forloop.counter0 }}-id" value="{{ img.id }}">
-            <input type="hidden" name="listingimage_set-{{ forloop.counter0 }}-image" value="{{ img.image.url }}">
+            <input type="hidden" name="listingimage_set-{{ forloop.counter0 }}-image" value="{{ img.image }}">
             <input type="hidden" name="listingimage_set-{{ forloop.counter0 }}-DELETE" value="">
           </div>
           {% endfor %}
@@ -145,7 +145,7 @@ input[name$="-id"] { position: absolute; left: -9999px; }
               <i class="bi bi-plus-lg"></i>
               <span>Add Photo</span>
             </div>
-            <input type="file" id="multiFileInput" accept="image/*"> {# REMOVED capture #}
+            <input type="file" id="multiFileInput" accept="image/*">
           </div>
         </div>
         <div id="newImageUrls"></div>
