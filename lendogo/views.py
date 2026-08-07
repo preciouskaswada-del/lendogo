@@ -283,15 +283,10 @@ def mark_as_sold(request, pk):
     messages.success(request, f'{listing.product} marked as sold! This helps improve market prices for everyone.')
     return redirect('dashboard')
 
-from django.db import transaction, models
-from django.contrib import messages
-
 @login_required
 def edit_listing(request, pk):
     listing = get_object_or_404(Listing, pk=pk, seller=request.user)
 
-    # KEY FIX 1: Use inlineformset_factory with our ListingImageForm from forms.py
-    # And prefix MUST match what template uses. Template has no prefix = default 'listingimage_set'
     if request.method == 'POST':
         # PATCH: Fix image orientation before processing
         fixed_files = {}
@@ -305,53 +300,49 @@ def edit_listing(request, pk):
             request.FILES[k] = v
 
         form = ListingForm(request.POST, request.FILES, instance=listing)
-        # KEY FIX 2: Use ImageFormSet from forms.py. NO prefix
         formset = ImageFormSet(request.POST, request.FILES, instance=listing)
 
-        # KEY FIX 3: ONLY validate main form. Ignore formset validation errors
         if form.is_valid():
             with transaction.atomic():
                 listing = form.save()
 
-                # 1. SAVE EXISTING IMAGES + DELETES
-                # Only save forms that have a URL. Skip empty ones
+                # 1. HANDLE DELETES - Check the DELETE hidden input manually
                 for img_form in formset:
-                    if img_form.cleaned_data and not img_form.cleaned_data.get('DELETE'):
-                        image_url = img_form.cleaned_data.get('image')
-                        if image_url: # Has Cloudinary URL
-                            img_obj = img_form.save(commit=False)
-                            img_obj.listing = listing
-                            img_obj.save()
+                    if img_form.instance.pk:
+                        delete_key = img_form.prefix + '-DELETE'
+                        if request.POST.get(delete_key) == 'on':
+                            img_form.instance.delete()
+                            continue # skip to next
 
-                # Handle deletes
-                for obj in formset.deleted_objects:
-                    obj.delete()
-
-                # 2. HANDLE NEW CLOUDINARY UPLOADS FROM JS
-                # JS fills the first empty formset input. So formset already picked it up above
-                # But we double check in case JS added more than formset.extra
-                for key, value in request.POST.items():
-                    if key.endswith('-image') and value.startswith('https://'):
-                        if not listing.images.filter(image=value).exists():
-                            ListingImage.objects.create(listing=listing, image=value)
+                # 2. SAVE/UPDATE IMAGES WITH URL
+                for img_form in formset:
+                    image_url = request.POST.get(img_form.prefix + '-image')
+                    if image_url and image_url.startswith('https://'):
+                        if img_form.instance.pk:
+                            # Update existing
+                            if str(img_form.instance.image)!= image_url:
+                                img_form.instance.image = image_url
+                                img_form.instance.save()
+                        else:
+                            # Create new
+                            if not listing.images.filter(image=image_url).exists():
+                                ListingImage.objects.create(listing=listing, image=image_url)
 
                 # 3. HANDLE VIDEO
                 video_url = request.POST.get('video', '')
-                if hasattr(listing, 'video'):
-                    listing.video = video_url if video_url else None
-                    listing.save(update_fields=['video'])
+                listing.video = video_url if video_url else None
+                listing.save(update_fields=['video'])
 
             messages.success(request, 'Listing updated successfully')
             return redirect('dashboard')
 
         else:
             print("FORM ERRORS:", form.errors)
-            print("FORMSET ERRORS:", formset.errors) # For debugging only
             messages.error(request, 'Please fix the errors below')
 
     else:
         form = ListingForm(instance=listing)
-        formset = ImageFormSet(instance=listing) # KEY: No queryset, use instance
+        formset = ImageFormSet(instance=listing)
 
     categories = Category.objects.all()
     return render(request, 'edit.html', {
@@ -360,7 +351,6 @@ def edit_listing(request, pk):
         'listing': listing,
         'categories': categories
     })
-
 # FIX 4: MANUAL BOOST FOR FRIENDS/ADMIN
 @login_required
 def manual_boost(request, pk):
