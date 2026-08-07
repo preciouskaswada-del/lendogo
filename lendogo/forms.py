@@ -19,6 +19,7 @@ ALLOWED_IMAGE_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
 MW_PHONE_REGEX = re.compile(r'^(\+265|0)[89]\d{8}$')
 DANGEROUS_CHARS = re.compile(r'[<>"\'%;(){}]')
 
+
 class ListingForm(forms.ModelForm):
     price = forms.CharField(
         max_length=25,
@@ -59,8 +60,8 @@ class ListingForm(forms.ModelForm):
             }),
             'latitude': forms.HiddenInput(),
             'longitude': forms.HiddenInput(),
-            'video': forms.URLInput(attrs={ # FIX 1: Changed from FileInput to URLInput
-                'class': 'd-none' # Hidden, JS fills Cloudinary URL
+            'video': forms.URLInput(attrs={ 
+                'class': 'd-none' 
             })
         }
 
@@ -106,7 +107,7 @@ class ListingForm(forms.ModelForm):
             raise ValidationError("Description too short. Min 10 characters helps buyers.")
         return desc
 
-    def clean_video(self): # FIX 2: Accept URL string from Cloudinary
+    def clean_video(self):
         video = self.cleaned_data.get('video')
         if not video:
             return None
@@ -114,7 +115,6 @@ class ListingForm(forms.ModelForm):
             if not video.startswith('https://'):
                 raise ValidationError("Invalid video URL")
             return video
-        # Fallback for direct upload
         if isinstance(video, UploadedFile):
             if video.size > MAX_VIDEO_SIZE:
                 raise ValidationError(f"Video is {video.size / 1024 / 1024:.1f}MB. Max: 50MB")
@@ -155,8 +155,9 @@ class ListingForm(forms.ModelForm):
                 raise ValidationError("Invalid longitude")
         return lng
 
+
 class ListingImageForm(forms.ModelForm):
-    image = forms.CharField(required=False, widget=forms.HiddenInput()) # FIX 3: CharField so we can put URL
+    image = forms.CharField(required=False, widget=forms.HiddenInput())
     
     class Meta:
         model = ListingImage
@@ -164,9 +165,10 @@ class ListingImageForm(forms.ModelForm):
 
     def clean_image(self):
         image = self.cleaned_data.get('image')
-        if not image: # FIX 4: Return None not '' so Django skips empty forms
+        if not image:
             return None
-        return image # Cloudinary URL string
+        return image
+
 
 class SignUpForm(UserCreationForm):
     email = forms.EmailField(
@@ -207,6 +209,7 @@ class SignUpForm(UserCreationForm):
         if len(username) < 3:
             raise ValidationError("Username too short. Min 3 characters.")
         return username
+
 
 class RentalListingForm(forms.ModelForm):
     price = forms.CharField(
@@ -340,7 +343,8 @@ class RentalListingForm(forms.ModelForm):
             image.name = re.sub(r'[^a-zA-Z0-9._-]', '', image.name)[:100]
         return image
 
-# FIX 5: Tell formset to ignore empty forms
+
+# FINAL FIX: validate_min=False so empty forms don't throw errors
 ImageFormSet = inlineformset_factory(
     Listing,
     ListingImage,
@@ -349,8 +353,8 @@ ImageFormSet = inlineformset_factory(
     max_num=10,
     can_delete=True,
     can_delete_extra=False,
-    fields=('image',) 
+    fields=('image',),
+    validate_min=False,
+    validate_max=False
 )
-
-# KEY: This makes empty image fields = None instead of ''
-ImageFormSet.form.base_fields['image'].empty_values = [None, '', [], (), {}]
+ImageFormSet.form.base_fields['image'].empty_values = [None, '']
