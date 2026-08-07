@@ -117,7 +117,7 @@ input[name$="-id"] { position: absolute; left: -9999px; }
             <input type="file" accept="image/*" class="file-input">
 
             {% if img_form.instance.pk and img_form.instance.image %}
-              <img src="{{ img_form.instance.image }}?w=400&h=400&c_fill" class="photo-preview" alt="Listing photo" loading="lazy">
+              <img src="{{ img_form.instance.image }}?w=200&h=200&c_fill" class="photo-preview" alt="Listing photo" loading="lazy">
               <div class="photo-actions">
                 <button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button>
                 <button type="button" class="btn btn-sm btn-danger delete-btn" title="Delete"><i class="bi bi-trash"></i></button>
@@ -128,7 +128,7 @@ input[name$="-id"] { position: absolute; left: -9999px; }
           {# LOOP 2: BACKUP - SHOW DB PHOTOS IF FORMSET IS EMPTY #}
           {% for img in existing_images %}
           <div class="photo-slot filled">
-            <img src="{{ img.image }}?w=400&h=400&c_fill" class="photo-preview" alt="Listing photo" loading="lazy">
+            <img src="{{ img.image }}?w=200&h=200&c_fill" class="photo-preview" alt="Listing photo" loading="lazy">
             <div class="photo-actions">
               <button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button>
               <button type="button" class="btn btn-sm btn-danger delete-btn" title="Delete"><i class="bi bi-trash"></i></button>
@@ -205,7 +205,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('editForm').setAttribute('novalidate', 'novalidate');
 });
 
-// FIX 1: Compress less to save RAM
+// Compress harder for memory
 function compressImage(file, maxWidth = 400, quality = 0.3){
     if(file.size < 300000) return Promise.resolve(file);
     return new Promise((resolve) => {
@@ -242,7 +242,7 @@ async function uploadToCloudinary(file, type = 'image') {
   }
 }
 
-// NEW: HANDLE CHANGE BUTTON
+// HANDLE CHANGE BUTTON - FIXED
 document.addEventListener('click', function(e){
     if(e.target.closest('.change-btn')){
         const slot = e.target.closest('.photo-slot');
@@ -265,11 +265,13 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
 
 async function handleFileUpload(file, targetSlot){
   const localUrl = URL.createObjectURL(file);
+  let isNew = false;
+
   if(!targetSlot){
-    // FIX 2: Add loading="lazy" to new images
+    isNew = true;
     targetSlot = document.createElement('div');
     targetSlot.className = 'photo-slot filled';
-    targetSlot.innerHTML = `<img src="${localUrl}" class="photo-preview" loading="lazy"><div class="uploading-overlay">Uploading...<div class="spinner-border spinner-border-sm mt-2"></div></div><div class="photo-actions"><button type="button" class="btn btn-sm btn-danger delete-new-btn" title="Delete"><i class="bi bi-trash"></i></button></div>`;
+    targetSlot.innerHTML = `<img src="${localUrl}" class="photo-preview" loading="lazy"><div class="uploading-overlay">Uploading...<div class="spinner-border spinner-border-sm mt-2"></div></div><div class="photo-actions"><button type="button" class="btn btn-sm btn-danger delete-new-btn" title="Delete"><i class="bi bi-trash"></i></button></div><input type="hidden" name="listingimage_set-__prefix__-image"><input type="hidden" name="listingimage_set-__prefix__-DELETE">`;
     document.getElementById('photoGrid').insertBefore(targetSlot, document.getElementById('addPhotoBtn'));
   } else {
     targetSlot.querySelector('img').src = localUrl;
@@ -279,10 +281,16 @@ async function handleFileUpload(file, targetSlot){
   const job = compressImage(file).then(c => uploadToCloudinary(c, 'image')).then(cloudUrl => {
       targetSlot.querySelector('.uploading-overlay')?.remove();
       if(cloudUrl) {
-        // FIX 3: Use small thumb + revoke URL immediately
-        targetSlot.querySelector('img').src = cloudUrl + '?w=400&h=400&c_fill';
+        targetSlot.querySelector('img').src = cloudUrl + '?w=200&h=200&c_fill';
         const input = targetSlot.querySelector('input[name$="-image"]');
         if(input) input.value = cloudUrl;
+        if(isNew){ // Fix index for new images
+            let totalForms = document.querySelector('#id_listingimage_set-TOTAL_FORMS');
+            let newIndex = parseInt(totalForms.value);
+            input.name = input.name.replace('__prefix__', newIndex);
+            targetSlot.querySelector('input[name$="-DELETE"]').name = `listingimage_set-${newIndex}-DELETE`;
+            totalForms.value = newIndex + 1;
+        }
         URL.revokeObjectURL(localUrl);
       } else {
         targetSlot.remove();
@@ -293,14 +301,16 @@ async function handleFileUpload(file, targetSlot){
   uploadPromises.push(job);
 }
 
-// DELETE
+// DELETE - FIXED TO USE.checked
 document.addEventListener('click', function(e) {
     if(e.target.closest('.delete-btn')){
         const slot = e.target.closest('.photo-slot');
         const deleteInput = slot.querySelector('input[name$="-DELETE"]');
         if(deleteInput){
+            deleteInput.checked = true; // KEY FIX: Django needs checked
             deleteInput.value = 'on';
             slot.classList.add('deleted');
+            slot.querySelector('img').style.opacity = '0.3';
         }
     }
     if(e.target.closest('.delete-new-btn')){
