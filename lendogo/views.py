@@ -287,6 +287,9 @@ def edit_listing(request, pk):
     listing = get_object_or_404(Listing, pk=pk, seller=request.user)
     existing_images = listing.images.all() # GET DB IMAGES
 
+    # ADD 1: Force enough forms so every existing image gets a form with id + DELETE
+    ImageFormSet = modelformset_factory(ListingImage, fields=['image'], extra=max(3, existing_images.count()), can_delete=True)
+
     if request.method == 'POST':
         # PATCH: Fix image orientation before processing
         fixed_files = {}
@@ -301,13 +304,16 @@ def edit_listing(request, pk):
 
         form = ListingForm(request.POST, request.FILES, instance=listing)
         # KEY FIX: Pass queryset so formset creates forms for existing images
-        formset = ImageFormSet(request.POST, request.FILES, instance=listing, queryset=existing_images)
+        formset = ImageFormSet(request.POST, request.FILES, queryset=existing_images) # REMOVED instance=listing
 
         if form.is_valid():
             with transaction.atomic():
                 listing = form.save()
 
-                # 1. HANDLE DELETES
+                # ADD 2: Let Django handle delete + update for us
+                formset.save()
+
+                # 1. HANDLE DELETES - Your old code. Keep for safety
                 for img_form in formset:
                     if img_form.instance.pk:
                         delete_key = img_form.prefix + '-DELETE'
@@ -349,7 +355,7 @@ def edit_listing(request, pk):
     else:
         form = ListingForm(instance=listing)
         # KEY FIX: Pass queryset here too so GET shows existing photos
-        formset = ImageFormSet(instance=listing, queryset=existing_images)
+        formset = ImageFormSet(queryset=existing_images) # REMOVED instance=listing
 
     categories = Category.objects.all()
     return render(request, 'edit.html', {
@@ -357,8 +363,9 @@ def edit_listing(request, pk):
         'formset': formset,
         'listing': listing,
         'categories': categories,
-        'existing_images': existing_images # Pass to template as backup
+        'existing_images': existing_images 
     })
+
 # FIX 4: MANUAL BOOST FOR FRIENDS/ADMIN
 @login_required
 def manual_boost(request, pk):
