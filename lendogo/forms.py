@@ -11,7 +11,7 @@ from.models import Listing, ListingImage, RentalListing
 
 User = get_user_model()
 
-MAX_PRICE = Decimal('1000000.00') # 1 Billion MWK
+MAX_PRICE = Decimal('1000000000.00') # 1 Billion MWK
 MAX_VIDEO_SIZE = 50 * 1024 * 1024
 MAX_IMAGE_SIZE = 10 * 1024 * 1024
 ALLOWED_VIDEO_TYPES = {'video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska'}
