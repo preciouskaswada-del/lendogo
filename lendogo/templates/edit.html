@@ -51,10 +51,19 @@ input[name$="-id"] { position: absolute; left: -9999px; }
 
   <form method="POST" enctype="multipart/form-data" id="editForm" novalidate>
     {% csrf_token %}
-    {% if form.errors %}
+    {% if form.errors or formset.errors %}
     <div class="alert alert-danger mb-3">
       <strong>Please fix these errors:</strong>
-      {{ form.errors }}
+      <ul class="mb-0">
+      {% for field, errors in form.errors.items %}
+        <li><b>{{ field }}:</b> {{ errors|join:", " }}</li>
+      {% endfor %}
+      {% for formset_form in formset %}
+        {% for field, errors in formset_form.errors.items %}
+          <li><b>Photo {{ forloop.parentloop.counter }} - {{ field }}:</b> {{ errors|join:", " }}</li>
+        {% endfor %}
+      {% endfor %}
+      </ul>
     </div>
     {% endif %}
 
@@ -210,7 +219,7 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
   e.target.value = '';
 });
 
-// SMART PREVIEW: Desktop=Image, Android=Green Box
+// FINAL FIX: ID field + Preview for Desktop
 async function handleFileUpload(file, targetSlot){
   let isNew = false;
   let newIndex = 0;
@@ -237,15 +246,14 @@ async function handleFileUpload(file, targetSlot){
 
   targetSlot.querySelector('.uploading-overlay')?.remove();
   if(cloudUrl) {
-    // DETECT LOW END ANDROID
     const isLowEnd = /Android/.test(navigator.userAgent) && (navigator.deviceMemory || 4) < 4;
     
     if(isLowEnd){
       // ANDROID: Green box to avoid crash
-      targetSlot.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:4px;background:#dcfce7;border:2px solid #22c55e;border-radius:12px;"><i class="bi bi-check-circle-fill" style="font-size:28px;color:#22c55e"></i><span style="font-size:11px;font-weight:600;color:#15803d">Uploaded</span></div><div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-new-btn" title="Delete"><i class="bi bi-trash"></i></button></div><input type="file" accept="image/*" class="file-input"><input type="hidden" name="listingimage_set-${newIndex}-image" value="${cloudUrl}"><input type="checkbox" name="listingimage_set-${newIndex}-DELETE" style="position:absolute;left:-9999px;opacity:0">`;
+      targetSlot.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:4px;background:#dcfce7;border:2px solid #22c55e;border-radius:12px;"><i class="bi bi-check-circle-fill" style="font-size:28px;color:#22c55e"></i><span style="font-size:11px;font-weight:600;color:#15803d">Uploaded</span></div><div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-new-btn" title="Delete"><i class="bi bi-trash"></i></button></div><input type="hidden" name="listingimage_set-${newIndex}-id" value=""><input type="file" accept="image/*" class="file-input"><input type="hidden" name="listingimage_set-${newIndex}-image" value="${cloudUrl}"><input type="checkbox" name="listingimage_set-${newIndex}-DELETE" style="position:absolute;left:-9999px;opacity:0">`;
     } else {
-      // DESKTOP/IPHONE: Show real preview
-      targetSlot.innerHTML = `<img src="${cloudUrl}?w=200&h=200&c_fill&_t=${Date.now()}" class="photo-preview" loading="lazy" decoding="async"><div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-new-btn" title="Delete"><i class="bi bi-trash"></i></button></div><input type="file" accept="image/*" class="file-input"><input type="hidden" name="listingimage_set-${newIndex}-image" value="${cloudUrl}"><input type="checkbox" name="listingimage_set-${newIndex}-DELETE" style="position:absolute;left:-9999px;opacity:0">`;
+      // DESKTOP/IPHONE: Show real preview - THIS WAS MISSING
+      targetSlot.innerHTML = `<img src="${cloudUrl}?w=200&h=200&c_fill&_t=${Date.now()}" class="photo-preview" loading="lazy" decoding="async"><div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-new-btn" title="Delete"><i class="bi bi-trash"></i></button></div><input type="hidden" name="listingimage_set-${newIndex}-id" value=""><input type="file" accept="image/*" class="file-input"><input type="hidden" name="listingimage_set-${newIndex}-image" value="${cloudUrl}"><input type="checkbox" name="listingimage_set-${newIndex}-DELETE" style="position:absolute;left:-9999px;opacity:0">`;
     }
     
   } else {
@@ -292,12 +300,13 @@ videoFileInput.addEventListener('change', async e => {
 });
 document.addEventListener('click', e => { if(e.target.id === 'removeVideoBtn'){ document.getElementById('videoUrlInput').value = ''; document.getElementById('videoPreview').classList.add('d-none'); document.getElementById('videoUploadArea')?.classList.remove('d-none'); }});
 
-// SUBMIT
-document.getElementById('editForm').addEventListener('submit', function(e) {
+// SUBMIT - WAIT FOR UPLOADS
+document.getElementById('editForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   const btn = document.getElementById('postBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+  await Promise.all(uploadPromises); // wait for cloudinary
   this.submit();
 });
 </script>
