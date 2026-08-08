@@ -263,7 +263,7 @@ async function handleFileUpload(file, targetSlot){
   }
 }
 
-// DELETE FUNCTION - FIXED TO UPDATE TOTAL_FORMS
+// DELETE FUNCTION
 document.addEventListener('click', function(e) {
     if(e.target.closest('.delete-btn')){
         const slot = e.target.closest('.photo-slot');
@@ -275,7 +275,6 @@ document.addEventListener('click', function(e) {
     }
     if(e.target.closest('.delete-new-btn')){
         e.target.closest('.photo-slot').remove();
-        // FIX: Update total forms count
         let totalForms = document.querySelector('#id_listingimage_set-TOTAL_FORMS');
         totalForms.value = document.querySelectorAll('#photoGrid.photo-slot.filled').length;
     }
@@ -304,20 +303,20 @@ videoFileInput.addEventListener('change', async e => {
 });
 document.addEventListener('click', e => { if(e.target.id === 'removeVideoBtn'){ document.getElementById('videoUrlInput').value = ''; document.getElementById('videoPreview').classList.add('d-none'); document.getElementById('videoUploadArea')?.classList.remove('d-none'); }});
 
-// SUBMIT - WAIT FOR UPLOADS + REMOVE EMPTY FORMS
+// SUBMIT - WAIT FOR UPLOADS + DISABLE EMPTY FORMS
 document.getElementById('editForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   const btn = document.getElementById('postBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
   await Promise.all(uploadPromises); // wait for cloudinary
-  
-  // FIX: Remove empty d-none slots so Django doesn't validate them
-  document.querySelectorAll('.photo-slot.d-none').forEach(slot => slot.remove());
+
+  // FIX: Disable empty d-none slots so Django ignores them
+  document.querySelectorAll('.photo-slot.d-none input').forEach(input => input.disabled = true);
   // FIX: Update TOTAL_FORMS to match actual filled slots
   let totalForms = document.querySelector('#id_listingimage_set-TOTAL_FORMS');
   totalForms.value = document.querySelectorAll('#photoGrid.photo-slot.filled').length;
-  
+
   this.submit();
 });
 </script>
