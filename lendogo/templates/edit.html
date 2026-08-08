@@ -210,7 +210,7 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
   e.target.value = '';
 });
 
-// FINAL WORKING VERSION: NO IMAGE PREVIEW FOR LOW END ANDROID
+// SMART PREVIEW: Desktop=Image, Android=Green Box
 async function handleFileUpload(file, targetSlot){
   let isNew = false;
   let newIndex = 0;
@@ -221,7 +221,7 @@ async function handleFileUpload(file, targetSlot){
     newIndex = parseInt(totalForms.value);
     targetSlot = document.createElement('div');
     targetSlot.className = 'photo-slot filled';
-    targetSlot.setAttribute('data-index', newIndex); // IMPORTANT FOR CHANGE
+    targetSlot.setAttribute('data-index', newIndex);
     targetSlot.innerHTML = `<div class="uploading-overlay">Uploading...<div class="spinner-border spinner-border-sm mt-2"></div></div>`;
     document.getElementById('photoGrid').insertBefore(targetSlot, document.getElementById('addPhotoBtn'));
     totalForms.value = newIndex + 1;
@@ -235,9 +235,19 @@ async function handleFileUpload(file, targetSlot){
   const compressed = await compressImage(file);
   const cloudUrl = await uploadToCloudinary(compressed, 'image');
 
+  targetSlot.querySelector('.uploading-overlay')?.remove();
   if(cloudUrl) {
-    // SUCCESS: Show green check instead of image to avoid Chrome crash
-    targetSlot.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:4px;background:#dcfce7;border:2px solid #22c55e;border-radius:12px;"><i class="bi bi-check-circle-fill" style="font-size:28px;color:#22c55e"></i><span style="font-size:11px;font-weight:600;color:#15803d">Uploaded</span></div><div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-new-btn" title="Delete"><i class="bi bi-trash"></i></button></div><input type="file" accept="image/*" class="file-input"><input type="hidden" name="listingimage_set-${newIndex}-image" value="${cloudUrl}"><input type="checkbox" name="listingimage_set-${newIndex}-DELETE" style="position:absolute;left:-9999px;opacity:0">`;
+    // DETECT LOW END ANDROID
+    const isLowEnd = /Android/.test(navigator.userAgent) && (navigator.deviceMemory || 4) < 4;
+    
+    if(isLowEnd){
+      // ANDROID: Green box to avoid crash
+      targetSlot.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:4px;background:#dcfce7;border:2px solid #22c55e;border-radius:12px;"><i class="bi bi-check-circle-fill" style="font-size:28px;color:#22c55e"></i><span style="font-size:11px;font-weight:600;color:#15803d">Uploaded</span></div><div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-new-btn" title="Delete"><i class="bi bi-trash"></i></button></div><input type="file" accept="image/*" class="file-input"><input type="hidden" name="listingimage_set-${newIndex}-image" value="${cloudUrl}"><input type="checkbox" name="listingimage_set-${newIndex}-DELETE" style="position:absolute;left:-9999px;opacity:0">`;
+    } else {
+      // DESKTOP/IPHONE: Show real preview
+      targetSlot.innerHTML = `<img src="${cloudUrl}?w=200&h=200&c_fill&_t=${Date.now()}" class="photo-preview" loading="lazy" decoding="async"><div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-new-btn" title="Delete"><i class="bi bi-trash"></i></button></div><input type="file" accept="image/*" class="file-input"><input type="hidden" name="listingimage_set-${newIndex}-image" value="${cloudUrl}"><input type="checkbox" name="listingimage_set-${newIndex}-DELETE" style="position:absolute;left:-9999px;opacity:0">`;
+    }
+    
   } else {
     targetSlot.remove();
     alert('Upload failed. Please try again.');
