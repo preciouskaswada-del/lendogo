@@ -210,7 +210,7 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
   e.target.value = '';
 });
 
-// FINAL FIX FOR ANDROID PREVIEW
+// FINAL FIX FOR ANDROID PREVIEW - ONLY 2 LINES ADDED
 async function handleFileUpload(file, targetSlot){
   let isNew = false;
   let newIndex = 0;
@@ -224,6 +224,8 @@ async function handleFileUpload(file, targetSlot){
     targetSlot.innerHTML = `<img id="img-${newIndex}" src="" class="photo-preview" loading="lazy" decoding="async" style="background:#e5e7eb"><div class="uploading-overlay">Uploading...<div class="spinner-border spinner-border-sm mt-2"></div></div><div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-new-btn" title="Delete"><i class="bi bi-trash"></i></button></div><input type="file" accept="image/*" class="file-input"><input type="hidden" name="listingimage_set-${newIndex}-image"><input type="checkbox" name="listingimage_set-${newIndex}-DELETE" style="position:absolute;left:-9999px;opacity:0">`;
     document.getElementById('photoGrid').insertBefore(targetSlot, document.getElementById('addPhotoBtn'));
     totalForms.value = newIndex + 1;
+
+    targetSlot.offsetHeight; // FIX 1: FORCE BROWSER TO PAINT NEW SLOT
   } else {
     if(!targetSlot.querySelector('.uploading-overlay')){
         targetSlot.innerHTML += `<div class="uploading-overlay">Uploading...<div class="spinner-border spinner-border-sm mt-2"></div></div>`;
@@ -238,8 +240,11 @@ async function handleFileUpload(file, targetSlot){
     const img = targetSlot.querySelector('img');
     img.src = cloudUrl + '?w=200&h=200&c_fill&_t=' + Date.now(); // CACHE BUST
     img.style.background = 'transparent';
-    img.style.display = 'none'; // FORCE REDRAW FIX FOR ANDROID
-    setTimeout(()=>{ img.style.display = 'block'; }, 50);
+    img.style.display = 'none';
+    setTimeout(()=>{
+      img.style.display = 'block';
+      targetSlot.offsetHeight; // FIX 2: FORCE REDRAW AFTER IMAGE LOAD
+    }, 50);
     targetSlot.querySelector('input[name$="-image"]').value = cloudUrl;
   } else {
     targetSlot.remove();
