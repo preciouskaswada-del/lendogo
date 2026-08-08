@@ -221,10 +221,12 @@ async function handleFileUpload(file, targetSlot){
     newIndex = parseInt(totalForms.value);
     targetSlot = document.createElement('div');
     targetSlot.className = 'photo-slot filled';
+    targetSlot.setAttribute('data-index', newIndex); // IMPORTANT FOR CHANGE
     targetSlot.innerHTML = `<div class="uploading-overlay">Uploading...<div class="spinner-border spinner-border-sm mt-2"></div></div>`;
     document.getElementById('photoGrid').insertBefore(targetSlot, document.getElementById('addPhotoBtn'));
     totalForms.value = newIndex + 1;
   } else {
+    newIndex = parseInt(targetSlot.getAttribute('data-index'));
     if(!targetSlot.querySelector('.uploading-overlay')){
         targetSlot.innerHTML = `<div class="uploading-overlay">Uploading...<div class="spinner-border spinner-border-sm mt-2"></div></div>` + targetSlot.innerHTML;
     }
