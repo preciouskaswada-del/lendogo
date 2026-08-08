@@ -161,7 +161,6 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('input[name$="-id"]').forEach(input => input.removeAttribute('required'));
 });
 
-// FAST COMPRESS
 function compressImage(file, maxWidth = 800, quality = 0.7){
     if(file.size < 500000) return Promise.resolve(file);
     return new Promise((resolve) => {
@@ -194,7 +193,6 @@ async function uploadToCloudinary(file, type = 'image') {
   return data.secure_url || null;
 }
 
-// CHANGE BUTTON
 document.addEventListener('click', function(e){
     if(e.target.closest('.change-btn')){
         const slot = e.target.closest('.photo-slot');
@@ -213,7 +211,6 @@ document.getElementById('multiFileInput').addEventListener('change', async e => 
   e.target.value = '';
 });
 
-// KEY FIX: Upload in background. Don't wait on submit
 async function handleFileUpload(file, targetSlot){
   let newIndex = 0;
   if(!targetSlot){
@@ -242,7 +239,6 @@ async function handleFileUpload(file, targetSlot){
   }
 }
 
-// DELETE
 document.addEventListener('click', function(e) {
     if(e.target.closest('.delete-btn')){
         const slot = e.target.closest('.photo-slot');
@@ -252,11 +248,10 @@ document.addEventListener('click', function(e) {
     if(e.target.closest('.delete-new-btn')){
         e.target.closest('.photo-slot').remove();
         let totalForms = document.querySelector('#id_listingimage_set-TOTAL_FORMS');
-        totalForms.value = document.querySelectorAll('#photoGrid.photo-slot.filled').length; // FIXED SPACE
+        totalForms.value = document.querySelectorAll('#photoGrid.photo-slot.filled').length; // FIX 1: added space
     }
 });
 
-// VIDEO
 const videoFileInput = document.getElementById('videoFileInput');
 document.getElementById('videoUploadBtn')?.addEventListener('click', () => videoFileInput.click());
 document.addEventListener('click', e => { if(e.target.id === 'changeVideoBtn') videoFileInput.click(); });
@@ -277,19 +272,18 @@ videoFileInput.addEventListener('change', async e => {
 });
 document.addEventListener('click', e => { if(e.target.id === 'removeVideoBtn'){ document.getElementById('videoUrlInput').value = ''; document.getElementById('videoPreview').classList.add('d-none'); document.getElementById('videoUploadArea')?.classList.remove('d-none'); }});
 
-// SUBMIT - FAST. Don't wait for uploads anymore
+// FIX 2: DISABLE ALL EMPTY FORMSET INPUTS BEFORE SUBMIT
 document.getElementById('editForm').addEventListener('submit', function(e) {
   const btn = document.getElementById('postBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
 
-  // Disable empty slots so Django ignores them
-  document.querySelectorAll('.photo-slot.d-none input').forEach(input => input.disabled = true);
-  // Update TOTAL_FORMS
-  let totalForms = document.querySelector('#id_listingimage_set-TOTAL_FORMS');
-  totalForms.value = document.querySelectorAll('#photoGrid.photo-slot.filled').length;
+  // Disable d-none slots AND deleted slots
+  document.querySelectorAll('.photo-slot.d-none input,.photo-slot.deleted input').forEach(input => input.disabled = true);
 
-  // No await. Submit immediately because URL is already in hidden input
+  // FIX: Count only filled and not deleted
+  let totalForms = document.querySelector('#id_listingimage_set-TOTAL_FORMS');
+  totalForms.value = document.querySelectorAll('#photoGrid.photo-slot.filled:not(.deleted)').length;
 });
 </script>
 {% endblock %}
