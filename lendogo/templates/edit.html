@@ -161,6 +161,10 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('input[name$="-image"]').forEach(input => {
         input.removeAttribute('required');
     });
+    // FIX 1: Also remove required from id fields so empty forms don't error
+    document.querySelectorAll('input[name$="-id"]').forEach(input => {
+        input.removeAttribute('required');
+    });
 });
 
 // LOW MEMORY FIX
@@ -247,15 +251,15 @@ async function handleFileUpload(file, targetSlot){
   targetSlot.querySelector('.uploading-overlay')?.remove();
   if(cloudUrl) {
     const isLowEnd = /Android/.test(navigator.userAgent) && (navigator.deviceMemory || 4) < 4;
-    
+
     if(isLowEnd){
       // ANDROID: Green box to avoid crash
       targetSlot.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:4px;background:#dcfce7;border:2px solid #22c55e;border-radius:12px;"><i class="bi bi-check-circle-fill" style="font-size:28px;color:#22c55e"></i><span style="font-size:11px;font-weight:600;color:#15803d">Uploaded</span></div><div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-new-btn" title="Delete"><i class="bi bi-trash"></i></button></div><input type="hidden" name="listingimage_set-${newIndex}-id" value=""><input type="file" accept="image/*" class="file-input"><input type="hidden" name="listingimage_set-${newIndex}-image" value="${cloudUrl}"><input type="checkbox" name="listingimage_set-${newIndex}-DELETE" style="position:absolute;left:-9999px;opacity:0">`;
     } else {
-      // DESKTOP/IPHONE: Show real preview - THIS WAS MISSING
+      // DESKTOP/IPHONE: Show real preview
       targetSlot.innerHTML = `<img src="${cloudUrl}?w=200&h=200&c_fill&_t=${Date.now()}" class="photo-preview" loading="lazy" decoding="async"><div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-new-btn" title="Delete"><i class="bi bi-trash"></i></button></div><input type="hidden" name="listingimage_set-${newIndex}-id" value=""><input type="file" accept="image/*" class="file-input"><input type="hidden" name="listingimage_set-${newIndex}-image" value="${cloudUrl}"><input type="checkbox" name="listingimage_set-${newIndex}-DELETE" style="position:absolute;left:-9999px;opacity:0">`;
     }
-    
+
   } else {
     targetSlot.remove();
     alert('Upload failed. Please try again.');
