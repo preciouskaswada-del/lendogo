@@ -161,7 +161,6 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('input[name$="-image"]').forEach(input => {
         input.removeAttribute('required');
     });
-    // FIX 1: Also remove required from id fields so empty forms don't error
     document.querySelectorAll('input[name$="-id"]').forEach(input => {
         input.removeAttribute('required');
     });
@@ -253,10 +252,8 @@ async function handleFileUpload(file, targetSlot){
     const isLowEnd = /Android/.test(navigator.userAgent) && (navigator.deviceMemory || 4) < 4;
 
     if(isLowEnd){
-      // ANDROID: Green box to avoid crash
       targetSlot.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:4px;background:#dcfce7;border:2px solid #22c55e;border-radius:12px;"><i class="bi bi-check-circle-fill" style="font-size:28px;color:#22c55e"></i><span style="font-size:11px;font-weight:600;color:#15803d">Uploaded</span></div><div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-new-btn" title="Delete"><i class="bi bi-trash"></i></button></div><input type="hidden" name="listingimage_set-${newIndex}-id" value=""><input type="file" accept="image/*" class="file-input"><input type="hidden" name="listingimage_set-${newIndex}-image" value="${cloudUrl}"><input type="checkbox" name="listingimage_set-${newIndex}-DELETE" style="position:absolute;left:-9999px;opacity:0">`;
     } else {
-      // DESKTOP/IPHONE: Show real preview
       targetSlot.innerHTML = `<img src="${cloudUrl}?w=200&h=200&c_fill&_t=${Date.now()}" class="photo-preview" loading="lazy" decoding="async"><div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn" title="Change"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-new-btn" title="Delete"><i class="bi bi-trash"></i></button></div><input type="hidden" name="listingimage_set-${newIndex}-id" value=""><input type="file" accept="image/*" class="file-input"><input type="hidden" name="listingimage_set-${newIndex}-image" value="${cloudUrl}"><input type="checkbox" name="listingimage_set-${newIndex}-DELETE" style="position:absolute;left:-9999px;opacity:0">`;
     }
 
@@ -266,7 +263,7 @@ async function handleFileUpload(file, targetSlot){
   }
 }
 
-// DELETE FUNCTION
+// DELETE FUNCTION - FIXED TO UPDATE TOTAL_FORMS
 document.addEventListener('click', function(e) {
     if(e.target.closest('.delete-btn')){
         const slot = e.target.closest('.photo-slot');
@@ -278,6 +275,9 @@ document.addEventListener('click', function(e) {
     }
     if(e.target.closest('.delete-new-btn')){
         e.target.closest('.photo-slot').remove();
+        // FIX: Update total forms count
+        let totalForms = document.querySelector('#id_listingimage_set-TOTAL_FORMS');
+        totalForms.value = document.querySelectorAll('#photoGrid.photo-slot.filled').length;
     }
 });
 
@@ -304,13 +304,20 @@ videoFileInput.addEventListener('change', async e => {
 });
 document.addEventListener('click', e => { if(e.target.id === 'removeVideoBtn'){ document.getElementById('videoUrlInput').value = ''; document.getElementById('videoPreview').classList.add('d-none'); document.getElementById('videoUploadArea')?.classList.remove('d-none'); }});
 
-// SUBMIT - WAIT FOR UPLOADS
+// SUBMIT - WAIT FOR UPLOADS + REMOVE EMPTY FORMS
 document.getElementById('editForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   const btn = document.getElementById('postBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
   await Promise.all(uploadPromises); // wait for cloudinary
+  
+  // FIX: Remove empty d-none slots so Django doesn't validate them
+  document.querySelectorAll('.photo-slot.d-none').forEach(slot => slot.remove());
+  // FIX: Update TOTAL_FORMS to match actual filled slots
+  let totalForms = document.querySelector('#id_listingimage_set-TOTAL_FORMS');
+  totalForms.value = document.querySelectorAll('#photoGrid.photo-slot.filled').length;
+  
   this.submit();
 });
 </script>
