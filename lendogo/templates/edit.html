@@ -15,30 +15,32 @@
 
 .photo-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(3, 1fr); /* 3 on mobile */
     gap: 12px;
   }
-@media (max-width: 768px) {
- .photo-grid { grid-template-columns: repeat(3, 1fr); }
+@media (min-width: 768px) {
+.photo-grid { grid-template-columns: repeat(5, 1fr); } /* 5 on desktop */
 }
 .photo-slot {
     aspect-ratio: 1; border-radius: 12px; border: 2px dashed #d1d5db; background: #f9fafb;
-    position: relative; overflow: hidden;
+    position: relative; overflow: hidden; cursor: pointer;
+    transition: all 0.2s;
   }
-.photo-slot.filled { border: 2px solid #e5e7eb; }
+.photo-slot:hover { border-color: #2563eb; background: #eff6ff; }
+.photo-slot.filled { border: 2px solid #e5e7eb; cursor: default; }
+.photo-slot.filled:hover { border-color: #e5e7eb; background: #f9fafb; }
 .photo-preview { width: 100%; height: 100%; object-fit: cover; }
 .photo-actions {
     position: absolute; bottom: 4px; right: 4px; display: flex; gap: 4px;
-    background: rgba(0,0,0,0.5); padding: 3px; border-radius: 6px;
+    background: rgba(0,0,0,0.6); padding: 3px; border-radius: 6px; z-index: 10;
   }
-.photo-actions.btn { padding: 2px 6px; font-size: 12px; }
 .photo-placeholder {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    height: 100%; color: #9ca3af; font-size: 11px;
+    height: 100%; color: #9ca3af; font-size: 11px; font-weight: 500;
   }
 .uploading-overlay {
     position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.6);
-    color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 12px;
+    color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 12px; z-index: 5;
   }
 .sticky-footer {
     position: sticky; bottom: 0; background: white; border-top: 1px solid #e5e7eb;
@@ -47,6 +49,11 @@
 .btn-primary { background: #2563eb; border: none; }
 .btn-primary:hover { background: #1d4ed8; }
 .btn-primary:disabled { background: #93c5fd; }
+
+/* HIDE DJANGO FIELDS */
+input[name$="-id"], input[name$="-image"], input[name$="-DELETE"], input[type="file"] {
+    position: absolute!important; left: -9999px!important; opacity: 0!important;
+}
 </style>
 {% endblock %}
 
@@ -79,31 +86,40 @@
       <div class="form-section">
         <h3 class="section-title">Photos <span class="text-muted fw-normal fs-6">Up to 10</span></h3>
         {{ formset.management_form }}
-        <div class="photo-grid">
+        <div class="photo-grid" id="photoGrid">
           {% for img_form in formset %}
           <div class="photo-slot {% if img_form.instance.image %}filled{% endif %}" data-index="{{ forloop.counter0 }}">
             {{ img_form.id }}
             {{ img_form.image }}
             {{ img_form.DELETE }}
-            <div class="d-none">{{ img_form.image_upload }}</div>
 
             {% if img_form.instance.image %}
-              <img src="{{ img_form.instance.image }}" class="photo-preview" id="preview-{{ forloop.counter0 }}">
+              <img src="{{ img_form.instance.image }}" class="photo-preview">
               <div class="photo-actions">
                 <button type="button" class="btn btn-sm btn-light change-btn"><i class="bi bi-arrow-repeat"></i></button>
                 <button type="button" class="btn btn-sm btn-danger delete-btn"><i class="bi bi-trash"></i></button>
               </div>
             {% else %}
-              <div class="photo-placeholder" id="placeholder-{{ forloop.counter0 }}">
+              <div class="photo-placeholder">
                 <i class="bi bi-camera fs-3 mb-1"></i>
-                <button type="button" class="btn btn-sm btn-outline-primary change-btn">Add</button>
+                <span>Add</span>
               </div>
-              <img src="" class="photo-preview d-none" id="preview-{{ forloop.counter0 }}">
+              <img src="" class="photo-preview d-none">
             {% endif %}
+            <input type="file" accept="image/*" class="file-input">
           </div>
           {% endfor %}
+
+          <!-- ADD PHOTO BUTTON -->
+          <div class="photo-slot" id="addPhotoBtn">
+            <div class="photo-placeholder">
+              <i class="bi bi-plus-lg fs-3 mb-1"></i>
+              <span>Add Photo</span>
+            </div>
+          </div>
         </div>
-        <small class="text-muted mt-2 d-block">Tip: First photo = main photo. Portrait photos auto-rotate.</small>
+        <small class="text-muted mt-2 d-block">Tip: First photo = main photo. Tap any box to upload</small>
+        <input type="file" id="multiFileInput" accept="image/*">
       </div>
 
       <div class="form-section">
@@ -155,14 +171,14 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-const CLOUD_NAME = "sbsdxiie"; // FIXED: Your cloud name
-const UPLOAD_PRESET = "lendogo_unsigned"; // Must be Unsigned in Cloudinary
+const CLOUD_NAME = "sbsdxiie";
+const UPLOAD_PRESET = "lendogo_unsigned";
 
 document.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(el => {
   el.classList.add('form-control');
 });
 
-let isUploading = false; // NEW: Block submit
+let isUploading = false;
 let currentInput = null;
 const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
 
@@ -175,7 +191,7 @@ async function uploadToCloudinary(file, type = 'image') {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('upload_preset', UPLOAD_PRESET);
-  formData.append('folder', 'lendogo');
+  formData.append('folder', 'lendogo3'); // CHANGED TO lendogo3
   try {
     const res = await fetch(url, { method: 'POST', body: formData });
     const data = await res.json();
@@ -194,18 +210,30 @@ document.getElementById('editForm').addEventListener('submit', function(e) {
     e.preventDefault();
     alert('Still uploading. Please wait.');
   }
+  let filledCount = document.querySelectorAll('#photoGrid.photo-slot.filled').length;
+  document.querySelector('#id_listingimage_set-TOTAL_FORMS').value = filledCount;
+  document.querySelector('#id_listingimage_set-INITIAL_FORMS').value = filledCount;
 });
 
-// PHOTO LOGIC
+// CLICK ANYWHERE TO UPLOAD
 document.addEventListener('click', function(e){
+  const emptySlot = e.target.closest('.photo-slot:not(.filled)');
+  if(emptySlot &&!e.target.closest('.photo-actions') && emptySlot.id!== 'addPhotoBtn'){
+    emptySlot.querySelector('.file-input').click();
+  }
+
+  if(e.target.closest('#addPhotoBtn')){
+    document.getElementById('multiFileInput').click();
+  }
+
   const btn = e.target.closest('.change-btn');
   if (btn){
     e.preventDefault();
     const slot = btn.closest('.photo-slot');
-    currentInput = slot.querySelector('input[type="file"]');
+    currentInput = slot.querySelector('.file-input');
     if (slot.classList.contains('filled')) { confirmModal.show(); }
-    else { currentInput.click(); }
   }
+
   const delBtn = e.target.closest('.delete-btn');
   if (delBtn){
     e.preventDefault();
@@ -222,8 +250,49 @@ document.getElementById('confirmChangeBtn').addEventListener('click', function()
   if (currentInput) currentInput.click();
 });
 
+// ADD NEW PHOTO
+document.getElementById('multiFileInput').addEventListener('change', async function(e){
+  if (!e.target.files[0]) return;
+  const file = e.target.files[0];
+
+  let totalForms = document.querySelector('#id_listingimage_set-TOTAL_FORMS');
+  let newIndex = parseInt(totalForms.value);
+
+  const grid = document.querySelector('#photoGrid');
+  const newSlot = document.createElement('div');
+  newSlot.className = 'photo-slot';
+  newSlot.innerHTML = `
+    <input type="hidden" name="listingimage_set-${newIndex}-id" value="">
+    <input type="hidden" name="listingimage_set-${newIndex}-image">
+    <input type="checkbox" name="listingimage_set-${newIndex}-DELETE" style="position:absolute;left:-9999px;">
+    <div class="uploading-overlay">Uploading...</div>
+  `;
+  grid.insertBefore(newSlot, document.getElementById('addPhotoBtn'));
+  totalForms.value = newIndex + 1;
+
+  try {
+    const cloudUrl = await uploadToCloudinary(file, 'image');
+    newSlot.querySelector('input[name$="-image"]').value = cloudUrl;
+    newSlot.innerHTML = `
+      <input type="hidden" name="listingimage_set-${newIndex}-id" value="">
+      <input type="hidden" name="listingimage_set-${newIndex}-image" value="${cloudUrl}">
+      <input type="checkbox" name="listingimage_set-${newIndex}-DELETE" style="position:absolute;left:-9999px;">
+      <img src="${cloudUrl}" class="photo-preview">
+      <div class="photo-actions">
+        <button type="button" class="btn btn-sm btn-light change-btn"><i class="bi bi-arrow-repeat"></i></button>
+        <button type="button" class="btn btn-sm btn-danger delete-btn"><i class="bi bi-trash"></i></button>
+      </div>
+    `;
+    newSlot.classList.add('filled');
+  } catch (err) {
+    newSlot.remove();
+    alert('Upload failed: ' + err.message);
+  }
+  e.target.value = '';
+});
+
 document.addEventListener('change', async function(e) {
-  if (e.target.type === 'file' && e.target.closest('.photo-slot') && e.target.files[0]) {
+  if (e.target.type === 'file' && e.target.closest('.photo-slot') && e.target.files[0] &&!e.target.id) {
     const slot = e.target.closest('.photo-slot');
     const file = e.target.files[0];
     const img = slot.querySelector('.photo-preview');
