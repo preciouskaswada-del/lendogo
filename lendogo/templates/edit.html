@@ -136,8 +136,8 @@ input[name$="-id"], input[name$="-image"], input[name$="-DELETE"], input[type="f
           <div id="videoPreview" class="mt-3 {% if not form.instance.video %}d-none{% endif %}">
             {% if form.instance.video %}
             <video src="{{ form.instance.video }}" controls class="w-100 rounded" style="max-height:250px;"></video>
-            <button type="button" class="btn btn-sm btn-outline-danger mt-2" id="removeVideoBtn">Remove</button>
             {% endif %}
+            <button type="button" class="btn btn-sm btn-outline-danger mt-2" id="removeVideoBtn">Remove</button>
           </div>
         </div>
       </div>
@@ -192,7 +192,7 @@ async function uploadToCloudinary(file, type = 'image') {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('upload_preset', UPLOAD_PRESET);
-  formData.append('folder', 'lendogo3'); // CHANGED TO lendogo3
+  formData.append('folder', 'lendogo3');
   try {
     const res = await fetch(url, { method: 'POST', body: formData });
     const data = await res.json();
@@ -320,11 +320,34 @@ document.addEventListener('change', async function(e) {
   }
 });
 
-// VIDEO LOGIC - FULLY FIXED
+// VIDEO LOGIC - FINAL FIX
 const videoUploadBtn = document.getElementById('videoUploadBtn');
 const videoFileInput = document.querySelector('input[name="video_upload"]');
 const videoUrlInput = document.querySelector('input[name="video"]');
 const videoPreview = document.getElementById('videoPreview');
+
+function showVideo(url){
+  videoPreview.innerHTML = `
+    <video src="${url}" controls class="w-100 rounded" style="max-height:250px;"></video>
+    <button type="button" class="btn btn-sm btn-outline-danger mt-2" id="removeVideoBtn">Remove</button>
+  `;
+  videoPreview.classList.remove('d-none');
+  videoUploadBtn.classList.add('d-none');
+}
+
+function hideVideo(){
+  videoUrlInput.value = '';
+  videoFileInput.value = '';
+  videoPreview.classList.add('d-none');
+  videoPreview.innerHTML = `<button type="button" class="btn btn-sm btn-outline-danger mt-2" id="removeVideoBtn">Remove</button>`;
+  videoUploadBtn.classList.remove('d-none');
+  document.getElementById('videoBox').classList.remove('border-primary');
+}
+
+// Show existing video on load
+{% if form.instance.video %}
+showVideo("{{ form.instance.video }}");
+{% endif %}
 
 videoUploadBtn.addEventListener('click', () => {
   videoFileInput.click();
@@ -333,11 +356,7 @@ videoUploadBtn.addEventListener('click', () => {
 videoFileInput.addEventListener('change', async function(e){
   const file = e.target.files[0];
   if (!file) return;
-
-  if(file.size > 30 * 1024 * 1024){
-    alert('Video too big. Max 30MB');
-    return;
-  }
+  if(file.size > 30 * 1024 * 1024){ alert('Video too big. Max 30MB'); return; }
 
   const box = document.getElementById('videoBox');
   box.insertAdjacentHTML('beforeend', '<div class="uploading-overlay">Uploading Video...</div>');
@@ -347,17 +366,9 @@ videoFileInput.addEventListener('change', async function(e){
   try {
     const cloudUrl = await uploadToCloudinary(file, 'video');
     videoUrlInput.value = cloudUrl;
-
-    videoPreview.innerHTML = `
-      <video src="${cloudUrl}" controls class="w-100 rounded" style="max-height:250px;"></video>
-      <button type="button" class="btn btn-sm btn-outline-danger mt-2" id="removeVideoBtn">Remove</button>
-    `;
-    videoPreview.classList.remove('d-none');
-    videoUploadBtn.classList.add('d-none');
+    showVideo(cloudUrl);
     box.classList.add('border-primary');
-  } catch (err) {
-    alert('Video upload failed: ' + err.message);
-  }
+  } catch (err) { alert('Video upload failed: ' + err.message); }
   finally {
     box.querySelector('.uploading-overlay')?.remove();
     videoUploadBtn.disabled = false;
@@ -365,15 +376,10 @@ videoFileInput.addEventListener('change', async function(e){
   }
 });
 
-// EVENT DELEGATION FOR REMOVE
+// EVENT DELEGATION because button gets recreated
 document.addEventListener('click', function(e){
   if(e.target.id === 'removeVideoBtn'){
-    videoUrlInput.value = '';
-    videoFileInput.value = '';
-    videoPreview.classList.add('d-none');
-    videoPreview.innerHTML = '';
-    videoUploadBtn.classList.remove('d-none');
-    document.getElementById('videoBox').classList.remove('border-primary');
+    hideVideo();
   }
 });
 </script>
