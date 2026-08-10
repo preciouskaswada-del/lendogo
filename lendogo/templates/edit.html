@@ -15,11 +15,11 @@
 
 .photo-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr); /* 3 on mobile */
+    grid-template-columns: repeat(3, 1fr);
     gap: 12px;
   }
 @media (min-width: 768px) {
-.photo-grid { grid-template-columns: repeat(5, 1fr); } /* 5 on desktop */
+.photo-grid { grid-template-columns: repeat(5, 1fr); }
 }
 .photo-slot {
     aspect-ratio: 1; border-radius: 12px; border: 2px dashed #d1d5db; background: #f9fafb;
@@ -50,9 +50,12 @@
 .btn-primary:hover { background: #1d4ed8; }
 .btn-primary:disabled { background: #93c5fd; }
 
-/* HIDE DJANGO FIELDS */
-input[name$="-id"], input[name$="-image"], input[name$="-DELETE"], input[type="file"] {
+/* HIDE DJANGO FIELDS - FIXED FOR MOBILE */
+input[name$="-id"], input[name$="-image"], input[name$="-DELETE"] {
     position: absolute!important; left: -9999px!important; opacity: 0!important;
+}
+.file-input, #multiFileInput, input[name="video_upload"] {
+    width: 0.1px; height: 0.1px; opacity: 0; overflow: hidden; position: absolute; z-index: -1;
 }
 </style>
 {% endblock %}
@@ -63,7 +66,7 @@ input[name$="-id"], input[name$="-image"], input[name$="-DELETE"], input[type="f
     <i class="bi bi-arrow-left"></i> Back
   </a>
 
-  <form method="POST" id="editForm">
+  <form method="POST" id="editForm" enctype="multipart/form-data">
     {% csrf_token %}
     <div class="form-card">
 
@@ -110,7 +113,6 @@ input[name$="-id"], input[name$="-image"], input[name$="-DELETE"], input[type="f
           </div>
           {% endfor %}
 
-          <!-- ADD PHOTO BUTTON -->
           <div class="photo-slot" id="addPhotoBtn">
             <div class="photo-placeholder">
               <i class="bi bi-plus-lg fs-3 mb-1"></i>
@@ -122,11 +124,11 @@ input[name$="-id"], input[name$="-image"], input[name$="-DELETE"], input[type="f
         <input type="file" id="multiFileInput" accept="image/*">
       </div>
 
-      <!-- VIDEO SECTION FIXED -->
+      <!-- VIDEO SECTION - FIXED FOR MOBILE -->
       <div class="form-section">
         <h3 class="section-title">Video <span class="text-muted fw-normal fs-6">Optional</span></h3>
         {{ form.video }}
-        <div class="d-none">{{ form.video_upload }}</div>
+        {{ form.video_upload }} <!-- REMOVED d-none wrapper so mobile can trigger it -->
         <div class="border rounded-3 p-4 text-center bg-light" id="videoBox">
           <i class="bi bi-camera-video fs-1 text-muted d-block mb-2"></i>
           <p class="text-muted mb-3">Add a short video to show your item in action</p>
@@ -193,6 +195,7 @@ async function uploadToCloudinary(file, type = 'image') {
   formData.append('file', file);
   formData.append('upload_preset', UPLOAD_PRESET);
   formData.append('folder', 'lendogo3');
+  formData.append('resource_type', type); // IMPORTANT FOR VIDEO
   try {
     const res = await fetch(url, { method: 'POST', body: formData });
     const data = await res.json();
@@ -205,7 +208,6 @@ async function uploadToCloudinary(file, type = 'image') {
   }
 }
 
-// BLOCK FORM SUBMIT IF UPLOADING
 document.getElementById('editForm').addEventListener('submit', function(e) {
   if (isUploading) {
     e.preventDefault();
@@ -216,17 +218,15 @@ document.getElementById('editForm').addEventListener('submit', function(e) {
   document.querySelector('#id_listingimage_set-INITIAL_FORMS').value = filledCount;
 });
 
-// CLICK ANYWHERE TO UPLOAD - PHOTO CODE UNCHANGED
+// PHOTO CODE UNCHANGED
 document.addEventListener('click', function(e){
   const emptySlot = e.target.closest('.photo-slot:not(.filled)');
   if(emptySlot &&!e.target.closest('.photo-actions') && emptySlot.id!== 'addPhotoBtn'){
     emptySlot.querySelector('.file-input').click();
   }
-
   if(e.target.closest('#addPhotoBtn')){
     document.getElementById('multiFileInput').click();
   }
-
   const btn = e.target.closest('.change-btn');
   if (btn){
     e.preventDefault();
@@ -234,7 +234,6 @@ document.addEventListener('click', function(e){
     currentInput = slot.querySelector('.file-input');
     if (slot.classList.contains('filled')) { confirmModal.show(); }
   }
-
   const delBtn = e.target.closest('.delete-btn');
   if (delBtn){
     e.preventDefault();
@@ -251,49 +250,27 @@ document.getElementById('confirmChangeBtn').addEventListener('click', function()
   if (currentInput) currentInput.click();
 });
 
-// ADD NEW PHOTO - UNCHANGED
 document.getElementById('multiFileInput').addEventListener('change', async function(e){
   if (!e.target.files[0]) return;
   const file = e.target.files[0];
-
   let totalForms = document.querySelector('#id_listingimage_set-TOTAL_FORMS');
   let newIndex = parseInt(totalForms.value);
-
   const grid = document.querySelector('#photoGrid');
   const newSlot = document.createElement('div');
   newSlot.className = 'photo-slot';
-  newSlot.innerHTML = `
-    <input type="hidden" name="listingimage_set-${newIndex}-id" value="">
-    <input type="hidden" name="listingimage_set-${newIndex}-image">
-    <input type="checkbox" name="listingimage_set-${newIndex}-DELETE" style="position:absolute;left:-9999px;">
-    <div class="uploading-overlay">Uploading...</div>
-  `;
+  newSlot.innerHTML = `<input type="hidden" name="listingimage_set-${newIndex}-id" value=""><input type="hidden" name="listingimage_set-${newIndex}-image"><input type="checkbox" name="listingimage_set-${newIndex}-DELETE" style="position:absolute;left:-9999px;"><div class="uploading-overlay">Uploading...</div>`;
   grid.insertBefore(newSlot, document.getElementById('addPhotoBtn'));
   totalForms.value = newIndex + 1;
-
   try {
     const cloudUrl = await uploadToCloudinary(file, 'image');
-    newSlot.querySelector('input[name$="-image"]').value = cloudUrl;
-    newSlot.innerHTML = `
-      <input type="hidden" name="listingimage_set-${newIndex}-id" value="">
-      <input type="hidden" name="listingimage_set-${newIndex}-image" value="${cloudUrl}">
-      <input type="checkbox" name="listingimage_set-${newIndex}-DELETE" style="position:absolute;left:-9999px;">
-      <img src="${cloudUrl}" class="photo-preview">
-      <div class="photo-actions">
-        <button type="button" class="btn btn-sm btn-light change-btn"><i class="bi bi-arrow-repeat"></i></button>
-        <button type="button" class="btn btn-sm btn-danger delete-btn"><i class="bi bi-trash"></i></button>
-      </div>
-    `;
+    newSlot.innerHTML = `<input type="hidden" name="listingimage_set-${newIndex}-id" value=""><input type="hidden" name="listingimage_set-${newIndex}-image" value="${cloudUrl}"><input type="checkbox" name="listingimage_set-${newIndex}-DELETE" style="position:absolute;left:-9999px;"><img src="${cloudUrl}" class="photo-preview"><div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-btn"><i class="bi bi-trash"></i></button></div>`;
     newSlot.classList.add('filled');
-  } catch (err) {
-    newSlot.remove();
-    alert('Upload failed: ' + err.message);
-  }
+  } catch (err) { newSlot.remove(); alert('Upload failed: ' + err.message); }
   e.target.value = '';
 });
 
 document.addEventListener('change', async function(e) {
-  if (e.target.type === 'file' && e.target.closest('.photo-slot') && e.target.files[0] &&!e.target.id) {
+  if (e.target.classList.contains('file-input') && e.target.files[0]) {
     const slot = e.target.closest('.photo-slot');
     const file = e.target.files[0];
     const img = slot.querySelector('.photo-preview');
@@ -308,29 +285,21 @@ document.addEventListener('change', async function(e) {
       if (placeholder) placeholder.remove();
       slot.classList.add('filled');
       if (!slot.querySelector('.photo-actions')) {
-        slot.insertAdjacentHTML('beforeend', `
-          <div class="photo-actions">
-            <button type="button" class="btn btn-sm btn-light change-btn"><i class="bi bi-arrow-repeat"></i></button>
-            <button type="button" class="btn btn-sm btn-danger delete-btn"><i class="bi bi-trash"></i></button>
-          </div>
-        `);
+        slot.insertAdjacentHTML('beforeend', `<div class="photo-actions"><button type="button" class="btn btn-sm btn-light change-btn"><i class="bi bi-arrow-repeat"></i></button><button type="button" class="btn btn-sm btn-danger delete-btn"><i class="bi bi-trash"></i></button></div>`);
       }
     } catch (err) { alert('Upload failed: ' + err.message); }
     finally { slot.querySelector('.uploading-overlay')?.remove(); }
   }
 });
 
-// VIDEO LOGIC - FINAL FIX
+// VIDEO LOGIC - FIXED FOR MOBILE
 const videoUploadBtn = document.getElementById('videoUploadBtn');
 const videoFileInput = document.querySelector('input[name="video_upload"]');
 const videoUrlInput = document.querySelector('input[name="video"]');
 const videoPreview = document.getElementById('videoPreview');
 
 function showVideo(url){
-  videoPreview.innerHTML = `
-    <video src="${url}" controls class="w-100 rounded" style="max-height:250px;"></video>
-    <button type="button" class="btn btn-sm btn-outline-danger mt-2" id="removeVideoBtn">Remove</button>
-  `;
+  videoPreview.innerHTML = `<video src="${url}" controls class="w-100 rounded" style="max-height:250px;"></video><button type="button" class="btn btn-sm btn-outline-danger mt-2" id="removeVideoBtn">Remove</button>`;
   videoPreview.classList.remove('d-none');
   videoUploadBtn.classList.add('d-none');
 }
@@ -344,39 +313,30 @@ function hideVideo(){
   document.getElementById('videoBox').classList.remove('border-primary');
 }
 
-// Show existing video on load
 {% if form.instance.video %}
 showVideo("{{ form.instance.video }}");
 {% endif %}
 
 videoUploadBtn.addEventListener('click', () => {
-  videoFileInput.click();
+  videoFileInput.click(); // This will now work on mobile
 });
 
 videoFileInput.addEventListener('change', async function(e){
   const file = e.target.files[0];
   if (!file) return;
   if(file.size > 30 * 1024 * 1024){ alert('Video too big. Max 30MB'); return; }
-
   const box = document.getElementById('videoBox');
   box.insertAdjacentHTML('beforeend', '<div class="uploading-overlay">Uploading Video...</div>');
   videoUploadBtn.disabled = true;
-  videoUploadBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Uploading...';
-
   try {
     const cloudUrl = await uploadToCloudinary(file, 'video');
     videoUrlInput.value = cloudUrl;
     showVideo(cloudUrl);
     box.classList.add('border-primary');
   } catch (err) { alert('Video upload failed: ' + err.message); }
-  finally {
-    box.querySelector('.uploading-overlay')?.remove();
-    videoUploadBtn.disabled = false;
-    videoUploadBtn.innerHTML = '<i class="bi bi-upload"></i> Upload Video';
-  }
+  finally { box.querySelector('.uploading-overlay')?.remove(); videoUploadBtn.disabled = false; }
 });
 
-// EVENT DELEGATION because button gets recreated
 document.addEventListener('click', function(e){
   if(e.target.id === 'removeVideoBtn'){
     hideVideo();
