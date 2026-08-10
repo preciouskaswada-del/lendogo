@@ -78,18 +78,23 @@ input[name$="-id"], input[name$="-image"], input[name$="-DELETE"] { position: ab
         <input type="file" id="multiFileInput" accept="image/*">
       </div>
 
-      <!-- VIDEO SECTION - RAW INPUT -->
+      <!-- VIDEO SECTION -->
       <div class="form-section">
         <h3 class="section-title">Video <span class="text-muted fw-normal fs-6">Optional</span></h3>
-        {{ form.video }} <!-- This is the hidden field that saves to DB -->
-        <input type="file" id="rawVideoInput" accept="video/*"> <!-- This is what we actually click -->
+        {{ form.video }}
+        <input type="file" id="rawVideoInput" accept="video/*">
 
         <div class="border rounded-3 p-4 text-center bg-light" id="videoBox">
-          <i class="bi bi-camera-video fs-1 text-muted d-block mb-2"></i>
-          <p class="text-muted mb-3">Add a short video to show your item in action</p>
+          <!-- WRAP ICON + TEXT IN THIS DIV SO WE CAN HIDE IT -->
+          <div id="videoEmptyState">
+            <i class="bi bi-camera-video fs-1 text-muted d-block mb-2"></i>
+            <p class="text-muted mb-3">Add a short video to show your item in action</p>
+          </div>
+
           <button type="button" class="btn btn-outline-primary {% if form.instance.video %}d-none{% endif %}" id="videoUploadBtn">
             <i class="bi bi-upload"></i> Upload Video
           </button>
+
           <div id="videoPreview" class="mt-3 {% if not form.instance.video %}d-none{% endif %}">
             {% if form.instance.video %}
             <video src="{{ form.instance.video }}" controls class="w-100 rounded" style="max-height:250px;"></video>
@@ -185,24 +190,28 @@ document.addEventListener('change', async function(e) {
   }
 });
 
-// VIDEO LOGIC - RAW INPUT VERSION
+// VIDEO LOGIC
 const videoUploadBtn = document.getElementById('videoUploadBtn');
 const rawVideoInput = document.getElementById('rawVideoInput');
-const videoUrlInput = document.querySelector('input[name="video"]'); // Django field
+const videoUrlInput = document.querySelector('input[name="video"]');
 const videoPreview = document.getElementById('videoPreview');
+const videoEmptyState = document.getElementById('videoEmptyState'); // NEW
 
 function showVideo(url){
   videoPreview.innerHTML = `<video src="${url}" controls class="w-100 rounded" style="max-height:250px;"></video><button type="button" class="btn btn-sm btn-outline-danger mt-2" id="removeVideoBtn">Remove</button>`;
   videoPreview.classList.remove('d-none');
   videoUploadBtn.classList.add('d-none');
+  videoEmptyState.classList.add('d-none'); // HIDE TEXT + ICON
+  document.getElementById('videoBox').classList.add('border-primary');
 }
 
 function hideVideo(){
-  videoUrlInput.value = ''; // Clear the Django field
+  videoUrlInput.value = '';
   rawVideoInput.value = '';
   videoPreview.classList.add('d-none');
   videoPreview.innerHTML = `<button type="button" class="btn btn-sm btn-outline-danger mt-2" id="removeVideoBtn">Remove</button>`;
   videoUploadBtn.classList.remove('d-none');
+  videoEmptyState.classList.remove('d-none'); // SHOW TEXT + ICON AGAIN
   document.getElementById('videoBox').classList.remove('border-primary');
 }
 
@@ -210,30 +219,24 @@ function hideVideo(){
 showVideo("{{ form.instance.video }}");
 {% endif %}
 
-videoUploadBtn.addEventListener('click', () => {
-  rawVideoInput.click(); // Click the raw input
-});
+videoUploadBtn.addEventListener('click', () => { rawVideoInput.click(); });
 
 rawVideoInput.addEventListener('change', async function(e){
-  const file = e.target.files[0];
-  if (!file) return;
+  const file = e.target.files[0]; if (!file) return;
   if(file.size > 30 * 1024 * 1024){ alert('Video too big. Max 30MB'); return; }
   const box = document.getElementById('videoBox');
   box.insertAdjacentHTML('beforeend', '<div class="uploading-overlay">Uploading Video...</div>');
   videoUploadBtn.disabled = true;
   try {
     const cloudUrl = await uploadToCloudinary(file, 'video');
-    videoUrlInput.value = cloudUrl; // Put URL into Django hidden field
+    videoUrlInput.value = cloudUrl;
     showVideo(cloudUrl);
-    box.classList.add('border-primary');
   } catch (err) { alert('Video upload failed: ' + err.message); }
   finally { box.querySelector('.uploading-overlay')?.remove(); videoUploadBtn.disabled = false; }
 });
 
 document.addEventListener('click', function(e){
-  if(e.target.id === 'removeVideoBtn'){
-    hideVideo();
-  }
+  if(e.target.id === 'removeVideoBtn'){ hideVideo(); }
 });
 </script>
 {% endblock %}
