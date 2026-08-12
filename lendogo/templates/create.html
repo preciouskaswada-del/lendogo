@@ -19,9 +19,8 @@
 .photo-slot.uploading { opacity: 0.5; }
 .photo-preview { width: 100%; height: 100%; object-fit: cover; }
 .photo-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #9ca3af; font-size: 13px; text-align: center; }
-.remove-photo { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 50%; width: 24px; height: 24px; font-size: 14px; line-height: 24px; cursor: pointer; z-index: 10; display: none; }
-.photo-slot.filled:hover.remove-photo { display: block; } /* FIXED: added space here */
-.remove-photo:hover { background: #dc2626; }
+.remove-photo { position: absolute; top: 6px; right: 6px; background: rgba(220,38,38,0.9); color: white; border: none; border-radius: 50%; width: 24px; height: 24px; font-size: 16px; line-height: 22px; cursor: pointer; z-index: 10; display: block; } /* CHANGED: display block + red bg */
+.remove-photo:hover { background: #b91c1c; transform: scale(1.1); }
 .video-upload { border: 2px dashed #d1d5db; border-radius: 12px; padding: 32px 20px; text-align: center; background: #f9fafb; cursor: pointer; transition: 0.2s; position: relative; }
 .video-upload:hover { border-color: #2563eb; background: #eff6ff; }
 .video-upload.has-video { border: 2px solid #e5e7eb; padding: 12px; cursor: default; }
