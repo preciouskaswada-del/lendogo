@@ -176,7 +176,7 @@ const imagePreview = document.getElementById('image_preview');
 const dt = new DataTransfer();
 let removeIndex = null;
 
-// COMPRESSION FUNCTION
+// COMPRESSION FUNCTION - FIXED
 async function compressImage(file) {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -202,7 +202,7 @@ async function compressImage(file) {
         ctx.drawImage(img, 0, 0, width, height);
 
         canvas.toBlob((blob) => {
-          const compressedFile = new File(, file.name, {
+          const compressedFile = new File([blob], file.name, { // <-- FIXED: added [blob]
             type: 'image/jpeg',
             lastModified: Date.now()
           });
