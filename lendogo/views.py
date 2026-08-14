@@ -711,11 +711,15 @@ def start_conversation(request, listing_id):
             'market_avg': str(listing.market_avg_price) if listing.market_avg_price else None,
         }, status=400)
 
+    # FIX: Use content_object for GenericFK instead of listing=
+    from django.contrib.contenttypes.models import ContentType
+    content_type = ContentType.objects.get_for_model(Listing)
     convo, created = Conversation.objects.get_or_create(
-        listing=listing,
-        rental=None,
+        content_type=content_type,
+        object_id=listing.id,
         buyer=request.user,
-        seller=seller
+        seller=seller,
+        defaults={'listing': listing} # in case you still have listing field
     )
     convo.save()
     return redirect('chat:room', convo_id=convo.id)
@@ -907,7 +911,7 @@ def post_rental(request):
         rental = RentalListing.objects.create(**rental_data)
 
         messages.success(request, 'Rental posted successfully!')
-        return redirect('rental_page')
+        return redirect('rental_detail', pk=rental.pk) # FIX: Redirect to detail page
 
     return render(request, 'post_rental.html')
 
@@ -935,11 +939,15 @@ def start_rental_conversation(request, rental_id):
         messages.error(request, "You can't message yourself.")
         return redirect('rental_detail', pk=rental_id)
 
+    # FIX: Use content_object for GenericFK instead of rental=
+    from django.contrib.contenttypes.models import ContentType
+    content_type = ContentType.objects.get_for_model(RentalListing)
     convo, created = Conversation.objects.get_or_create(
-        rental=rental,
-        listing=None,
+        content_type=content_type,
+        object_id=rental.id,
         buyer=request.user,
-        seller=seller
+        seller=seller,
+        defaults={'rental': rental} # in case you still have rental field
     )
 
     convo.save()
@@ -982,4 +990,5 @@ def whatsapp_webhook(request):
     if request.method == 'POST':
         data = json.loads(request.body)
         print("WHATSAPP DATA:", data)
-        return HttpResponse('EVENT_RECEIVED', status=200)
+        return HttpResponse('EVENT_RECEIVED', status=200) # <-- This is the line
+
