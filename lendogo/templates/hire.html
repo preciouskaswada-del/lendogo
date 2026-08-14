@@ -13,7 +13,7 @@
       <button class="menu-btn" onclick="toggleMenu()">⋯</button>
       <div id="userMenu">
         <div style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9; font-weight: 600; color: #1e293b;">Hey 👋 {{ user.username }}</div>
-        <a href="{% url 'home' %}">🏠 Back to Home Page</a>  <!-- ADDED -->
+        <a href="{% url 'home' %}">🏠 Back to Home Page</a>
         <a href="/hire/post/">📦 Post Rental Product</a>    
         <a href="/chat/" id="msgLink">💬 Messages<span id="msgBadge" class="msg-badge">0</span></a>
         <a href="{% url 'dashboard' %}">📊 Dashboard</a>
@@ -42,9 +42,9 @@
   --border: #e2e8f0;
 }
 
-.hire-nav { background: rgba(0,0,0,0.4); backdrop-filter: blur(10px); padding: 12px 0; position: sticky; top: 0; width: 100%; z-index: 1000; }
+.hire-nav { background: #0F766E; backdrop-filter: blur(10px); padding: 12px 0; position: sticky; top: 0; width: 100%; z-index: 1000; } /* FIX: solid bg */
 .nav-content { max-width: 1200px; margin: 0 auto; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; }
-.logo { font-size: 26px; font-weight: 800; color: var(--primary); text-decoration: none; }
+.logo { font-size: 26px; font-weight: 800; color: white; text-decoration: none; } /* FIX: white logo */
 
 .menu-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: white; }
 #userMenu { display: none; position: absolute; right: 16px; top: 50px; background: white; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); min-width: 220px; z-index: 1000; padding: 8px 0; }
@@ -59,9 +59,8 @@
 
 .toolbar { background: var(--card); padding: 16px; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 24px; }
 
-/* FIXED: Search row won't overflow on mobile */
 .search-row { display: flex; gap: 12px; }
-.search-form { flex: 1; position: relative; min-width: 0; } /* min-width:0 fixes overflow */
+.search-form { flex: 1; position: relative; min-width: 0; } /* FIX: prevents overflow */
 .search-input { width: 100%; padding: 14px 50px 14px 16px; border: 2px solid var(--border); border-radius: 12px; font-size: 15px; outline: none; transition: 0.2s; }
 .search-input:focus { border-color: var(--primary); }
 .search-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: var(--primary); color: #fff; border: none; width: 38px; height: 38px; border-radius: 10px; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: 0.2s; flex-shrink: 0; }
@@ -91,7 +90,7 @@
   .card-info { padding: 12px; }
   .card-info h3 { font-size: 14px; }
   .price { font-size: 16px; }
-  .search-row { flex-direction: column; } /* Stack on mobile */
+  .search-row { flex-direction: column; } /* FIX: stack on mobile */
   .search-form, .filter-select { width: 100%; flex: unset; min-width: unset; }
 }
 </style>
@@ -138,13 +137,11 @@
     {% for item in rentals %}
       <a href="{% url 'rental_detail' item.id %}" class="card">
         <div class="card-image">
-          {% if item.images %}
-            {% with first_img=item.images|first %}
-              <img src="{{ first_img }}" 
-                   alt="{{ item.product }}"
-                   loading="lazy"
-                   onerror="this.src='/static/images/placeholder.jpg'">
-            {% endwith %}
+          {% if item.images and item.images.0 %}
+            <img src="{{ item.images.0 }}" 
+                 alt="{{ item.product }}"
+                 loading="lazy"
+                 onerror="this.src='/static/images/placeholder.jpg'">
           {% elif item.image %}
             <img src="{{ item.image }}" 
                  alt="{{ item.product }}"
