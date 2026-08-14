@@ -16,7 +16,6 @@
         <a href="{% url 'home' %}">🏠 Back to Home Page</a>
         <a href="/hire/post/">📦 Post Rental Product</a>    
         <a href="/chat/" id="msgLink">💬 Messages<span id="msgBadge" class="msg-badge">0</span></a>
-        <a href="{% url 'dashboard' %}">📊 Dashboard</a>
         <form method="post" action="{% url 'logout' %}" style="display: block; padding: 8px 16px; margin:0; border-top: 1px solid #f1f5f9">
           {% csrf_token %}
           <button type="submit" style="border: none; background: none; padding: 0; color: #ef4444; cursor: pointer; font-weight: 600;">🚪 Logout</button>
