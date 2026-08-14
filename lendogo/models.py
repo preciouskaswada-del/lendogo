@@ -292,6 +292,9 @@ class Message(models.Model):
     is_read = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+
+User = get_user_model()
+
 class RentalListing(models.Model):
     RENTAL_TYPE_CHOICES = [('hour', 'Per Hour'),('day', 'Per Day'),('week', 'Per Week'),('month', 'Per Month')]
     CATEGORY_CHOICES = [('cars', 'Cars & Vehicles'),('ps_system', 'PS / Gaming Systems'),('tents', 'Tents'),('chairs', 'Chairs'),('halls', 'Halls for Weddings'),('garden', 'Garden Equipment'),('tools', 'Tools & Equipment'),('electronics', 'Electronics'),('sound', 'Sound Systems'),('other', 'Other')]
@@ -304,9 +307,11 @@ class RentalListing(models.Model):
     location = models.CharField(max_length=100, blank=True, default='Lilongwe')
     contact = models.CharField(max_length=50, blank=True, default='')
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other', db_index=True)
-    image = models.ImageField(upload_to='rental_images/', blank=True, null=True)
-    images = JSONField(default=list, blank=True)
-    video = models.FileField(upload_to='rental_videos/', blank=True, null=True)
+    
+    image = models.URLField(max_length=500, blank=True, null=True) # CHANGED: for main thumbnail
+    images = JSONField(default=list, blank=True) # GOOD: this will hold ["https://...", "https://..."]
+    video = models.URLField(max_length=500, blank=True, null=True) # CHANGED: for video url
+
     deposit_required = models.DecimalField(max_digits=12, decimal_places=2, default=0, validators=[MinValueValidator(0)])
     available_from = models.DateField(default=timezone.now)
     views = models.PositiveIntegerField(default=0, db_index=True)
