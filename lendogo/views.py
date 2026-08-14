@@ -1,4 +1,20 @@
 import os
+import cloudinary
+import cloudinary.uploader
+import random
+import secrets
+import sys # PATCH 1
+import json
+import uuid
+import re
+import requests
+import urllib3
+import time
+from decimal import Decimal, InvalidOperation
+from io import BytesIO # PATCH 1
+from datetime import date, datetime, timedelta
+from urllib.parse import urlencode
+
 from dotenv import load_dotenv
 
 from django.forms import inlineformset_factory, modelformset_factory, ModelForm, URLInput
@@ -10,37 +26,32 @@ from django.contrib.auth.decorators import login_required
 from.models import Listing, ListingImage, RentalListing, ListingView, WhatsAppClick, UserProfile, Category
 from django.db.models import Q, Count, Sum, F
 from django.db import models, transaction
-from urllib.parse import urlencode
 from django.contrib import messages
 from django.core.mail import send_mail
-import random
 from django.conf import settings
-import secrets
-from datetime import date, datetime, timedelta
 from django.http import JsonResponse, HttpResponse, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
 from lendogo.chat.models import Conversation, Message
 from django.utils import timezone
-import json
 from django.views.decorators.http import require_POST, require_GET
 from django.core.files.storage import default_storage
-from decimal import Decimal, InvalidOperation
 from payments.airtel import initiate_airtel_payment
-import uuid
-import re
-import requests
-import urllib3
-import time
 from PIL import Image, ExifTags # PATCH 1
-from io import BytesIO # PATCH 1
 from django.core.files.uploadedfile import InMemoryUploadedFile # PATCH 1
-import sys # PATCH 1
+
 load_dotenv()
+
+# CLOUDINARY CONFIG
+cloudinary.config(
+    cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME'),
+    api_key = os.environ.get('CLOUDINARY_API_KEY'),
+    api_secret = os.environ.get('CLOUDINARY_API_SECRET'),
+    secure = True
+)
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 User = get_user_model()
-
 # KEY FIX: Custom form to make image not required
 class EditListingImageForm(ModelForm):
     class Meta:
