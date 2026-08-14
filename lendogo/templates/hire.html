@@ -3,32 +3,6 @@
 
 {% block title %}For Hire - Lendogo{% endblock %}
 
-{% block navbar %}
-<!-- CUSTOM HIRE NAVBAR - OVERRIDES BASE.HTML -->
-<div class="hire-nav">
-  <div class="nav-content">
-    <a href="{% url 'home' %}" class="logo">Lendogo</a>
-    {% if user.is_authenticated %}
-    <div style="position: relative;">
-      <button class="menu-btn" onclick="toggleMenu()">⋯</button>
-      <div id="userMenu">
-        <div style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9; font-weight: 600; color: #1e293b;">Hey 👋 {{ user.username }}</div>
-        <a href="{% url 'home' %}">🏠 Back to Home Page</a>
-        <a href="/hire/post/">📦 Post Rental Product</a>    
-        <a href="/chat/" id="msgLink">💬 Messages<span id="msgBadge" class="msg-badge">0</span></a>
-        <form method="post" action="{% url 'logout' %}" style="display: block; padding: 8px 16px; margin:0; border-top: 1px solid #f1f5f9">
-          {% csrf_token %}
-          <button type="submit" style="border: none; background: none; padding: 0; color: #ef4444; cursor: pointer; font-weight: 600;">🚪 Logout</button>
-        </form> 
-      </div>
-    </div>
-    {% else %}
-      <a href="{% url 'login' %}" style="padding: 8px 16px; background: var(--primary); color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px;">Login</a>
-    {% endif %}
-  </div>
-</div>
-{% endblock %}
-
 {% block extra_css %}
 <style>
 :root {
@@ -41,9 +15,10 @@
   --border: #e2e8f0;
 }
 
-.hire-nav { background: #0F766E; backdrop-filter: blur(10px); padding: 12px 0; position: sticky; top: 0; width: 100%; z-index: 1000; } /* FIX: solid bg */
+/* FORCED NAVBAR - renders even if base.html has no block */
+.hire-nav { background: #0F766E; backdrop-filter: blur(10px); padding: 12px 0; position: sticky; top: 0; width: 100%; z-index: 1000; }
 .nav-content { max-width: 1200px; margin: 0 auto; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; }
-.logo { font-size: 26px; font-weight: 800; color: white; text-decoration: none; } /* FIX: white logo */
+.logo { font-size: 26px; font-weight: 800; color: white; text-decoration: none; }
 
 .menu-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: white; }
 #userMenu { display: none; position: absolute; right: 16px; top: 50px; background: white; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); min-width: 220px; z-index: 1000; padding: 8px 0; }
@@ -56,7 +31,7 @@
 .header h1 { font-size: 32px; color: var(--text); margin-bottom: 8px; font-weight: 800; }
 .header p { color: var(--text-muted); font-size: 16px; }
 
-.toolbar { background: var(--card); padding: 16px; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 24px; }
+.toolbar { background: var(--card); padding: 12px; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 24px; } /* FIX: reduced padding */
 
 .search-row { display: flex; gap: 12px; }
 .search-form { flex: 1; position: relative; min-width: 0; } /* FIX: prevents overflow */
@@ -91,11 +66,38 @@
   .price { font-size: 16px; }
   .search-row { flex-direction: column; } /* FIX: stack on mobile */
   .search-form, .filter-select { width: 100%; flex: unset; min-width: unset; }
+  .toolbar { padding: 8px; } /* FIX: less padding on mobile */
+  .hire-container { padding: 16px 8px; } /* FIX: less padding on mobile */
 }
 </style>
 {% endblock %}
 
 {% block content %}
+<!-- CUSTOM HIRE NAVBAR - INSIDE CONTENT SO IT ALWAYS SHOWS -->
+<div class="hire-nav">
+  <div class="nav-content">
+    <a href="{% url 'home' %}" class="logo">Lendogo</a>
+    {% if user.is_authenticated %}
+    <div style="position: relative;">
+      <button class="menu-btn" onclick="toggleMenu()">⋯</button>
+      <div id="userMenu">
+        <div style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9; font-weight: 600; color: #1e293b;">Hey 👋 {{ user.username }}</div>
+        <a href="{% url 'home' %}">🏠 Back to Home Page</a>
+        <a href="/hire/post/">📦 Post Rental Product</a>    
+        <a href="/chat/" id="msgLink">💬 Messages<span id="msgBadge" class="msg-badge">0</span></a>
+        <a href="{% url 'dashboard' %}">📊 Dashboard</a>
+        <form method="post" action="{% url 'logout' %}" style="display: block; padding: 8px 16px; margin:0; border-top: 1px solid #f1f5f9">
+          {% csrf_token %}
+          <button type="submit" style="border: none; background: none; padding: 0; color: #ef4444; cursor: pointer; font-weight: 600;">🚪 Logout</button>
+        </form> 
+      </div>
+    </div>
+    {% else %}
+      <a href="{% url 'login' %}" style="padding: 8px 16px; background: var(--primary); color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px;">Login</a>
+    {% endif %}
+  </div>
+</div>
+
 <div class="hire-container">
   <div class="header">
     <h1>🔧 For Hire</h1>
