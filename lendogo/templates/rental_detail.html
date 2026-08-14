@@ -120,7 +120,7 @@ h1 { font-size: 24px; }
 
     {% if rental.video %}
       <video class="detail-video" controls preload="metadata">
-        <source src="{{ rental.video.url|slice:':50' }}q_auto/{{ rental.video.url|slice:'50:' }}" type="video/mp4">
+        <source src="{{ rental.video }}" type="video/mp4"> {# FIX: Direct URL #}
       </video>
     {% endif %}
 
@@ -129,7 +129,7 @@ h1 { font-size: 24px; }
       <div class="carousel-inner">
         {% for img_url in rental.images %}
           <div class="slide {% if forloop.first %}active{% endif %}">
-            <img src="{% if 'http' in img_url or img_url|slice:':1' == '/' %}{{ img_url|slice:':50' }}w_1000,q_auto,f_auto/{{ img_url|slice:'50:' }}{% else %}{{ MEDIA_URL }}{{ img_url|slice:':50' }}w_1000,q_auto,f_auto/{{ img_url|slice:'50:' }}{% endif %}"
+            <img src="{{ img_url }}" {# FIX: Just use the URL directly #}
                  alt="{{ rental.product }}"
                  data-index="{{ forloop.counter0 }}"
                  loading="lazy"
@@ -152,7 +152,7 @@ h1 { font-size: 24px; }
     {% if rental.images|length > 1 %}
     <div class="thumbs">
       {% for img_url in rental.images %}
-        <img src="{% if 'http' in img_url or img_url|slice:':1' == '/' %}{{ img_url|slice:':50' }}w_200,q_auto,f_auto/{{ img_url|slice:'50:' }}{% else %}{{ MEDIA_URL }}{{ img_url|slice:':50' }}w_200,q_auto,f_auto/{{ img_url|slice:'50:' }}{% endif %}"
+        <img src="{{ img_url }}" {# FIX: Just use the URL directly #}
              class="thumb {% if forloop.first %}active{% endif %}"
              data-index="{{ forloop.counter0 }}" alt="{{ rental.product }}"
              loading="lazy"
@@ -202,7 +202,7 @@ h1 { font-size: 24px; }
     {% endif %}
 
     <div class="btn-group">
-      {% if request.user.is_authenticated and request.user != rental.seller %}
+      {% if request.user.is_authenticated and request.user!= rental.seller %}
         <form method="POST" action="{% url 'start_rental_conversation' rental.id %}" style="display: contents;">
           {% csrf_token %}
           <button type="submit" class="btn btn-chat">
