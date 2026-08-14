@@ -825,6 +825,8 @@ def rental_page(request):
         'unread_count': unread_count,
         'MEDIA_URL': settings.MEDIA_URL,
     })
+
+
 @login_required
 def post_rental(request):
     if request.method == 'POST':
@@ -835,13 +837,11 @@ def post_rental(request):
             messages.error(request, 'Product name is required')
             return render(request, 'post_rental.html')
 
+        # FIX 1: NO CAP. Just remove commas
         price_str = request.POST.get('price', '0').replace(',', '').strip()
         try:
             price = Decimal(price_str) if price_str else Decimal('0')
-            if price < 0:
-                price = Decimal('0')
-            elif price > Decimal('9999.99'):
-                price = Decimal('9999.99')
+            if price < 0: price = Decimal('0')
         except (InvalidOperation, ValueError, TypeError):
             price = Decimal('0')
 
@@ -854,85 +854,68 @@ def post_rental(request):
         if category not in valid_categories:
             category = 'other'
 
+        # FIX 1: NO CAP for deposit too
         deposit_str = request.POST.get('deposit_required', '0').replace(',', '').strip()
         try:
             deposit = Decimal(deposit_str) if deposit_str else Decimal('0')
-            if deposit < 0:
-                deposit = Decimal('0')
-            elif deposit > Decimal('9999.99'):
-                deposit = Decimal('9999.99')
+            if deposit < 0: deposit = Decimal('0')
         except (InvalidOperation, ValueError, TypeError):
             deposit = Decimal('0')
 
+        # FIX 2: Handle DD/MM/YYYY from your phone
         available_from_str = request.POST.get('available_from', '').strip()
         available_from = timezone.now().date()
         if available_from_str:
-            try:
-                parsed_date = datetime.strptime(available_from_str, '%Y-%m-%d').date()
-                if date(1900, 1, 1) <= parsed_date <= date(9999, 12, 31):
-                    available_from = parsed_date
-            except (ValueError, TypeError):
-                pass
+            for fmt in ['%d/%m/%Y', '%Y-%m-%d']: # try both formats
+                try:
+                    parsed_date = datetime.strptime(available_from_str, fmt).date()
+                    if date(1900, 1, 1) <= parsed_date <= date(9999, 12, 31):
+                        available_from = parsed_date
+                        break
+                except (ValueError, TypeError):
+                    continue
 
-        # CLOUDINARY UPLOAD - NO FOLDER
+        # CLOUDINARY UPLOAD
         image_urls = []
         video_url = None
 
         images = request.FILES.getlist('images')
         for img in images[:10]:
-            if img.size > 10 * 1024 * 1024:
-                continue
+            if img.size > 10 * 1024 * 1024: continue
             try:
-                result = cloudinary.uploader.upload(
-                    img,
-                    upload_preset="lendogo3",
-                    resource_type="auto"
-                )
+                result = cloudinary.uploader.upload(img, upload_preset="lendogo3", resource_type="auto")
                 image_urls.append(result['secure_url'])
             except Exception as e:
                 print("CLOUDINARY IMAGE ERROR:", e)
-                continue
 
         video_file = request.FILES.get('video')
-        if video_file and video_file.size > 50 * 1024 * 1024:
-            video_file = None
-
-        if video_file:
+        if video_file and video_file.size <= 50 * 1024 * 1024:
             try:
-                result = cloudinary.uploader.upload(
-                    video_file,
-                    upload_preset="lendogo3",
-                    resource_type="video"
-                )
+                result = cloudinary.uploader.upload(video_file, upload_preset="lendogo3", resource_type="video")
                 video_url = result['secure_url']
             except Exception as e:
                 print("CLOUDINARY VIDEO ERROR:", e)
 
-        rental_data = {
-            'seller': request.user,
-            'product': product,
-            'description': description,
-            'price': price,
-            'rental_type': rental_type,
-            'location': location,
-            'contact': contact,
-            'deposit_required': deposit,
-            'available_from': available_from,
-            'images': image_urls,
-            'image': image_urls[0] if image_urls else None,
-            'video': video_url
-        }
+        rental = RentalListing.objects.create(
+            seller=request.user,
+            product=product,
+            description=description,
+            price=price,
+            rental_type=rental_type,
+            location=location,
+            contact=contact,
+            category=category,
+            deposit_required=deposit,
+            available_from=available_from,
+            images=image_urls,
+            image=image_urls[0] if image_urls else None,
+            video=video_url
+        )
 
-        if hasattr(RentalListing, 'category'):
-            rental_data['category'] = category
-
-        rental = RentalListing.objects.create(**rental_data)
-
-        messages.success(request, 'Rental posted successfully!')
+        messages.success(request, f'Rental posted! MK{price:,}')
         return redirect('rental_detail', pk=rental.pk)
 
-    return render(request, 'post_rental.html')
-
+    return render(request, 'post_rental.html')   
 def rental_detail(request, pk):
     rental = get_object_or_404(RentalListing.objects.select_related('seller'), pk=pk, is_active=True)
     RentalListing.objects.filter(pk=pk).update(views=F('views') + 1)
