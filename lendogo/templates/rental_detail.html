@@ -202,7 +202,7 @@ h1 { font-size: 24px; }
     {% endif %}
 
     <div class="btn-group">
-      {% if request.user.is_authenticated and request.user!= rental.seller %}
+      {% if request.user.is_authenticated and request.user != rental.seller %}
         <form method="POST" action="{% url 'start_rental_conversation' rental.id %}" style="display: contents;">
           {% csrf_token %}
           <button type="submit" class="btn btn-chat">
