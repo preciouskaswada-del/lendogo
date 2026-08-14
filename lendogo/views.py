@@ -916,6 +916,7 @@ def post_rental(request):
         return redirect('rental_detail', pk=rental.pk)
 
     return render(request, 'post_rental.html')   
+    
 def rental_detail(request, pk):
     rental = get_object_or_404(RentalListing.objects.select_related('seller'), pk=pk, is_active=True)
     RentalListing.objects.filter(pk=pk).update(views=F('views') + 1)
