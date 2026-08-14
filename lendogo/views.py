@@ -825,7 +825,6 @@ def rental_page(request):
         'unread_count': unread_count,
         'MEDIA_URL': settings.MEDIA_URL,
     })
-
 @login_required
 def post_rental(request):
     if request.method == 'POST':
@@ -875,20 +874,39 @@ def post_rental(request):
             except (ValueError, TypeError):
                 pass
 
+        # CLOUDINARY UPLOAD - NO FOLDER
+        image_urls = []
+        video_url = None
+
         images = request.FILES.getlist('images')
-        image_paths = []
         for img in images[:10]:
             if img.size > 10 * 1024 * 1024:
                 continue
             try:
-                path = default_storage.save(f'rental_images/{timezone.now().strftime("%Y%m%d_%H%M%S")}_{img.name}', img)
-                image_paths.append(settings.MEDIA_URL + path)
-            except:
+                result = cloudinary.uploader.upload(
+                    img,
+                    upload_preset="lendogo3",
+                    resource_type="auto"
+                )
+                image_urls.append(result['secure_url'])
+            except Exception as e:
+                print("CLOUDINARY IMAGE ERROR:", e)
                 continue
 
         video_file = request.FILES.get('video')
         if video_file and video_file.size > 50 * 1024 * 1024:
             video_file = None
+
+        if video_file:
+            try:
+                result = cloudinary.uploader.upload(
+                    video_file,
+                    upload_preset="lendogo3",
+                    resource_type="video"
+                )
+                video_url = result['secure_url']
+            except Exception as e:
+                print("CLOUDINARY VIDEO ERROR:", e)
 
         rental_data = {
             'seller': request.user,
@@ -900,9 +918,9 @@ def post_rental(request):
             'contact': contact,
             'deposit_required': deposit,
             'available_from': available_from,
-            'images': image_paths,
-            'image': image_paths[0] if image_paths else None,
-            'video': video_file
+            'images': image_urls,
+            'image': image_urls[0] if image_urls else None,
+            'video': video_url
         }
 
         if hasattr(RentalListing, 'category'):
@@ -911,11 +929,9 @@ def post_rental(request):
         rental = RentalListing.objects.create(**rental_data)
 
         messages.success(request, 'Rental posted successfully!')
-        return redirect('rental_detail', pk=rental.pk) # FIX: Redirect to detail page
+        return redirect('rental_detail', pk=rental.pk)
 
     return render(request, 'post_rental.html')
-
-from django.conf import settings
 
 def rental_detail(request, pk):
     rental = get_object_or_404(RentalListing.objects.select_related('seller'), pk=pk, is_active=True)
