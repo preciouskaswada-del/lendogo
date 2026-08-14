@@ -15,32 +15,57 @@
   --border: #e2e8f0;
 }
 
-/* FORCED NAVBAR - renders even if base.html has no block */
-.hire-nav { background: #0F766E; backdrop-filter: blur(10px); padding: 12px 0; position: sticky; top: 0; width: 100%; z-index: 1000; }
-.nav-content { max-width: 1200px; margin: 0 auto; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; }
-.logo { font-size: 26px; font-weight: 800; color: white; text-decoration: none; }
+/* PRO NAVBAR */
+.hire-nav { 
+  background: linear-gradient(135deg, #0F766E 0%, #115E59 100%); 
+  backdrop-filter: blur(10px); 
+  padding: 14px 0; 
+  position: sticky; 
+  top: 0; 
+  width: 100%; 
+  z-index: 1000; 
+  box-shadow: 0 4px 12px rgba(15, 118, 110, 0.15);
+}
+.nav-content { max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; }
+.logo { font-size: 28px; font-weight: 800; color: white; text-decoration: none; letter-spacing: -0.5px; }
+.logo:hover { opacity: 0.9; }
 
-.menu-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: white; }
-#userMenu { display: none; position: absolute; right: 16px; top: 50px; background: white; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); min-width: 220px; z-index: 1000; padding: 8px 0; }
-#userMenu a { display: block; padding: 12px 16px; text-decoration: none; color: #475569; font-weight: 500; }
-#userMenu a:hover { background: #f8fafc; }
-.msg-badge { background: #ef4444; color: white; border-radius: 10px; padding: 2px 6px; font-size: 11px; font-weight: 700; margin-left: 6px; display: none; }
+.menu-btn { background: rgba(255,255,255,0.15); border: none; font-size: 22px; cursor: pointer; color: white; width: 42px; height: 42px; border-radius: 10px; transition: 0.2s; }
+.menu-btn:hover { background: rgba(255,255,255,0.25); }
 
-.hire-container { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
-.header { text-align: center; margin-bottom: 24px; }
+#userMenu { 
+  display: none; 
+  position: absolute; 
+  right: 0; 
+  top: 52px; 
+  background: white; 
+  border-radius: 14px; 
+  box-shadow: 0 12px 32px rgba(0,0,0,0.15); 
+  min-width: 240px; 
+  z-index: 1000; 
+  padding: 8px 0; 
+  overflow: hidden;
+}
+#userMenu a { display: flex; align-items: center; gap: 10px; padding: 12px 18px; text-decoration: none; color: #475569; font-weight: 600; font-size: 14px; transition: 0.2s; }
+#userMenu a:hover { background: #f0fdfd; color: var(--primary); }
+.msg-badge { background: #ef4444; color: white; border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: 700; margin-left: auto; }
+
+.hire-container { max-width: 1200px; margin: 0 auto; padding: 24px 20px; }
+.header { text-align: center; margin-bottom: 28px; }
 .header h1 { font-size: 32px; color: var(--text); margin-bottom: 8px; font-weight: 800; }
 .header p { color: var(--text-muted); font-size: 16px; }
 
-.toolbar { background: var(--card); padding: 12px; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 24px; } /* FIX: reduced padding */
+.toolbar { background: var(--card); padding: 14px; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-bottom: 28px; }
 
-.search-row { display: flex; gap: 12px; }
-.search-form { flex: 1; position: relative; min-width: 0; } /* FIX: prevents overflow */
-.search-input { width: 100%; padding: 14px 50px 14px 16px; border: 2px solid var(--border); border-radius: 12px; font-size: 15px; outline: none; transition: 0.2s; }
-.search-input:focus { border-color: var(--primary); }
-.search-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: var(--primary); color: #fff; border: none; width: 38px; height: 38px; border-radius: 10px; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: 0.2s; flex-shrink: 0; }
+/* FIXED: Search won't overflow */
+.search-row { display: flex; gap: 12px; align-items: center; }
+.search-form { flex: 1 1 0; position: relative; min-width: 0; } /* key: flex:1 1 0 */
+.search-input { width: 100%; padding: 14px 50px 14px 16px; border: 2px solid var(--border); border-radius: 12px; font-size: 15px; outline: none; transition: 0.2s; box-sizing: border-box; }
+.search-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(15,118,110,0.1); }
+.search-btn { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: var(--primary); color: #fff; border: none; width: 40px; height: 40px; border-radius: 10px; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
 .search-btn:hover { background: var(--primary-dark); }
-.filter-select { padding: 14px 16px; border: 2px solid var(--border); border-radius: 12px; font-size: 15px; font-weight: 600; background: #fff; cursor: pointer; outline: none; min-width: 180px; flex-shrink: 0; }
-.filter-select:focus { border-color: var(--primary); }
+.filter-select { padding: 14px 16px; border: 2px solid var(--border); border-radius: 12px; font-size: 15px; font-weight: 600; background: #fff; cursor: pointer; outline: none; width: 200px; flex-shrink: 0; }
+.filter-select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(15,118,110,0.1); }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
 .card { background: var(--card); border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); text-decoration: none; color: inherit; transition: 0.3s; display: block; }
@@ -60,20 +85,23 @@
 .btn:hover { background: var(--primary-dark); transform: translateY(-2px); }
 
 @media (max-width: 640px) {
+  .nav-content { padding: 0 12px; }
+  .logo { font-size: 24px; }
   .grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
   .card-info { padding: 12px; }
   .card-info h3 { font-size: 14px; }
   .price { font-size: 16px; }
-  .search-row { flex-direction: column; } /* FIX: stack on mobile */
+  .search-row { flex-direction: column; align-items: stretch; } /* Stack */
   .search-form, .filter-select { width: 100%; flex: unset; min-width: unset; }
-  .toolbar { padding: 8px; } /* FIX: less padding on mobile */
-  .hire-container { padding: 16px 8px; } /* FIX: less padding on mobile */
+  .filter-select { width: 100%; }
+  .toolbar { padding: 10px; }
+  .hire-container { padding: 16px 12px; }
 }
 </style>
 {% endblock %}
 
 {% block content %}
-<!-- CUSTOM HIRE NAVBAR - INSIDE CONTENT SO IT ALWAYS SHOWS -->
+<!-- PRO NAVBAR -->
 <div class="hire-nav">
   <div class="nav-content">
     <a href="{% url 'home' %}" class="logo">Lendogo</a>
@@ -81,19 +109,18 @@
     <div style="position: relative;">
       <button class="menu-btn" onclick="toggleMenu()">⋯</button>
       <div id="userMenu">
-        <div style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9; font-weight: 600; color: #1e293b;">Hey 👋 {{ user.username }}</div>
+        <div style="padding: 14px 18px; border-bottom: 1px solid #f1f5f9; font-weight: 700; color: #1e293b; font-size: 15px;">Hey 👋 {{ user.username }}</div>
         <a href="{% url 'home' %}">🏠 Back to Home Page</a>
         <a href="/hire/post/">📦 Post Rental Product</a>    
         <a href="/chat/" id="msgLink">💬 Messages<span id="msgBadge" class="msg-badge">0</span></a>
-        <a href="{% url 'dashboard' %}">📊 Dashboard</a>
-        <form method="post" action="{% url 'logout' %}" style="display: block; padding: 8px 16px; margin:0; border-top: 1px solid #f1f5f9">
+        <form method="post" action="{% url 'logout' %}" style="display: block; padding: 8px 18px; margin:0; border-top: 1px solid #f1f5f9">
           {% csrf_token %}
-          <button type="submit" style="border: none; background: none; padding: 0; color: #ef4444; cursor: pointer; font-weight: 600;">🚪 Logout</button>
+          <button type="submit" style="border: none; background: none; padding: 4px 0; color: #ef4444; cursor: pointer; font-weight: 700; font-size: 14px; width: 100%; text-align: left;">🚪 Logout</button>
         </form> 
       </div>
     </div>
     {% else %}
-      <a href="{% url 'login' %}" style="padding: 8px 16px; background: var(--primary); color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px;">Login</a>
+      <a href="{% url 'login' %}" style="padding: 10px 18px; background: white; color: var(--primary); text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 14px;">Login</a>
     {% endif %}
   </div>
 </div>
@@ -195,7 +222,7 @@ window.onclick = function(event) {
   }
 }
 
-// Messages badge
+// Messages badge counter
 function fetchUnreadCount() {
   fetch('/chat/unread_count/')
     .then(r => r.json())
