@@ -991,4 +991,3 @@ def whatsapp_webhook(request):
         data = json.loads(request.body)
         print("WHATSAPP DATA:", data)
         return HttpResponse('EVENT_RECEIVED', status=200) # <-- This is the line
-
