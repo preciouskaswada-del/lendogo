@@ -12,7 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY - NOW FROM ENV
 SECRET_KEY = os.environ.get('SECRET_KEY')
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'  # KEPT AS IS FOR DEBUGGING
 
 ALLOWED_HOSTS = ['lendogo-production.up.railway.app', '.up.railway.app', 'localhost', '127.0.0.1']  
 CSRF_TRUSTED_ORIGINS = [
@@ -111,14 +111,8 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # MEDIA FILES - CLOUDINARY FROM ENV
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 MEDIA_URL = '/media/'
-
-cloudinary.config( 
-  cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME'),  
-  api_key = os.environ.get('CLOUDINARY_API_KEY'),        
-  api_secret = os.environ.get('CLOUDINARY_API_SECRET')   
-)
-
-CLOUDINARY_URL = f"cloudinary://{os.environ.get('CLOUDINARY_API_KEY')}:{os.environ.get('CLOUDINARY_API_SECRET')}@{os.environ.get('CLOUDINARY_CLOUD_NAME')}"
+# CLOUDINARY WILL AUTO-READ CLOUDINARY_URL FROM RAILWAY
+# NO NEED FOR cloudinary.config() HERE
 
 # PAYCHANGU - FROM ENV
 PAYCHANGU_PUBLIC_KEY = os.environ.get('PAYCHANGU_PUBLIC_KEY')
