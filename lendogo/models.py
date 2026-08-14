@@ -292,9 +292,6 @@ class Message(models.Model):
     is_read = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
-
-User = get_user_model()
-
 class RentalListing(models.Model):
     RENTAL_TYPE_CHOICES = [('hour', 'Per Hour'),('day', 'Per Day'),('week', 'Per Week'),('month', 'Per Month')]
     CATEGORY_CHOICES = [('cars', 'Cars & Vehicles'),('ps_system', 'PS / Gaming Systems'),('tents', 'Tents'),('chairs', 'Chairs'),('halls', 'Halls for Weddings'),('garden', 'Garden Equipment'),('tools', 'Tools & Equipment'),('electronics', 'Electronics'),('sound', 'Sound Systems'),('other', 'Other')]
