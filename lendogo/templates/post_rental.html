@@ -63,6 +63,15 @@ small { color: #64748b; font-size: 12px; display: block; margin-top: 4px; }
 .btn-cancel { background: #e2e8f0; color: #334155; }
 
 #uploadStatus { text-align: center; color: #2563eb; font-weight: 600; margin-top: 10px; display: none; font-size: 14px; }
+
+/* NEW: Loading Overlay */
+.loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); z-index: 9999; align-items: center; justify-content: center; flex-direction: column; color: white; }
+.loading-overlay.active { display: flex; }
+.loading-overlay h2 { font-size: 24px; margin-bottom: 8px; }
+.loading-overlay p { font-size: 14px; color: #cbd5e1; }
+.spinner { border: 4px solid rgba(255,255,255,0.2); border-top: 4px solid #2563eb; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 16px; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
 </style>
 {% endblock %}
 
@@ -128,10 +137,10 @@ small { color: #64748b; font-size: 12px; display: block; margin-top: 4px; }
     </div>
 
     <div class="form-group">
-      <label>Upload Photos</label>
+      <label>Upload Photos <span id="photoCount" style="color:#2563eb; font-weight:400;">0/10</span></label> {# NEW: count #}
       <label for="image_input" class="btn btn-upload" id="image_label">+ Add Photos</label> {# FIXED: custom button #}
       <input type="file" name="images" id="image_input" accept="image/*" multiple style="display:none;"> {# FIXED: hidden #}
-      <small>Click X to remove</small>
+      <small>Max 10 photos. Click X to remove. Click + Add Photos again to add more.</small>
       <div id="uploadStatus">Uploading images... Please wait</div>
       <div class="preview-grid" id="image_preview"></div>
     </div>
@@ -140,7 +149,7 @@ small { color: #64748b; font-size: 12px; display: block; margin-top: 4px; }
       <label>Upload Video - Optional</label>
       <label for="video_input" class="btn btn-upload" id="video_label">+ Add Video</label> {# FIXED: custom button #}
       <input type="file" name="video" id="video_input" accept="video/*" style="display:none;"> {# FIXED: hidden #}
-      <small>MP4, MOV. Max 50MB. Show the item working</small>
+      <small>MP4, MOV. Max 30MB. Show the item working</small> {# CHANGED: 50MB to 30MB #}
       <div id="video_preview" style="margin-top:12px"></div>
     </div>
 
@@ -156,10 +165,20 @@ small { color: #64748b; font-size: 12px; display: block; margin-top: 4px; }
     <button class="btn-cancel" onclick="closeModal()">Cancel</button>
   </div>
 </div>
+
+<!-- NEW: Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <h2>Posting...</h2>
+  <p>Please wait patiently while we upload and redirect</p>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+const MAX_PHOTOS = 10; // NEW
+const MAX_VIDEO_SIZE = 30 * 1024 * 1024; // NEW: 30MB
+
 function formatNumberInput(displayInput, hiddenInput) {
   displayInput.addEventListener('input', (e) => {
     let num = e.target.value.replace(/[^0-9.]/g, '');
@@ -179,6 +198,7 @@ formatNumberInput(document.getElementById('deposit_display'), document.getElemen
 const imageInput = document.getElementById('image_input');
 const imagePreview = document.getElementById('image_preview');
 const imageLabel = document.getElementById('image_label'); // NEW
+const photoCount = document.getElementById('photoCount'); // NEW
 const dt = new DataTransfer();
 let removeIndex = null;
 
@@ -220,11 +240,16 @@ async function compressImage(file) {
 }
 
 imageInput.addEventListener('change', async (e) => {
+  const slotsLeft = MAX_PHOTOS - dt.files.length; // NEW
+  if(slotsLeft <= 0) return; // NEW: block if full
+
+  const filesToAdd = Array.from(e.target.files).slice(0, slotsLeft); // NEW: only take what fits
+  if(filesToAdd.length === 0) return; // NEW
+
   document.getElementById('uploadStatus').style.display = 'block';
   document.getElementById('submitBtn').disabled = true;
 
-  dt.items.clear();
-  for(let file of Array.from(e.target.files)) {
+  for(let file of filesToAdd) { // CHANGED: only loop filesToAdd
     const compressed = await compressImage(file);
     dt.items.add(compressed);
   }
@@ -233,12 +258,16 @@ imageInput.addEventListener('change', async (e) => {
   updateImagePreview();
   document.getElementById('uploadStatus').style.display = 'none';
   document.getElementById('submitBtn').disabled = false;
+  imageInput.value = ''; // NEW: reset so you can click "Add Photos" again
 });
 
 function updateImagePreview() {
   imagePreview.innerHTML = '';
   const fileCount = dt.files.length; // NEW
-  imageLabel.innerText = fileCount > 0? `${fileCount} Photos Selected` : '+ Add Photos'; // NEW
+  photoCount.innerText = `${fileCount}/${MAX_PHOTOS}`; // NEW
+  imageLabel.innerText = fileCount >= MAX_PHOTOS? `Max ${MAX_PHOTOS} Reached` : `+ Add Photos (${fileCount}/${MAX_PHOTOS})`; // NEW
+  imageLabel.style.pointerEvents = fileCount >= MAX_PHOTOS? 'none' : 'auto'; // NEW
+  imageLabel.style.opacity = fileCount >= MAX_PHOTOS? '0.6' : '1'; // NEW
 
   Array.from(dt.files).forEach((file, index) => {
     const div = document.createElement('div');
@@ -263,18 +292,22 @@ const videoPreview = document.getElementById('video_preview');
 const videoLabel = document.getElementById('video_label'); // NEW
 videoInput.addEventListener('change', () => {
   const file = videoInput.files[0];
-  if(file) {
-    videoLabel.innerText = '1 Video Selected'; // NEW
-    videoPreview.innerHTML = `
-      <div class="preview-item" style="max-width:250px">
-        <video src="${URL.createObjectURL(file)}" controls muted></video>
-        <button type="button" class="remove-btn" onclick="removeVideo()">×</button>
-      </div>
-    `;
-  } else {
-    videoLabel.innerText = '+ Add Video'; // NEW
-    videoPreview.innerHTML = '';
+  if(!file) return; // NEW
+
+  // NEW: 30MB check
+  if(file.size > MAX_VIDEO_SIZE) {
+      alert('Video too big! Maximum 30MB allowed.');
+      videoInput.value = '';
+      return;
   }
+
+  videoLabel.innerText = '1 Video Selected'; // NEW
+  videoPreview.innerHTML = `
+    <div class="preview-item" style="max-width:250px">
+      <video src="${URL.createObjectURL(file)}" controls muted></video>
+      <button type="button" class="remove-btn" onclick="removeVideo()">×</button>
+    </div>
+  `;
 });
 
 function removeVideo() {
@@ -294,5 +327,11 @@ function closeModal() {
   document.getElementById('removeModal').classList.remove('active');
   removeIndex = null;
 }
+
+// NEW: Show loading overlay on submit
+document.getElementById('rentalForm').addEventListener('submit', function() {
+    document.getElementById('loadingOverlay').classList.add('active');
+    document.getElementById('submitBtn').disabled = true;
+});
 </script>
 {% endblock %}
