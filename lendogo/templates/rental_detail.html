@@ -85,16 +85,20 @@ h1 { font-size: 30px; color: var(--text); font-weight: 800; line-height: 1.2; }
 
 .icon { width: 18px; height: 18px; display: inline-block; flex-shrink: 0; }
 
+/* MOBILE FIXES - Added */
 @media (max-width: 768px) {
-.detail-card { padding: 20px; border-radius: 0; }
+.detail-card { padding: 20px; border-radius: 0; overflow-x: hidden; }
 .detail-container { margin: 0; }
-h1 { font-size: 24px; }
+h1 { font-size: 22px; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; width: 100%; }
 .carousel-inner { height: 350px; }
-.product-header { flex-direction: column; align-items: start; }
+.product-header { flex-direction: column; align-items: start; gap: 12px; }
+.price-badge { font-size: 18px; padding: 8px 16px; white-space: normal; text-align: center; width: 100%; }
 .btn-group { grid-template-columns: 1fr; }
 .zoom-nav { width: 40px; height: 40px; font-size: 20px; }
 .zoom-prev { left: 15px; }
 .zoom-next { right: 15px; }
+.info-value { word-wrap: break-word; overflow-wrap: break-word; }
+.description { word-wrap: break-word; overflow-wrap: break-word; }
 }
 </style>
 {% endblock %}
@@ -120,16 +124,16 @@ h1 { font-size: 24px; }
 
     {% if rental.video %}
       <video class="detail-video" controls preload="metadata">
-        <source src="{{ rental.video }}" type="video/mp4"> {# FIX: Direct URL #}
+        <source src="{{ rental.video }}" type="video/mp4">
       </video>
     {% endif %}
 
-    {% if rental.images and rental.images|length > 0 %}
+    {% if rental.images.all and rental.images.all|length > 0 %}
     <div class="carousel" id="carousel">
       <div class="carousel-inner">
-        {% for img_url in rental.images %}
+        {% for img in rental.images.all %}
           <div class="slide {% if forloop.first %}active{% endif %}">
-            <img src="{{ img_url }}" {# FIX: Just use the URL directly #}
+            <img src="{{ img.image.url }}"
                  alt="{{ rental.product }}"
                  data-index="{{ forloop.counter0 }}"
                  loading="lazy"
@@ -138,21 +142,21 @@ h1 { font-size: 24px; }
         {% endfor %}
       </div>
 
-      {% if rental.images|length > 1 %}
+      {% if rental.images.all|length > 1 %}
         <button type="button" class="prev">‹</button>
         <button type="button" class="next">›</button>
         <div class="dots">
-          {% for img_url in rental.images %}
+          {% for img in rental.images.all %}
             <span class="dot {% if forloop.first %}active{% endif %}" data-index="{{ forloop.counter0 }}"></span>
           {% endfor %}
         </div>
       {% endif %}
     </div>
 
-    {% if rental.images|length > 1 %}
+    {% if rental.images.all|length > 1 %}
     <div class="thumbs">
-      {% for img_url in rental.images %}
-        <img src="{{ img_url }}" {# FIX: Just use the URL directly #}
+      {% for img in rental.images.all %}
+        <img src="{{ img.image.url }}"
              class="thumb {% if forloop.first %}active{% endif %}"
              data-index="{{ forloop.counter0 }}" alt="{{ rental.product }}"
              loading="lazy"
@@ -202,7 +206,7 @@ h1 { font-size: 24px; }
     {% endif %}
 
     <div class="btn-group">
-      {% if request.user.is_authenticated and request.user != rental.seller %}
+      {% if request.user.is_authenticated and request.user!= rental.seller %}
         <form method="POST" action="{% url 'start_rental_conversation' rental.id %}" style="display: contents;">
           {% csrf_token %}
           <button type="submit" class="btn btn-chat">
@@ -223,7 +227,7 @@ h1 { font-size: 24px; }
           Call Seller
         </a>
         <a href="https://wa.me/{{ rental.contact|cut:' '|cut:'+'|cut:'-' }}" target="_blank" class="btn btn-whatsapp">
-          <svg class="icon" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 0.16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+          <svg class="icon" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 0.16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
           WhatsApp
         </a>
       {% endif %}
