@@ -47,9 +47,10 @@ small { color: #64748b; font-size: 12px; display: block; margin-top: 4px; }
 
 .btn-upload { background: #e2e8f0; color: #334155; text-align: center; display: block; }
 .btn-upload:hover { background: #cbd5e1; }
+.btn-upload:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin-top: 12px; }
-.preview-item { position: relative; aspect-ratio: 1/1; border-radius: 8px; overflow: hidden; border: 2px solid #e2e8f0; }
+.preview-item { position: relative; aspect-ratio: 1/1; border-radius: 8px; overflow: hidden; border: 2px solid #e2e8f0; background: #f8fafc; }
 .preview-item img,.preview-item video { width: 100%; height: 100%; object-fit: cover; }
 .remove-btn { position: absolute; top: 4px; right: 4px; background: #ef4444; color: white; border: none; border-radius: 50%; width: 26px; height: 26px; cursor: pointer; font-size: 16px; font-weight: 700; z-index: 2; }
 
@@ -64,7 +65,6 @@ small { color: #64748b; font-size: 12px; display: block; margin-top: 4px; }
 
 #uploadStatus { text-align: center; color: #2563eb; font-weight: 600; margin-top: 10px; display: none; font-size: 14px; }
 
-/* NEW: Loading Overlay */
 .loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); z-index: 9999; align-items: center; justify-content: center; flex-direction: column; color: white; }
 .loading-overlay.active { display: flex; }
 .loading-overlay h2 { font-size: 24px; margin-bottom: 8px; }
@@ -72,6 +72,9 @@ small { color: #64748b; font-size: 12px; display: block; margin-top: 4px; }
 .spinner { border: 4px solid rgba(255,255,255,0.2); border-top: 4px solid #2563eb; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 16px; }
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
+@media (max-width: 768px){
+.post-container { padding: 20px; border-radius: 0; }
+}
 </style>
 {% endblock %}
 
@@ -85,7 +88,7 @@ small { color: #64748b; font-size: 12px; display: block; margin-top: 4px; }
   <h1>🔧 Post Rental Product</h1>
   <p class="subtitle">List your item so people can rent it from you</p>
 
-  <form method="post" enctype="multipart/form-data" id="rentalForm" action=""> {# FIXED: added action="" #}
+  <form method="post" enctype="multipart/form-data" id="rentalForm">
     {% csrf_token %}
 
     <div class="form-group">
@@ -127,7 +130,7 @@ small { color: #64748b; font-size: 12px; display: block; margin-top: 4px; }
 
     <div class="form-group">
       <label>Deposit Required - MK</label>
-      <input type="text" id="deposit_display" value="0">
+      <input type="text" id="deposit_display" placeholder="0">
       <input type="hidden" name="deposit_required" id="deposit_raw" value="0">
     </div>
 
@@ -137,19 +140,19 @@ small { color: #64748b; font-size: 12px; display: block; margin-top: 4px; }
     </div>
 
     <div class="form-group">
-      <label>Upload Photos <span id="photoCount" style="color:#2563eb; font-weight:400;">0/10</span></label> {# NEW: count #}
-      <label for="image_input" class="btn btn-upload" id="image_label">+ Add Photos</label> {# FIXED: custom button #}
-      <input type="file" name="images" id="image_input" accept="image/*" multiple style="display:none;"> {# FIXED: hidden #}
-      <small>Max 10 photos. Click X to remove. Click + Add Photos again to add more.</small>
-      <div id="uploadStatus">Uploading images... Please wait</div>
+      <label>Upload Photos <span id="photoCount" style="color:#2563eb; font-weight:400;">0/10</span></label>
+      <label for="image_input" class="btn btn-upload" id="image_label">+ Add Photos</label>
+      <input type="file" name="images" id="image_input" accept="image/*" multiple style="display:none;">
+      <small>Max 10 photos. ~400KB each after compression. Click X to remove.</small>
+      <div id="uploadStatus">Compressing images... Please wait</div>
       <div class="preview-grid" id="image_preview"></div>
     </div>
 
     <div class="form-group">
       <label>Upload Video - Optional</label>
-      <label for="video_input" class="btn btn-upload" id="video_label">+ Add Video</label> {# FIXED: custom button #}
-      <input type="file" name="video" id="video_input" accept="video/*" style="display:none;"> {# FIXED: hidden #}
-      <small>MP4, MOV. Max 30MB. Show the item working</small> {# CHANGED: 50MB to 30MB #}
+      <label for="video_input" class="btn btn-upload" id="video_label">+ Add Video</label>
+      <input type="file" name="video" id="video_input" accept="video/*" style="display:none;">
+      <small>MP4, MOV. Max 30MB. Show the item working</small>
       <div id="video_preview" style="margin-top:12px"></div>
     </div>
 
@@ -159,14 +162,13 @@ small { color: #64748b; font-size: 12px; display: block; margin-top: 4px; }
 
 <div class="modal" id="removeModal">
   <div class="modal-box">
-    <h3>Remove this file?</h3>
-    <p>This only removes it from the form. Won't delete from server yet</p>
+    <h3>Remove this photo?</h3>
+    <p>This only removes it from the form.</p>
     <button class="btn-danger" id="confirmRemove">Yes, Remove</button>
     <button class="btn-cancel" onclick="closeModal()">Cancel</button>
   </div>
 </div>
 
-<!-- NEW: Loading Overlay -->
 <div class="loading-overlay" id="loadingOverlay">
   <div class="spinner"></div>
   <h2>Posting...</h2>
@@ -176,20 +178,30 @@ small { color: #64748b; font-size: 12px; display: block; margin-top: 4px; }
 
 {% block extra_js %}
 <script>
-const MAX_PHOTOS = 10; // NEW
-const MAX_VIDEO_SIZE = 30 * 1024 * 1024; // NEW: 30MB
+const MAX_PHOTOS = 10;
+const MAX_VIDEO_SIZE = 30 * 1024 * 1024; // 30MB
+const MAX_WIDTH = 1200;
 
+// FIXED: Price formatter that doesn't reset to 0
 function formatNumberInput(displayInput, hiddenInput) {
-  displayInput.addEventListener('input', (e) => {
-    let num = e.target.value.replace(/[^0-9.]/g, '');
-
-    if(num!== '') {
-      hiddenInput.value = num;
-      e.target.value = Number(num).toLocaleString();
-    } else {
-      hiddenInput.value = '0';
-      e.target.value = '';
+  function formatValue(val) {
+    let num = val.replace(/[^0-9]/g, ''); // Only numbers
+    if(num === '') return {display: '', raw: ''}; // Stay blank, don't force 0
+    return {
+      display: Number(num).toLocaleString(), // 1000000 -> 1,000,000
+      raw: num // 1000000
     }
+  }
+
+  displayInput.addEventListener('input', (e) => {
+    const {display, raw} = formatValue(e.target.value);
+    e.target.value = display;
+    hiddenInput.value = raw; // Save raw number to backend
+  });
+
+  displayInput.addEventListener('blur', (e) => {
+    const {display} = formatValue(e.target.value);
+    e.target.value = display;
   });
 }
 formatNumberInput(document.getElementById('price_display'), document.getElementById('price_raw'));
@@ -197,83 +209,97 @@ formatNumberInput(document.getElementById('deposit_display'), document.getElemen
 
 const imageInput = document.getElementById('image_input');
 const imagePreview = document.getElementById('image_preview');
-const imageLabel = document.getElementById('image_label'); // NEW
-const photoCount = document.getElementById('photoCount'); // NEW
+const imageLabel = document.getElementById('image_label');
+const photoCount = document.getElementById('photoCount');
+const uploadStatus = document.getElementById('uploadStatus');
 const dt = new DataTransfer();
 let removeIndex = null;
+let objectUrls = [];
 
-// COMPRESSION FUNCTION - FIXED
+// FIXED: Memory safe compression for 1GB phones
 async function compressImage(file) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
+    reader.onerror = () => reject('File read error');
     reader.readAsDataURL(file);
     reader.onload = (event) => {
       const img = new Image();
-      img.src = event.target.result;
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-
         let width = img.width;
         let height = img.height;
-        const maxWidth = 1200;
-
-        if (width > maxWidth) {
-          height *= maxWidth / width;
-          width = maxWidth;
+        if (width > MAX_WIDTH) {
+          height *= MAX_WIDTH / width;
+          width = MAX_WIDTH;
         }
-
+        const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
         ctx.drawImage(img, 0, 0, width, height);
 
         canvas.toBlob((blob) => {
-          const compressedFile = new File([blob], file.name, {
+          const compressedFile = new File([blob], file.name.replace(/\..+$/, '') + '.jpg', {
             type: 'image/jpeg',
             lastModified: Date.now()
           });
+          img.src = '';
+          canvas.width = 0; canvas.height = 0;
           resolve(compressedFile);
-        }, 'image/jpeg', 0.7);
+        }, 'image/jpeg', 0.65);
       };
+      img.onerror = () => reject('Image load error');
+      img.src = event.target.result;
     };
   });
 }
 
 imageInput.addEventListener('change', async (e) => {
-  const slotsLeft = MAX_PHOTOS - dt.files.length; // NEW
-  if(slotsLeft <= 0) return; // NEW: block if full
+  const slotsLeft = MAX_PHOTOS - dt.files.length;
+  if(slotsLeft <= 0) return;
 
-  const filesToAdd = Array.from(e.target.files).slice(0, slotsLeft); // NEW: only take what fits
-  if(filesToAdd.length === 0) return; // NEW
+  const filesToAdd = Array.from(e.target.files).slice(0, slotsLeft);
+  if(filesToAdd.length === 0) return;
 
-  document.getElementById('uploadStatus').style.display = 'block';
+  uploadStatus.style.display = 'block';
+  imageLabel.style.pointerEvents = 'none';
   document.getElementById('submitBtn').disabled = true;
 
-  for(let file of filesToAdd) { // CHANGED: only loop filesToAdd
-    const compressed = await compressImage(file);
-    dt.items.add(compressed);
+  for(let file of filesToAdd) {
+    try {
+      const compressed = await compressImage(file);
+      dt.items.add(compressed);
+    } catch(err) {
+      console.error('Compression failed:', err);
+      alert('Failed to process 1 image. Skipping it.');
+    }
   }
 
   imageInput.files = dt.files;
   updateImagePreview();
-  document.getElementById('uploadStatus').style.display = 'none';
+  uploadStatus.style.display = 'none';
+  imageLabel.style.pointerEvents = 'auto';
   document.getElementById('submitBtn').disabled = false;
-  imageInput.value = ''; // NEW: reset so you can click "Add Photos" again
+  imageInput.value = '';
 });
 
 function updateImagePreview() {
+  objectUrls.forEach(url => URL.revokeObjectURL(url));
+  objectUrls = [];
+
   imagePreview.innerHTML = '';
-  const fileCount = dt.files.length; // NEW
-  photoCount.innerText = `${fileCount}/${MAX_PHOTOS}`; // NEW
-  imageLabel.innerText = fileCount >= MAX_PHOTOS? `Max ${MAX_PHOTOS} Reached` : `+ Add Photos (${fileCount}/${MAX_PHOTOS})`; // NEW
-  imageLabel.style.pointerEvents = fileCount >= MAX_PHOTOS? 'none' : 'auto'; // NEW
-  imageLabel.style.opacity = fileCount >= MAX_PHOTOS? '0.6' : '1'; // NEW
+  const fileCount = dt.files.length;
+  photoCount.innerText = `${fileCount}/${MAX_PHOTOS}`;
+  imageLabel.innerText = fileCount >= MAX_PHOTOS? `Max ${MAX_PHOTOS} Reached` : `+ Add Photos (${fileCount}/${MAX_PHOTOS})`;
+  imageLabel.style.opacity = fileCount >= MAX_PHOTOS? '0.6' : '1';
+  imageLabel.style.pointerEvents = fileCount >= MAX_PHOTOS? 'none' : 'auto';
 
   Array.from(dt.files).forEach((file, index) => {
+    const url = URL.createObjectURL(file);
+    objectUrls.push(url);
     const div = document.createElement('div');
     div.className = 'preview-item';
     div.innerHTML = `
-      <img src="${URL.createObjectURL(file)}">
+      <img src="${url}" loading="lazy">
       <button type="button" class="remove-btn" data-index="${index}">×</button>
     `;
     imagePreview.appendChild(div);
@@ -289,34 +315,41 @@ imagePreview.addEventListener('click', (e) => {
 
 const videoInput = document.getElementById('video_input');
 const videoPreview = document.getElementById('video_preview');
-const videoLabel = document.getElementById('video_label'); // NEW
+const videoLabel = document.getElementById('video_label');
+let videoUrl = null;
+
 videoInput.addEventListener('change', () => {
   const file = videoInput.files[0];
-  if(!file) return; // NEW
+  if(!file) return;
 
-  // NEW: 30MB check
   if(file.size > MAX_VIDEO_SIZE) {
       alert('Video too big! Maximum 30MB allowed.');
       videoInput.value = '';
       return;
   }
 
-  videoLabel.innerText = '1 Video Selected'; // NEW
+  if(videoUrl) URL.revokeObjectURL(videoUrl);
+  videoUrl = URL.createObjectURL(file);
+
+  videoLabel.innerText = '1 Video Selected';
   videoPreview.innerHTML = `
     <div class="preview-item" style="max-width:250px">
-      <video src="${URL.createObjectURL(file)}" controls muted></video>
+      <video src="${videoUrl}" controls muted preload="metadata"></video>
       <button type="button" class="remove-btn" onclick="removeVideo()">×</button>
     </div>
   `;
 });
 
 function removeVideo() {
+  if(videoUrl) URL.revokeObjectURL(videoUrl);
+  videoUrl = null;
   videoInput.value = '';
   videoPreview.innerHTML = '';
-  videoLabel.innerText = '+ Add Video'; // NEW
+  videoLabel.innerText = '+ Add Video';
 }
 
 document.getElementById('confirmRemove').onclick = () => {
+  if(objectUrls[removeIndex]) URL.revokeObjectURL(objectUrls[removeIndex]);
   dt.items.remove(removeIndex);
   imageInput.files = dt.files;
   updateImagePreview();
@@ -328,10 +361,21 @@ function closeModal() {
   removeIndex = null;
 }
 
-// NEW: Show loading overlay on submit
-document.getElementById('rentalForm').addEventListener('submit', function() {
+document.getElementById('rentalForm').addEventListener('submit', function(e) {
+    // FIXED: Only set to 0 on submit if empty
+    if(document.getElementById('price_raw').value === ''){
+        document.getElementById('price_raw').value = '0';
+    }
+    if(document.getElementById('deposit_raw').value === ''){
+        document.getElementById('deposit_raw').value = '0';
+    }
     document.getElementById('loadingOverlay').classList.add('active');
     document.getElementById('submitBtn').disabled = true;
+});
+
+window.addEventListener('beforeunload', () => {
+  objectUrls.forEach(url => URL.revokeObjectURL(url));
+  if(videoUrl) URL.revokeObjectURL(videoUrl);
 });
 </script>
 {% endblock %}
