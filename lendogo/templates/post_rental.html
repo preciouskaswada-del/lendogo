@@ -7,53 +7,25 @@
 <style>
 .post-nav { background: white; padding: 16px 24px; box-shadow: 0 2px 4px rgba(0,0,0,0.06); margin: -16px -16px 30px -16px; }
 .post-nav a { text-decoration: none; color: #2563eb; font-weight: 600; font-size: 18px; margin-right: 15px; }
-
 .post-container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-
 h1 { font-size: 28px; color: #1e293b; margin-bottom: 8px; }
 .subtitle { color: #64748b; margin-bottom: 25px; }
-
 .form-group { margin-bottom: 20px; }
 label { display: block; font-weight: 600; color: #334155; margin-bottom: 6px; font-size: 14px; }
-input, textarea, select {
-  width: 100%;
-  padding: 12px;
-  border: 2px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 15px;
-  font-family: inherit;
-}
-input:focus, textarea:focus, select:focus {
-  outline: none;
-  border-color: #2563eb;
-}
+input, textarea, select { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 15px; font-family: inherit; }
+input:focus, textarea:focus, select:focus { outline: none; border-color: #2563eb; }
 textarea { min-height: 100px; resize: vertical; }
 small { color: #64748b; font-size: 12px; display: block; margin-top: 4px; }
-
-.btn {
-  width: 100%;
-  padding: 14px;
-  background: #2563eb;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  margin-top: 10px;
-}
+.btn { width: 100%; padding: 14px; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px; }
 .btn:hover { background: #1d4ed8; }
 .btn:disabled { background: #94a3b8; cursor: not-allowed; }
-
 .btn-upload { background: #e2e8f0; color: #334155; text-align: center; display: block; }
 .btn-upload:hover { background: #cbd5e1; }
 .btn-upload:disabled { opacity: 0.6; cursor: not-allowed; }
-
 .preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin-top: 12px; }
 .preview-item { position: relative; aspect-ratio: 1/1; border-radius: 8px; overflow: hidden; border: 2px solid #e2e8f0; background: #f8fafc; }
 .preview-item img,.preview-item video { width: 100%; height: 100%; object-fit: cover; }
 .remove-btn { position: absolute; top: 4px; right: 4px; background: #ef4444; color: white; border: none; border-radius: 50%; width: 26px; height: 26px; cursor: pointer; font-size: 16px; font-weight: 700; z-index: 2; }
-
 .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 999; align-items: center; justify-content: center; }
 .modal.active { display: flex; }
 .modal-box { background: white; padding: 24px; border-radius: 12px; max-width: 350px; text-align: center; }
@@ -62,19 +34,14 @@ small { color: #64748b; font-size: 12px; display: block; margin-top: 4px; }
 .modal-box button { margin: 6px; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
 .btn-danger { background: #ef4444; color: white; }
 .btn-cancel { background: #e2e8f0; color: #334155; }
-
 #uploadStatus { text-align: center; color: #2563eb; font-weight: 600; margin-top: 10px; display: none; font-size: 14px; }
-
 .loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); z-index: 9999; align-items: center; justify-content: center; flex-direction: column; color: white; }
 .loading-overlay.active { display: flex; }
 .loading-overlay h2 { font-size: 24px; margin-bottom: 8px; }
 .loading-overlay p { font-size: 14px; color: #cbd5e1; }
 .spinner { border: 4px solid rgba(255,255,255,0.2); border-top: 4px solid #2563eb; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 16px; }
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-@media (max-width: 768px){
-.post-container { padding: 20px; border-radius: 0; }
-}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); }
+@media (max-width: 768px){.post-container { padding: 20px; border-radius: 0; } }
 </style>
 {% endblock %}
 
@@ -90,115 +57,41 @@ small { color: #64748b; font-size: 12px; display: block; margin-top: 4px; }
 
   <form method="post" enctype="multipart/form-data" id="rentalForm">
     {% csrf_token %}
-
-    <div class="form-group">
-      <label>Title / Product Name</label>
-      <input type="text" name="product" placeholder="e.g. Ps system" required>
-    </div>
-
-    <div class="form-group">
-      <label>Description</label>
-      <textarea name="description" placeholder="ndiya new one ndima bass bin folo" required></textarea>
-    </div>
-
-    <div class="form-group">
-      <label>Price (MK)</label>
-      <input type="text" id="price_display" placeholder="5,000" required>
-      <input type="hidden" name="price" id="price_raw">
-      <small>Commas auto-added.</small>
-    </div>
-
-    <div class="form-group">
-      <label>Rental Type</label>
-      <select name="rental_type" required>
-        <option value="hour">Per Hour</option>
-        <option value="day" selected>Per Day</option>
-        <option value="week">Per Week</option>
-        <option value="month">Per Month</option>
-      </select>
-    </div>
-
-    <div class="form-group">
-      <label>Location</label>
-      <input type="text" name="location" placeholder="e.g. Area 49, Lilongwe" required>
-    </div>
-
-    <div class="form-group">
-      <label>Contact Phone - Optional</label>
-      <input type="text" name="contact" placeholder="088xxxxx or 099xxxx">
-    </div>
-
-    <div class="form-group">
-      <label>Deposit Required - MK</label>
-      <input type="text" id="deposit_display" placeholder="0">
-      <input type="hidden" name="deposit_required" id="deposit_raw" value="0">
-    </div>
-
-    <div class="form-group">
-      <label>Available From</label>
-      <input type="date" name="available_from">
-    </div>
-
-    <div class="form-group">
-      <label>Upload Photos <span id="photoCount" style="color:#2563eb; font-weight:400;">0/10</span></label>
-      <label for="image_input" class="btn btn-upload" id="image_label">+ Add Photos</label>
-      <input type="file" name="images" id="image_input" accept="image/*" multiple style="display:none;">
-      <small>Max 10 photos. ~400KB each after compression. Click X to remove.</small>
-      <div id="uploadStatus">Compressing images... Please wait</div>
-      <div class="preview-grid" id="image_preview"></div>
-    </div>
-
-    <div class="form-group">
-      <label>Upload Video - Optional</label>
-      <label for="video_input" class="btn btn-upload" id="video_label">+ Add Video</label>
-      <input type="file" name="video" id="video_input" accept="video/*" style="display:none;">
-      <small>MP4, MOV. Max 30MB. Show the item working</small>
-      <div id="video_preview" style="margin-top:12px"></div>
-    </div>
-
+    <div class="form-group"><label>Title / Product Name</label><input type="text" name="product" placeholder="e.g. Ps system" required></div>
+    <div class="form-group"><label>Description</label><textarea name="description" placeholder="ndiya new one ndima bass bin folo" required></textarea></div>
+    <div class="form-group"><label>Price (MK)</label><input type="text" id="price_display" placeholder="5,000" required><input type="hidden" name="price" id="price_raw"><small>Commas auto-added.</small></div>
+    <div class="form-group"><label>Rental Type</label><select name="rental_type" required><option value="hour">Per Hour</option><option value="day" selected>Per Day</option><option value="week">Per Week</option><option value="month">Per Month</option></select></div>
+    <div class="form-group"><label>Location</label><input type="text" name="location" placeholder="e.g. Area 49, Lilongwe" required></div>
+    <div class="form-group"><label>Contact Phone - Optional</label><input type="text" name="contact" placeholder="088xxxxx or 099xxxx"></div>
+    <div class="form-group"><label>Deposit Required - MK</label><input type="text" id="deposit_display" placeholder="0"><input type="hidden" name="deposit_required" id="deposit_raw" value="0"></div>
+    <div class="form-group"><label>Available From</label><input type="date" name="available_from"></div>
+    <div class="form-group"><label>Upload Photos <span id="photoCount" style="color:#2563eb; font-weight:400;">0/10</span></label><label for="image_input" class="btn btn-upload" id="image_label">+ Add Photos</label><input type="file" name="images" id="image_input" accept="image/*" multiple style="display:none;"><small>Max 10 photos. ~180KB each after compression. Click X to remove.</small><div id="uploadStatus">Compressing images... Please wait</div><div class="preview-grid" id="image_preview"></div></div>
+    <div class="form-group"><label>Upload Video - Optional</label><label for="video_input" class="btn btn-upload" id="video_label">+ Add Video</label><input type="file" name="video" id="video_input" accept="video/*" style="display:none;"><small>MP4, MOV. Max 30MB. Show the item working</small><div id="video_preview" style="margin-top:12px"></div></div>
     <button type="submit" class="btn" id="submitBtn">Post Rental Product</button>
   </form>
 </div>
 
-<div class="modal" id="removeModal">
-  <div class="modal-box">
-    <h3>Remove this photo?</h3>
-    <p>This only removes it from the form.</p>
-    <button class="btn-danger" id="confirmRemove">Yes, Remove</button>
-    <button class="btn-cancel" onclick="closeModal()">Cancel</button>
-  </div>
-</div>
-
-<div class="loading-overlay" id="loadingOverlay">
-  <div class="spinner"></div>
-  <h2>Posting...</h2>
-  <p>Please wait patiently while we upload and redirect</p>
-</div>
+<div class="modal" id="removeModal"><div class="modal-box"><h3>Remove this photo?</h3><p>This only removes it from the form.</p><button class="btn-danger" id="confirmRemove">Yes, Remove</button><button class="btn-cancel" onclick="closeModal()">Cancel</button></div></div>
+<div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div><h2>Posting...</h2><p>Please wait patiently while we upload and redirect</p></div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 const MAX_PHOTOS = 10;
-const MAX_VIDEO_SIZE = 30 * 1024 * 1024; // 30MB
+const MAX_VIDEO_SIZE = 30 * 1024 * 1024;
 const MAX_WIDTH = 1200;
 
-// FIXED: Price formatter that doesn't reset to 0
 function formatNumberInput(displayInput, hiddenInput) {
   function formatValue(val) {
-    let num = val.replace(/[^0-9]/g, ''); // Only numbers
-    if(num === '') return {display: '', raw: ''}; // Stay blank, don't force 0
-    return {
-      display: Number(num).toLocaleString(), // 1000000 -> 1,000,000
-      raw: num // 1000000
-    }
+    let num = val.replace(/[^0-9]/g, '');
+    if(num === '') return {display: '', raw: ''};
+    return { display: Number(num).toLocaleString(), raw: num }
   }
-
   displayInput.addEventListener('input', (e) => {
     const {display, raw} = formatValue(e.target.value);
     e.target.value = display;
-    hiddenInput.value = raw; // Save raw number to backend
+    hiddenInput.value = raw;
   });
-
   displayInput.addEventListener('blur', (e) => {
     const {display} = formatValue(e.target.value);
     e.target.value = display;
@@ -216,7 +109,6 @@ const dt = new DataTransfer();
 let removeIndex = null;
 let objectUrls = [];
 
-// FIXED: Memory safe compression for 1GB phones
 async function compressImage(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -225,27 +117,17 @@ async function compressImage(file) {
     reader.onload = (event) => {
       const img = new Image();
       img.onload = () => {
-        let width = img.width;
-        let height = img.height;
-        if (width > MAX_WIDTH) {
-          height *= MAX_WIDTH / width;
-          width = MAX_WIDTH;
-        }
+        let width = img.width; let height = img.height;
+        if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
         const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
+        canvas.width = width; canvas.height = height;
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         ctx.drawImage(img, 0, 0, width, height);
-
         canvas.toBlob((blob) => {
-          const compressedFile = new File([blob], file.name.replace(/\..+$/, '') + '.jpg', {
-            type: 'image/jpeg',
-            lastModified: Date.now()
-          });
-          img.src = '';
-          canvas.width = 0; canvas.height = 0;
+          const compressedFile = new File([blob], file.name.replace(/\..+$/, '') + '.jpg', { type: 'image/jpeg', lastModified: Date.now() });
+          img.src = ''; canvas.width = 0; canvas.height = 0;
           resolve(compressedFile);
-        }, 'image/jpeg', 0.65);
+        }, 'image/jpeg', 0.4); // FIXED: was 0.65
       };
       img.onerror = () => reject('Image load error');
       img.src = event.target.result;
@@ -256,24 +138,15 @@ async function compressImage(file) {
 imageInput.addEventListener('change', async (e) => {
   const slotsLeft = MAX_PHOTOS - dt.files.length;
   if(slotsLeft <= 0) return;
-
   const filesToAdd = Array.from(e.target.files).slice(0, slotsLeft);
   if(filesToAdd.length === 0) return;
-
   uploadStatus.style.display = 'block';
   imageLabel.style.pointerEvents = 'none';
   document.getElementById('submitBtn').disabled = true;
-
   for(let file of filesToAdd) {
-    try {
-      const compressed = await compressImage(file);
-      dt.items.add(compressed);
-    } catch(err) {
-      console.error('Compression failed:', err);
-      alert('Failed to process 1 image. Skipping it.');
-    }
+    try { const compressed = await compressImage(file); dt.items.add(compressed); }
+    catch(err) { console.error('Compression failed:', err); alert('Failed to process 1 image. Skipping it.'); }
   }
-
   imageInput.files = dt.files;
   updateImagePreview();
   uploadStatus.style.display = 'none';
@@ -285,23 +158,18 @@ imageInput.addEventListener('change', async (e) => {
 function updateImagePreview() {
   objectUrls.forEach(url => URL.revokeObjectURL(url));
   objectUrls = [];
-
   imagePreview.innerHTML = '';
   const fileCount = dt.files.length;
   photoCount.innerText = `${fileCount}/${MAX_PHOTOS}`;
   imageLabel.innerText = fileCount >= MAX_PHOTOS? `Max ${MAX_PHOTOS} Reached` : `+ Add Photos (${fileCount}/${MAX_PHOTOS})`;
   imageLabel.style.opacity = fileCount >= MAX_PHOTOS? '0.6' : '1';
   imageLabel.style.pointerEvents = fileCount >= MAX_PHOTOS? 'none' : 'auto';
-
   Array.from(dt.files).forEach((file, index) => {
     const url = URL.createObjectURL(file);
     objectUrls.push(url);
     const div = document.createElement('div');
     div.className = 'preview-item';
-    div.innerHTML = `
-      <img src="${url}" loading="lazy">
-      <button type="button" class="remove-btn" data-index="${index}">×</button>
-    `;
+    div.innerHTML = `<img src="${url}" loading="lazy"><button type="button" class="remove-btn" data-index="${index}">×</button>`;
     imagePreview.appendChild(div);
   });
 }
@@ -321,31 +189,16 @@ let videoUrl = null;
 videoInput.addEventListener('change', () => {
   const file = videoInput.files[0];
   if(!file) return;
-
-  if(file.size > MAX_VIDEO_SIZE) {
-      alert('Video too big! Maximum 30MB allowed.');
-      videoInput.value = '';
-      return;
-  }
-
+  if(file.size > MAX_VIDEO_SIZE) { alert('Video too big! Maximum 30MB allowed.'); videoInput.value = ''; return; }
   if(videoUrl) URL.revokeObjectURL(videoUrl);
   videoUrl = URL.createObjectURL(file);
-
   videoLabel.innerText = '1 Video Selected';
-  videoPreview.innerHTML = `
-    <div class="preview-item" style="max-width:250px">
-      <video src="${videoUrl}" controls muted preload="metadata"></video>
-      <button type="button" class="remove-btn" onclick="removeVideo()">×</button>
-    </div>
-  `;
+  videoPreview.innerHTML = `<div class="preview-item" style="max-width:250px"><video src="${videoUrl}" controls muted preload="metadata"></video><button type="button" class="remove-btn" onclick="removeVideo()">×</button></div>`;
 });
 
 function removeVideo() {
   if(videoUrl) URL.revokeObjectURL(videoUrl);
-  videoUrl = null;
-  videoInput.value = '';
-  videoPreview.innerHTML = '';
-  videoLabel.innerText = '+ Add Video';
+  videoUrl = null; videoInput.value = ''; videoPreview.innerHTML = ''; videoLabel.innerText = '+ Add Video';
 }
 
 document.getElementById('confirmRemove').onclick = () => {
@@ -362,13 +215,13 @@ function closeModal() {
 }
 
 document.getElementById('rentalForm').addEventListener('submit', function(e) {
-    // FIXED: Only set to 0 on submit if empty
-    if(document.getElementById('price_raw').value === ''){
-        document.getElementById('price_raw').value = '0';
-    }
-    if(document.getElementById('deposit_raw').value === ''){
-        document.getElementById('deposit_raw').value = '0';
-    }
+    // FIXED: Remove commas before sending
+    document.getElementById('price_raw').value = document.getElementById('price_raw').value.replace(/,/g, '');
+    document.getElementById('deposit_raw').value = document.getElementById('deposit_raw').value.replace(/,/g, '');
+    
+    if(document.getElementById('price_raw').value === ''){ document.getElementById('price_raw').value = '0'; }
+    if(document.getElementById('deposit_raw').value === ''){ document.getElementById('deposit_raw').value = '0'; }
+    
     document.getElementById('loadingOverlay').classList.add('active');
     document.getElementById('submitBtn').disabled = true;
 });
