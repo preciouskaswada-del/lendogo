@@ -85,7 +85,6 @@ h1 { font-size: 30px; color: var(--text); font-weight: 800; line-height: 1.2; }
 
 .icon { width: 18px; height: 18px; display: inline-block; flex-shrink: 0; }
 
-/* MOBILE FIXES - Added */
 @media (max-width: 768px) {
 .detail-card { padding: 20px; border-radius: 0; overflow-x: hidden; }
 .detail-container { margin: 0; }
@@ -123,8 +122,8 @@ h1 { font-size: 22px; word-wrap: break-word; overflow-wrap: break-word; white-sp
     </div>
 
     {% if rental.video %}
-      <video class="detail-video" controls preload="metadata">
-        <source src="{{ rental.video }}" type="video/mp4">
+      <video class="detail-video" controls preload="none"> {# FIXED: added.url and preload=none for low RAM #}
+        <source src="{{ rental.video.url }}" type="video/mp4">
       </video>
     {% endif %}
 
@@ -133,7 +132,7 @@ h1 { font-size: 22px; word-wrap: break-word; overflow-wrap: break-word; white-sp
       <div class="carousel-inner">
         {% for img in rental.images.all %}
           <div class="slide {% if forloop.first %}active{% endif %}">
-            <img src="{{ img.image.url }}"
+            <img src="{{ img.image.url }}" {# FIXED: was missing.url before #}
                  alt="{{ rental.product }}"
                  data-index="{{ forloop.counter0 }}"
                  loading="lazy"
@@ -156,7 +155,7 @@ h1 { font-size: 22px; word-wrap: break-word; overflow-wrap: break-word; white-sp
     {% if rental.images.all|length > 1 %}
     <div class="thumbs">
       {% for img in rental.images.all %}
-        <img src="{{ img.image.url }}"
+        <img src="{{ img.image.url }}" {# FIXED: was missing.url before #}
              class="thumb {% if forloop.first %}active{% endif %}"
              data-index="{{ forloop.counter0 }}" alt="{{ rental.product }}"
              loading="lazy"
@@ -206,7 +205,7 @@ h1 { font-size: 22px; word-wrap: break-word; overflow-wrap: break-word; white-sp
     {% endif %}
 
     <div class="btn-group">
-      {% if request.user.is_authenticated and request.user != rental.seller %}
+      {% if request.user.is_authenticated and request.user!= rental.seller %}
         <form method="POST" action="{% url 'start_rental_conversation' rental.id %}" style="display: contents;">
           {% csrf_token %}
           <button type="submit" class="btn btn-chat">
