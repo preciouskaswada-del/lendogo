@@ -836,8 +836,6 @@ def rental_page(request):
         'unread_count': unread_count,
         'MEDIA_URL': settings.MEDIA_URL,
     })
-
-
 @login_required
 def post_rental(request):
     if request.method == 'POST':
@@ -896,16 +894,20 @@ def post_rental(request):
             try:
                 result = cloudinary.uploader.upload(img, upload_preset="lendogo3", resource_type="auto")
                 image_urls.append(result['secure_url'])
+                print(f"CLOUDINARY UPLOAD SUCCESS: {result['secure_url']}") # <-- ADDED
             except Exception as e:
                 print("CLOUDINARY IMAGE ERROR:", e)
+                messages.error(request, f'Image upload failed: {e}') # <-- ADDED
 
         video_file = request.FILES.get('video')
         if video_file and video_file.size <= 50 * 1024 * 1024:
             try:
                 result = cloudinary.uploader.upload(video_file, upload_preset="lendogo3", resource_type="video")
                 video_url = result['secure_url']
+                print(f"CLOUDINARY VIDEO SUCCESS: {result['secure_url']}") # <-- ADDED
             except Exception as e:
                 print("CLOUDINARY VIDEO ERROR:", e)
+                messages.error(request, f'Video upload failed: {e}') # <-- ADDED
 
         rental = RentalListing.objects.create(
             seller=request.user,
@@ -918,16 +920,16 @@ def post_rental(request):
             category=category,
             deposit_required=deposit,
             available_from=available_from,
-            images=image_urls,
-            image=image_urls[0] if image_urls else None,
-            video=video_url
+            images=image_urls, # Must be JSONField or TextField
+            image=image_urls[0] if image_urls else None, # Must be CharField
+            video=video_url # Must be CharField
         )
 
         messages.success(request, f'Rental posted! MK{price:,}')
         return redirect('rental_detail', pk=rental.pk)
 
-    return render(request, 'post_rental.html')   
-    
+    return render(request, 'post_rental.html')
+
 def rental_detail(request, pk):
     rental = get_object_or_404(RentalListing.objects.select_related('seller'), pk=pk, is_active=True)
     RentalListing.objects.filter(pk=pk).update(views=F('views') + 1)
@@ -936,10 +938,11 @@ def rental_detail(request, pk):
     if not rental.images:
         rental.images = []
 
+    # FIX: Removed MEDIA_URL. Cloudinary URLs are already full https://...
     return render(request, 'rental_detail.html', {
         'rental': rental,
-        'MEDIA_URL': settings.MEDIA_URL,
     })
+
 @login_required
 @require_POST
 def start_rental_conversation(request, rental_id):
