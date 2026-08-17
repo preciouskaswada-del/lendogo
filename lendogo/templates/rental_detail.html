@@ -122,17 +122,17 @@ h1 { font-size: 22px; word-wrap: break-word; overflow-wrap: break-word; white-sp
     </div>
 
     {% if rental.video %}
-      <video class="detail-video" controls preload="none"> {# FIXED: added.url and preload=none for low RAM #}
-        <source src="{{ rental.video.url }}" type="video/mp4">
+      <video class="detail-video" controls preload="none">
+        <source src="{{ rental.video }}" type="video/mp4"> {# FIXED: removed.url #}
       </video>
     {% endif %}
 
-    {% if rental.images.all and rental.images.all|length > 0 %}
+    {% if rental.images and rental.images|length > 0 %}
     <div class="carousel" id="carousel">
       <div class="carousel-inner">
-        {% for img in rental.images.all %}
+        {% for img in rental.images %}
           <div class="slide {% if forloop.first %}active{% endif %}">
-            <img src="{{ img.image.url }}" {# FIXED: was missing.url before #}
+            <img src="{{ img }}" {# FIXED: removed.image.url #}
                  alt="{{ rental.product }}"
                  data-index="{{ forloop.counter0 }}"
                  loading="lazy"
@@ -141,21 +141,21 @@ h1 { font-size: 22px; word-wrap: break-word; overflow-wrap: break-word; white-sp
         {% endfor %}
       </div>
 
-      {% if rental.images.all|length > 1 %}
+      {% if rental.images|length > 1 %}
         <button type="button" class="prev">‹</button>
         <button type="button" class="next">›</button>
         <div class="dots">
-          {% for img in rental.images.all %}
+          {% for img in rental.images %}
             <span class="dot {% if forloop.first %}active{% endif %}" data-index="{{ forloop.counter0 }}"></span>
           {% endfor %}
         </div>
       {% endif %}
     </div>
 
-    {% if rental.images.all|length > 1 %}
+    {% if rental.images|length > 1 %}
     <div class="thumbs">
-      {% for img in rental.images.all %}
-        <img src="{{ img.image.url }}" {# FIXED: was missing.url before #}
+      {% for img in rental.images %}
+        <img src="{{ img }}" {# FIXED: removed.image.url #}
              class="thumb {% if forloop.first %}active{% endif %}"
              data-index="{{ forloop.counter0 }}" alt="{{ rental.product }}"
              loading="lazy"
@@ -205,7 +205,7 @@ h1 { font-size: 22px; word-wrap: break-word; overflow-wrap: break-word; white-sp
     {% endif %}
 
     <div class="btn-group">
-      {% if request.user.is_authenticated and request.user != rental.seller %}
+      {% if request.user.is_authenticated and request.user!= rental.seller %}
         <form method="POST" action="{% url 'start_rental_conversation' rental.id %}" style="display: contents;">
           {% csrf_token %}
           <button type="submit" class="btn btn-chat">
