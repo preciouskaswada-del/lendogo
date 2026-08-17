@@ -56,5 +56,5 @@ urlpatterns = [
     path('webhook', views.whatsapp_webhook, name='webhook'),
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# FIX: Serve media files in production too. Railway needs this.
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
