@@ -34,8 +34,6 @@
 h1 { font-size: 30px; color: var(--text); font-weight: 800; line-height: 1.2; }
 .price-badge { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; padding: 10px 20px; border-radius: 12px; font-weight: 800; font-size: 22px; white-space: nowrap; box-shadow: 0 4px 14px rgba(37,99,235,0.25); }
 
-.debug-box { background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; font-family: monospace; }
-
 .carousel { position: relative; width: 100%; margin-bottom: 16px; background: #000; border-radius: 16px; overflow: hidden; }
 .carousel-inner { position: relative; height: 500px; }
 .slide { position: absolute; inset: 0; opacity: 0; transition: opacity 0.5s ease; }
@@ -123,13 +121,7 @@ h1 { font-size: 22px; word-wrap: break-word; overflow-wrap: break-word; white-sp
       <div class="price-badge">MK{{ rental.price|default:0|floatformat:2|intcomma }} / {{ rental.get_rental_type_display }}</div>
     </div>
 
-    <!-- DEBUG BOX: REMOVE AFTER TESTING -->
-    <div class="debug-box">
-      <strong>DEBUG:</strong><br>
-      images = {{ rental.images }}<br>
-      images count = {{ rental.images|length }}<br>
-      video = {{ rental.video|default:"None" }}
-    </div>
+    <!-- DEBUG BOX REMOVED -->
 
     {% if rental.video %}
       <video class="detail-video" controls preload="none">
@@ -215,7 +207,7 @@ h1 { font-size: 22px; word-wrap: break-word; overflow-wrap: break-word; white-sp
     {% endif %}
 
     <div class="btn-group">
-      {% if request.user.is_authenticated and request.user != rental.seller %}
+      {% if request.user.is_authenticated and request.user!= rental.seller %}
         <form method="POST" action="{% url 'start_rental_conversation' rental.id %}" style="display: contents;">
           {% csrf_token %}
           <button type="submit" class="btn btn-chat">
