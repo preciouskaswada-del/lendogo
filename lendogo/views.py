@@ -836,6 +836,7 @@ def rental_page(request):
         'unread_count': unread_count,
         'MEDIA_URL': settings.MEDIA_URL,
     })
+
 @login_required
 def post_rental(request):
     if request.method == 'POST':
@@ -845,6 +846,11 @@ def post_rental(request):
         if not product:
             messages.error(request, 'Product name is required')
             return render(request, 'post_rental.html')
+
+        # ADD THIS LINE 1
+        images = request.FILES.getlist('images')
+        print(f"===== POST RENTAL DEBUG =====")
+        print(f"FILES RECEIVED: {len(images)} images") # <-- ADD THIS
 
         # FIX 1: NO CAP. Just remove commas
         price_str = request.POST.get('price', '0').replace(',', '').strip()
@@ -888,26 +894,28 @@ def post_rental(request):
         image_urls = []
         video_url = None
 
-        images = request.FILES.getlist('images')
-        for img in images[:10]:
+        for img in images[:10]: # <-- use the images variable we already made
             if img.size > 10 * 1024 * 1024: continue
             try:
                 result = cloudinary.uploader.upload(img, upload_preset="lendogo3", resource_type="auto")
                 image_urls.append(result['secure_url'])
-                print(f"CLOUDINARY UPLOAD SUCCESS: {result['secure_url']}") # <-- ADDED
+                print(f"CLOUDINARY UPLOAD SUCCESS: {result['secure_url']}")
             except Exception as e:
                 print("CLOUDINARY IMAGE ERROR:", e)
-                messages.error(request, f'Image upload failed: {e}') # <-- ADDED
+                messages.error(request, f'Image upload failed: {e}')
 
         video_file = request.FILES.get('video')
         if video_file and video_file.size <= 50 * 1024 * 1024:
             try:
                 result = cloudinary.uploader.upload(video_file, upload_preset="lendogo3", resource_type="video")
                 video_url = result['secure_url']
-                print(f"CLOUDINARY VIDEO SUCCESS: {result['secure_url']}") # <-- ADDED
+                print(f"CLOUDINARY VIDEO SUCCESS: {result['secure_url']}")
             except Exception as e:
                 print("CLOUDINARY VIDEO ERROR:", e)
-                messages.error(request, f'Video upload failed: {e}') # <-- ADDED
+                messages.error(request, f'Video upload failed: {e}')
+
+        # ADD THIS LINE 2
+        print(f"SAVING TO DB: images={image_urls}") # <-- ADD THIS
 
         rental = RentalListing.objects.create(
             seller=request.user,
@@ -920,9 +928,9 @@ def post_rental(request):
             category=category,
             deposit_required=deposit,
             available_from=available_from,
-            images=image_urls, # Must be JSONField or TextField
-            image=image_urls[0] if image_urls else None, # Must be CharField
-            video=video_url # Must be CharField
+            images=image_urls,
+            image=image_urls[0] if image_urls else None,
+            video=video_url
         )
 
         messages.success(request, f'Rental posted! MK{price:,}')
