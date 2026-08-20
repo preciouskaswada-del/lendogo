@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from.models import Listing, ListingImage, Conversation, Message
+from.models import Listing, ListingImage, Conversation, Message, RentalListing
 
 User = get_user_model()
 
@@ -49,3 +49,11 @@ class ConversationAdmin(admin.ModelAdmin):
 class MessageAdmin(admin.ModelAdmin):
     list_display = ('id', 'conversation', 'sender', 'content', 'created_at', 'is_read')
     list_filter = ('is_read', 'created_at')
+
+# ===== RENTAL LISTINGS - ADDED =====
+@admin.register(RentalListing)
+class RentalListingAdmin(admin.ModelAdmin):
+    list_display = ['product', 'price', 'rental_type', 'category', 'location', 'seller', 'created_at']
+    list_filter = ['rental_type', 'category', 'location']
+    search_fields = ['product', 'description', 'location']
+    list_per_page = 20
