@@ -40,7 +40,7 @@ small { color: #64748b; font-size: 12px; display: block; margin-top: 4px; }
 .loading-overlay h2 { font-size: 24px; margin-bottom: 8px; }
 .loading-overlay p { font-size: 14px; color: #cbd5e1; }
 .spinner { border: 4px solid rgba(255,255,255,0.2); border-top: 4px solid #2563eb; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 16px; }
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(rotate(360deg); }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 @media (max-width: 768px){.post-container { padding: 20px; border-radius: 0; }
 </style>
 {% endblock %}
@@ -55,7 +55,7 @@ small { color: #64748b; font-size: 12px; display: block; margin-top: 4px; }
   <h1>🔧 Post Rental Product</h1>
   <p class="subtitle">List your item so people can rent it from you</p>
 
-  <form method="post" enctype="multipart/form-data" id="rentalForm">
+  <form method="post" enctype="multipart/form-data" id="rentalForm" action="">
     {% csrf_token %}
     <div class="form-group"><label>Title / Product Name</label><input type="text" name="product" placeholder="e.g. Ps system" required></div>
     <div class="form-group"><label>Description</label><textarea name="description" placeholder="ndiya new one ndima bass bin folo" required></textarea></div>
@@ -65,7 +65,7 @@ small { color: #64748b; font-size: 12px; display: block; margin-top: 4px; }
     <div class="form-group"><label>Contact Phone - Optional</label><input type="text" name="contact" placeholder="088xxxxx or 099xxxx"></div>
     <div class="form-group"><label>Deposit Required - MK</label><input type="text" id="deposit_display" placeholder="0"><input type="hidden" name="deposit_required" id="deposit_raw" value="0"></div>
     <div class="form-group"><label>Available From</label><input type="date" name="available_from"></div>
-    <div class="form-group"><label>Upload Photos <span id="photoCount" style="color:#2563eb; font-weight:400;">0/10</span></label><label for="image_input" class="btn btn-upload" id="image_label">+ Add Photos</label><input type="file" name="images" id="image_input" accept="image/*" multiple style="display:none;"><small>Max 10 photos. Click X to remove.</small><div id="uploadStatus">Adding images... Please wait</div><div class="preview-grid" id="image_preview"></div></div>
+    <div class="form-group"><label>Upload Photos <span id="photoCount" style="color:#2563eb; font-weight:400;">0/10</span></label><label for="image_input" class="btn btn-upload" id="image_label">+ Add Photos</label><input type="file" id="image_input" accept="image/*" multiple style="display:none;"><small>Max 10 photos. Click X to remove.</small><div id="uploadStatus">Adding images... Please wait</div><div class="preview-grid" id="image_preview"></div></div>
     <div class="form-group"><label>Upload Video - Optional</label><label for="video_input" class="btn btn-upload" id="video_label">+ Add Video</label><input type="file" name="video" id="video_input" accept="video/*" style="display:none;"><small>MP4, MOV. Max 30MB. Show the item working</small><div id="video_preview" style="margin-top:12px"></div></div>
     <button type="submit" class="btn" id="submitBtn">Post Rental Product</button>
   </form>
@@ -104,7 +104,7 @@ const imagePreview = document.getElementById('image_preview');
 const imageLabel = document.getElementById('image_label');
 const photoCount = document.getElementById('photoCount');
 const uploadStatus = document.getElementById('uploadStatus');
-let filesArray = []; // FIX: USE ARRAY INSTEAD OF DATATRANSFER
+let filesArray = []; // STORE FILES HERE
 let removeIndex = null;
 let objectUrls = [];
 
@@ -120,11 +120,6 @@ imageInput.addEventListener('change', (e) => {
   document.getElementById('submitBtn').disabled = true;
   
   filesArray.push(...filesToAdd);
-
-  // Rebuild FileList for form submit
-  const dataTransfer = new DataTransfer();
-  filesArray.forEach(file => dataTransfer.items.add(file));
-  imageInput.files = dataTransfer.files;
   
   updateImagePreview();
   uploadStatus.style.display = 'none';
@@ -182,9 +177,6 @@ function removeVideo() {
 document.getElementById('confirmRemove').onclick = () => {
   if(objectUrls[removeIndex]) URL.revokeObjectURL(objectUrls[removeIndex]);
   filesArray.splice(removeIndex, 1);
-  const dataTransfer = new DataTransfer();
-  filesArray.forEach(file => dataTransfer.items.add(file));
-  imageInput.files = dataTransfer.files;
   updateImagePreview();
   closeModal();
 };
@@ -194,7 +186,10 @@ function closeModal() {
   removeIndex = null;
 }
 
+// FINAL FIX: USE FETCH + FORMDATA TO FORCE SEND FILES
 document.getElementById('rentalForm').addEventListener('submit', function(e) {
+    e.preventDefault(); // STOP NORMAL FORM SUBMIT
+    
     document.getElementById('price_raw').value = document.getElementById('price_raw').value.replace(/,/g, '');
     document.getElementById('deposit_raw').value = document.getElementById('deposit_raw').value.replace(/,/g, '');
 
@@ -203,6 +198,28 @@ document.getElementById('rentalForm').addEventListener('submit', function(e) {
 
     document.getElementById('loadingOverlay').classList.add('active');
     document.getElementById('submitBtn').disabled = true;
+
+    // Build FormData manually and APPEND IMAGES
+    const formData = new FormData(this);
+    filesArray.forEach(file => {
+        formData.append('images', file); // THIS IS THE KEY LINE
+    });
+
+    fetch(window.location.href, {
+        method: 'POST',
+        body: formData,
+        headers: {'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value}
+    }).then(response => {
+        if(response.redirected){
+            window.location.href = response.url;
+        } else {
+            return response.text().then(text => { document.open(); document.write(text); document.close(); });
+        }
+    }).catch(error => {
+        alert('Upload failed. Please try again.');
+        document.getElementById('loadingOverlay').classList.remove('active');
+        document.getElementById('submitBtn').disabled = false;
+    });
 });
 
 window.addEventListener('beforeunload', () => {
