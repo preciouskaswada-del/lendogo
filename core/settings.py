@@ -12,13 +12,20 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY - NOW FROM ENV
 SECRET_KEY = os.environ.get('SECRET_KEY')
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'  # KEPT TRUE FOR DEBUGGING
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'  # SET TO FALSE ON FLY
 
-ALLOWED_HOSTS = ['lendogo-production.up.railway.app', '.up.railway.app', 'localhost', '127.0.0.1']  
+ALLOWED_HOSTS = [
+    '.fly.dev',  # FLY DOMAIN
+    'localhost', 
+    '127.0.0.1',
+    # 'lendogo-production.up.railway.app',  # OLD RAILWAY - COMMENTED OUT
+    # '.up.railway.app',  # OLD RAILWAY - COMMENTED OUT
+]  
 CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:8000', 
     'http://localhost:8000',
-    'https://lendogo-production.up.railway.app'
+    'https://*.fly.dev',  # FLY DOMAIN
+    # 'https://lendogo-production.up.railway.app'  # OLD RAILWAY - COMMENTED OUT
 ]
 
 AUTH_USER_MODEL = 'lendogo.User'
@@ -71,7 +78,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
-# DATABASE
+# DATABASE - WORKS ON BOTH FLY AND RAILWAY VIA DATABASE_URL
 if os.environ.get('DATABASE_URL'):
     DATABASES = {
         'default': dj_database_url.config(
