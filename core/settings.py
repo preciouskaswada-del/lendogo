@@ -12,21 +12,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY - NOW FROM ENV
 SECRET_KEY = os.environ.get('SECRET_KEY')
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'  # SET TO FALSE ON FLY
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = [
-    '.fly.dev',  # FLY DOMAIN
-    'localhost', 
-    '127.0.0.1',
-    # 'lendogo-production.up.railway.app',  # OLD RAILWAY - COMMENTED OUT
-    # '.up.railway.app',  # OLD RAILWAY - COMMENTED OUT
-]  
-CSRF_TRUSTED_ORIGINS = [
-    'http://127.0.0.1:8000', 
-    'http://localhost:8000',
-    'https://*.fly.dev',  # FLY DOMAIN
-    # 'https://lendogo-production.up.railway.app'  # OLD RAILWAY - COMMENTED OUT
-]
+# FIX 1: READ FROM ENV FOR RENDER
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+
+# FIX 2: READ CSRF FROM ENV TOO
+CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://localhost:8000,http://127.0.0.1:8000').split(',')
 
 AUTH_USER_MODEL = 'lendogo.User'
 
