@@ -16,11 +16,15 @@ DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 if DEBUG:
     load_dotenv()
 
-# FIX 1: READ FROM ENV FOR RENDER
-ALLOWED_HOSTS = [host.strip() for host in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')]
+# FIX 1: HARDCODE HOSTS SO RENDER CAN'T MESS IT UP
+ALLOWED_HOSTS = ['hello-fly-014e.onrender.com', 'hello-fly-o14e.onrender.com', 'localhost', '127.0.0.1']
 
-# FIX 2: READ CSRF FROM ENV TOO
-CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://localhost:8000,http://127.0.0.1:8000').split(',')]
+# FIX 2: HARDCODE CSRF TOO
+CSRF_TRUSTED_ORIGINS = ['https://hello-fly-014e.onrender.com', 'https://hello-fly-o14e.onrender.com']
+
+# FIX 3: TELL DJANGO RENDER IS A PROXY
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 AUTH_USER_MODEL = 'lendogo.User'
 
@@ -138,14 +142,17 @@ LOGOUT_REDIRECT_URL = '/accounts/login/'
 DATA_UPLOAD_MAX_MEMORY_SIZE = 31457280
 FILE_UPLOAD_MAX_MEMORY_SIZE = 31457280
 
-# SECURITY SETTINGS FOR PRODUCTION
-SECURE_CONTENT_TYPE_NOSNIFF = True
-SECURE_BROWSER_XSS_FILTER = True
-X_FRAME_OPTIONS = 'DENY'
-CSRF_COOKIE_SECURE = True
-SESSION_COOKIE_SECURE = True
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-CSRF_COOKIE_SAMESITE = 'Lax'
-SESSION_COOKIE_SAMESITE = 'Lax'
+# FIX 4: ONLY MAKE COOKIES SECURE IN PRODUCTION
+if not DEBUG:
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_BROWSER_XSS_FILTER = True
+    X_FRAME_OPTIONS = 'DENY'
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_SAMESITE = 'Lax'
+else:
+    CSRF_COOKIE_SECURE = False
+    SESSION_COOKIE_SECURE = False
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
