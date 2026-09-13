@@ -114,6 +114,16 @@
                 <small class="text-muted">Add it to reset password via Gmail</small>
               </div>
 
+              <!-- ADDED: Phone Number - Optional -->
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Phone Number <span class="text-muted fw-normal">(optional)</span></label>
+                {{ form.phone_number }}
+                {% if form.phone_number.errors %}
+                  <div class="text-danger small mt-1">{{ form.phone_number.errors }}</div>
+                {% endif %}
+                <small class="text-muted">e.g. 0991234567 for SMS/WhatsApp/Airtel Money</small>
+              </div>
+
               <div class="mb-3">
                 <label class="form-label fw-semibold">Password</label>
                 {{ form.password1 }}
