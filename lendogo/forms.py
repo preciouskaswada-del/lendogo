@@ -19,7 +19,6 @@ ALLOWED_IMAGE_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
 MW_PHONE_REGEX = re.compile(r'^(\+265|0)[89]\d{8}$')
 DANGEROUS_CHARS = re.compile(r'[<>"\'%;(){}]')
 
-
 class ListingForm(forms.ModelForm):
     price = forms.CharField(
         max_length=25,
@@ -60,8 +59,8 @@ class ListingForm(forms.ModelForm):
             }),
             'latitude': forms.HiddenInput(),
             'longitude': forms.HiddenInput(),
-            'video': forms.URLInput(attrs={ 
-                'class': 'd-none' 
+            'video': forms.URLInput(attrs={
+                'class': 'd-none'
             })
         }
 
@@ -155,10 +154,9 @@ class ListingForm(forms.ModelForm):
                 raise ValidationError("Invalid longitude")
         return lng
 
-
 class ListingImageForm(forms.ModelForm):
     image = forms.CharField(required=False, widget=forms.HiddenInput())
-    
+
     class Meta:
         model = ListingImage
         fields = ['image']
@@ -168,7 +166,6 @@ class ListingImageForm(forms.ModelForm):
         if not image:
             return None
         return image
-
 
 class SignUpForm(UserCreationForm):
     email = forms.EmailField(
@@ -180,9 +177,20 @@ class SignUpForm(UserCreationForm):
         help_text="Optional. Add it to reset password via Gmail."
     )
 
+    # ADDED: phone_number field to match User model
+    phone_number = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'w-full p-2 border rounded',
+            'placeholder': 'e.g. 0991234567 - Optional',
+            'inputmode': 'tel'
+        }),
+        help_text="Optional. +265991234567 for SMS/WhatsApp/Airtel Money"
+    )
+
     class Meta:
         model = User
-        fields = ['username', 'email', 'password1', 'password2']
+        fields = ['username', 'email', 'phone_number', 'password1', 'password2'] # ADDED phone_number
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -202,6 +210,18 @@ class SignUpForm(UserCreationForm):
             raise ValidationError("Email already registered")
         return email or ''
 
+    # ADDED: clean phone to convert empty to None and format MW numbers
+    def clean_phone_number(self):
+        phone = str(self.cleaned_data.get('phone_number', '')).strip()
+        phone = re.sub(r'[\s\-\(\)]', '', phone)
+        if not phone:
+            return None
+        if not MW_PHONE_REGEX.match(phone):
+            raise ValidationError("Use: +265991234567 or 0991234567 or 0881234567")
+        if phone.startswith('0'):
+            phone = '+265' + phone[1:]
+        return phone
+
     def clean_username(self):
         username = self.cleaned_data.get('username', '').strip()
         if DANGEROUS_CHARS.search(username):
@@ -209,7 +229,6 @@ class SignUpForm(UserCreationForm):
         if len(username) < 3:
             raise ValidationError("Username too short. Min 3 characters.")
         return username
-
 
 class RentalListingForm(forms.ModelForm):
     price = forms.CharField(
@@ -342,7 +361,6 @@ class RentalListingForm(forms.ModelForm):
                 raise ValidationError("Cannot verify image. File may be corrupted.")
             image.name = re.sub(r'[^a-zA-Z0-9._-]', '', image.name)[:100]
         return image
-
 
 # FINAL FIX: validate_min=False so empty forms don't throw errors
 ImageFormSet = inlineformset_factory(
